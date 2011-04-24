@@ -3,7 +3,7 @@
 
 #define EEPG_FILE_EQUIV "eepg.equiv"
 
-#define MAX_THEMES 2046 //this should always be >=256, or Nagra will go wrong!! and must be over ~ 600 for MHW2
+#define MAX_THEMES 256 //this should always be >=256, or Nagra will go wrong!!
 #define MAX_CHANNELS 2048
 #define MAX_TITLES 262144
 
@@ -21,8 +21,8 @@
 #define NAGRA 		6
 #define HIGHEST_FORMAT 	6 //the highest number of EPG-formats that is supported by this plugin
 
-#define NAGRA_TABLE_ID  	0x60 //the lower the table Id, the more "current" it is; table_id 0x00 never gets overwritten, now/next are at 0x4e or 0x4f!
-#define DEFAULT_TABLE_ID 	0x30
+#define NAGRA_TABLE_ID  	0x55 //the lower the table Id, the more "current" it is; table_id 0x00 never gets overwritten, now/next are at 0x4e or 0x4f!
+#define DEFAULT_TABLE_ID 	0x60
 
 const char *FormatName[]= {"Premiere","FreeView","MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide"};
 
@@ -40,7 +40,7 @@ typedef struct
   unsigned short int ChannelId;
   unsigned short int SkyNumber;
   unsigned short int NumberOfEquivalences;//original channel sets this value to 1, every equivalent channel adds 1
-  unsigned int Src[MAX_EQUIVALENCES];
+  unsigned short int Src[MAX_EQUIVALENCES];
   unsigned short int Nid[MAX_EQUIVALENCES];
   unsigned short int Tid[MAX_EQUIVALENCES];
   unsigned short int Sid[MAX_EQUIVALENCES];
@@ -59,7 +59,6 @@ typedef struct {
   unsigned char Unknown1;//FIXME
   unsigned char Unknown2;//FIXME
   unsigned char Unknown3;//FIXME
-  unsigned char Rating;
 } Title_t;
 
 typedef struct {

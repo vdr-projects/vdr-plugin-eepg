@@ -1,3 +1,11 @@
+Release 0.0.5:
+-changed TableId's so that Now/Next overwrites Nagra which overwrites MHW
+
+
+Release 0.0.4:
+-fixed changed format MHW1 that CDNL temporarily broadcasted, but has reversed after a lot of complaints
+-now first loading NagraGuide, not loading MHW if present on same stream (CDNL)
+
 Release 0.0.3:
 -fixed undefined symbol error when not using NO_EPG patch
 -declare Nagra-events that have day-of-the month in the period between today-7days and yesterday as "old events"; some providers keep sending old eepg data that otherways are presented as next months'
