@@ -35,12 +35,13 @@
 #include <vdr/config.h>
 #include <libsi/section.h>
 #include <libsi/descriptor.h>
+#include <libsi/si.h>
 #include "eepg.h"
 
 #include <map>
-#include "../../../libsi/si.c"
+//#include "../../../libsi/si.c"
 
-#define VERBOSE 1
+#define VERBOSE 0
 /* 0 = only print errors, 1 = print channels and themes, 2 = print channels, themes, titles, summaries 3 = debug mode */
 /* all is logged into /var/log/syslog */
 
@@ -554,19 +555,16 @@ void decodeText2 (const unsigned char *from, int len, char *buffer, int size)
 //   const unsigned char *from=data.getData(0);
       char *to = buffer;
 //   int len=getLength();
-      if (len < 0 || len >= size)
-      {
+  if (len < 0 || len >= size){
 	strncpy (buffer, "text error", size);
 	buffer[size - 1] = 0;
 	return;
       }
-      if (len <= 0)
-      {
+  if (len <= 0){
 	*to = '\0';
 	return;
       }
       bool singleByte;
-
 
       if (from[0] == 0x1f) {
 	char *temp = freesat_huffman_decode (from, len);
@@ -600,7 +598,7 @@ void decodeText2 (const unsigned char *from, int len, char *buffer, int size)
 	  break;
       }
       *to = '\0';
-      if (!singleByte || !SI::SystemCharacterTableIsSingleByte) {
+  if (!singleByte || !SI::systemCharacterTableIsSingleByte()) {
 	char convBuffer[size];
 	if (SI::convertCharacterTable (buffer, strlen (buffer), convBuffer, sizeof (convBuffer), cs))
 	  strncpy (buffer, convBuffer, strlen (convBuffer) + 1);
@@ -677,7 +675,7 @@ void CleanString (unsigned char *String)
       *Src = 0xac;
     }
 
-    if (*Src < 0x20) {
+    if (*Src!=0x0A &&  *Src < 0x20) { //don't remove newline 
       *Src = 0x20;
     }
     if (*Src == 0x20) {
@@ -1072,8 +1070,8 @@ void cFilterEEPG::LoadEquivalentChannels (void)
 			nEquivChannels++;
 			if (VERBOSE >= 3)
 			  isyslog
-			    ("EEPG: Added equivalent nr %i with Channel Id %s-%i-%i-%i to channel with id %i.",
-			     C->NumberOfEquivalences, *cSource::ToString (C->Src[C->NumberOfEquivalences-1]),
+			    ("EEPG: Added equivalent nr %i with Channel Id %i %s-%i-%i-%i to channel with id %i.",
+			     C->NumberOfEquivalences, C->Src[C->NumberOfEquivalences-1], *cSource::ToString (C->Src[C->NumberOfEquivalences-1]),
 			     C->Nid[C->NumberOfEquivalences-1], C->Tid[C->NumberOfEquivalences-1],
 			     C->Sid[C->NumberOfEquivalences-1], i);
 		      }
@@ -1275,25 +1273,18 @@ int cFilterEEPG::GetThemesMHW2 (const u_char * Data, int Length)	//return code 0
 		    return 0;	//fatal error
 		}
 		if ((lenThemeName + 2) < 256) {
-		  int tlenThemeName=lenThemeName; //lenThemeName is equal for all subThemes
 		  decodeText2(&Data[pThemeName],lenThemeName,(char*)Themes[pThemeId],256);
 		  //memcpy (Themes[pThemeId], &Data[pThemeName], lenThemeName);
 		  if (Length >= (pSubThemeName + lenSubThemeName))
 		    if (lenSubThemeName > 0)
 		      if ((lenThemeName + lenSubThemeName + 2) < 256) {
-			for(int i=lenThemeName-1;i<256;i++) {
-				if(Themes[pThemeId][i]==0) {
-					tlenThemeName=i;
-					break;
-				}
-			}
-			Themes[pThemeId][tlenThemeName] = ' ';
-			decodeText2(&Data[pSubThemeName],lenSubThemeName,(char*)&Themes[pThemeId][tlenThemeName + 1],256-1-tlenThemeName);
+			Themes[pThemeId][lenThemeName] = ' ';
+			decodeText2(&Data[pSubThemeName],lenSubThemeName,(char*)&Themes[pThemeId][lenThemeName + 1],256);
 			//memcpy (&Themes[pThemeId][lenThemeName + 1], &Data[pSubThemeName], lenSubThemeName);
 		      }
 		  CleanString (Themes[pThemeId]);
 		  if (VERBOSE >= 1)
-		    isyslog ("%.*s", tlenThemeName + 1 + lenSubThemeName, Themes[pThemeId]);
+		    isyslog ("%.*s", lenThemeName + 1 + lenSubThemeName, Themes[pThemeId]);
 		  //isyslog ("%.15s", (lThemes + pThemeId)->Name);
 		  nThemes++;
 		  if (nThemes > MAX_THEMES) {
@@ -1513,7 +1504,9 @@ void cFilterEEPG::WriteToSchedule (cSchedule * ps[MAX_EQUIVALENCES], unsigned sh
 	Event->SetVersion (Version);	//TODO use version and tableID to decide whether to update; TODO add language code
 	Event->SetStartTime (StartTime);
 	Event->SetDuration (Duration * 60);
+	if (Rating){
 	Event->SetParentalRating(Rating);
+	}
 	char *tmp;
 	if (Text != 0x00) {
 	  WrittenTitle = true;
@@ -1525,7 +1518,7 @@ void cFilterEEPG::WriteToSchedule (cSchedule * ps[MAX_EQUIVALENCES], unsigned sh
 	//strreplace(t, '|', '\n');
 	if (SummText != 0x00) {
 	  WrittenSummary = true;
-	  CleanString ((uchar *) SummText);
+	  //CleanString ((uchar *) SummText);
 	  Event->SetDescription (SummText);
 	}
 	free (tmp);
@@ -1696,7 +1689,7 @@ int cFilterEEPG::GetThemesNagra (const u_char * Data, int Length, unsigned short
     int Textlength = *p;
     p++;			//skip textlength byte
     u_char *Text = p;
-    u_char ThemeId;
+    u_char ThemeId =0;
     p += Textlength;		//skip text
     int NrOfBlocks = (*p << 8) | *(p + 1);
     p += 2;			//skip nrofblocks
@@ -2270,7 +2263,7 @@ int cFilterEEPG::GetSummariesMHW2 (const u_char * Data, int Length)	//return cod
 	S->EventId = (Data[3] << 8) | Data[4];
 	unsigned char tmp[4096];	//TODO do this smarter
 	memcpy (tmp, &Data[Pos], lenText);
-	tmp[SummaryLength] = '|';
+	tmp[SummaryLength] = '\n';
 	SummaryLength += 1;
 	Pos += (lenText + 1);
 	if (Loop > 0) {
@@ -2281,7 +2274,7 @@ int cFilterEEPG::GetSummariesMHW2 (const u_char * Data, int Length)	//return cod
 	      memcpy (&tmp[SummaryLength], &Data[Pos], lenText);
 	      SummaryLength += lenText;
 	      if (Loop > 1) {
-		tmp[SummaryLength] = '|';
+		tmp[SummaryLength] = '\n';
 		SummaryLength += 1;
 	      }
 	    }
@@ -2463,19 +2456,19 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)	//return code
 	  int quality = Data[p + 7];
 	  switch (Data[p + 8] & 0x0F){
 	  case 0x01:
-	    T->Rating = 0x01; //"U"
+	    T->Rating = 0x00; //"U"
 	    break;
 	  case 0x02:
-	    T->Rating = 0x05; //"PG"
+	    T->Rating = 0x08; //"PG"
 	    break;
 	  case 0x03:
-	    T->Rating = 0x09; //"12"
+	    T->Rating = 0x0C; //"12"
 	    break;
 	  case 0x04:
-	    T->Rating = 0x0C; //"15"
+	    T->Rating = 0x0F; //"15"
 	    break;
 	  case 0x05:
-	    T->Rating = 0x0F; //"18"
+	    T->Rating = 0x12; //"18"
 	    break;
 	  default:
 	    T->Rating = 0x00; //"-"
@@ -2687,7 +2680,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
 	  PrepareToWriteToSchedule (C, s, p);
           
       char rating = 0x00;
-	  if (T->Rating){
+	  if ((Format == SKY_IT || Format == SKY_UK) &&  T->Rating){ //TODO only works on OTV for now
 	    rating = T->Rating;
 	  }
 
@@ -2730,7 +2723,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
 	  cSchedule *p[MAX_EQUIVALENCES];
 	  PrepareToWriteToSchedule (C, s, p);
       char rating = 0x00;
-	  if (T->Rating){
+	  if ((Format == SKY_IT || Format == SKY_UK) &&  T->Rating){ //TODO only works on OTV for now
 	    rating = T->Rating;
 	  }
 	  WriteToSchedule (p, C->NumberOfEquivalences, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
@@ -3032,9 +3025,38 @@ extern bool SystemCharacterTableIsSingleByte;*/
 	    }
 	  }
 	  break;
-	case SI::ContentDescriptorTag:
+	case SI::ContentDescriptorTag:{
+	  SI::ContentDescriptor *cd = (SI::ContentDescriptor *)d;
+	  SI::ContentDescriptor::Nibble Nibble;
+	  int NumContents = 0;
+	  uchar Contents[MaxEventContents] = { 0 };
+	  for (SI::Loop::Iterator it3; cd->nibbleLoop.getNext(Nibble, it3); ) {
+	    if (NumContents < MaxEventContents) {
+	      Contents[NumContents] = ((Nibble.getContentNibbleLevel1() & 0xF) << 4) | (Nibble.getContentNibbleLevel2() & 0xF);
+	      NumContents++;
+	      }
+	   }
+	   pEvent->SetContents(Contents);
+	  }
 	  break;
-	case SI::ParentalRatingDescriptorTag:
+	case SI::ParentalRatingDescriptorTag:{
+	  int LanguagePreferenceRating = -1;
+	  SI::ParentalRatingDescriptor *prd = (SI::ParentalRatingDescriptor *)d;
+	  SI::ParentalRatingDescriptor::Rating Rating;
+	  for (SI::Loop::Iterator it3; prd->ratingLoop.getNext(Rating, it3); ) {
+	    if (I18nIsPreferredLanguage(Setup.EPGLanguages, Rating.languageCode, LanguagePreferenceRating)) {
+	      int ParentalRating = (Rating.getRating() & 0xFF);
+	      switch (ParentalRating) {
+	        case 0x01 ... 0x0F: ParentalRating += 3; break;
+	        case 0x11:          ParentalRating = 10; break;
+	        case 0x12:          ParentalRating = 12; break;
+	        case 0x13:          ParentalRating = 16; break;
+	        default:            ParentalRating = 0;
+	        }
+	        pEvent->SetParentalRating(ParentalRating);
+	      }
+	    }
+	  }
 	  break;
 	case SI::PDCDescriptorTag:{
 	    SI::PDCDescriptor * pd = (SI::PDCDescriptor *) d;
