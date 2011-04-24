@@ -1,3 +1,17 @@
+Release 0.0.6pre:
+- Fix for vdr-1.7.x
+- Fix for OTV formats
+- Fix MHW2 format
+- Fix crash when Themes are less than the size needed for the MHW2. This has also to be completely modified since the current implementation is not best.
+- Added parental rating for SKY since it is provided and handled by vdr-1.7.15
+- Fixed charset 
+- Added viasat support
+- Removed include si.c
+- Changed docodeText2 to use code from vdr which also handles charset override
+- Removed some gotos
+- Added setup option to display message after finish of writing epg
+
+
 Release 0.0.5:
 -changed TableId's so that Now/Next overwrites Nagra which overwrites MHW
 
