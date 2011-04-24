@@ -71,6 +71,7 @@
 static const char *VERSION = "0.0.3";
 static const char *DESCRIPTION = trNOOP ("Parses Extended EPG data");
 
+
 // --- cSetupEEPG -------------------------------------------------------
 
 const char *optPats[] = {
@@ -544,6 +545,66 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
     return uncompressed;
   }
   return NULL;
+}
+
+// originally from libdtv, Copyright Rolf Hakenes <hakenes@hippomi.de>
+//void decodeText2(char *from, char *buffer, int size) {
+void decodeText2 (const unsigned char *from, int len, char *buffer, int size)
+{
+//   const unsigned char *from=data.getData(0);
+      char *to = buffer;
+//   int len=getLength();
+      if (len < 0 || len >= size)
+      {
+	strncpy (buffer, "text error", size);
+	buffer[size - 1] = 0;
+	return;
+      }
+      if (len <= 0)
+      {
+	*to = '\0';
+	return;
+      }
+      bool singleByte;
+
+
+      if (from[0] == 0x1f) {
+	char *temp = freesat_huffman_decode (from, len);
+	if (temp) {
+	  len = strlen (temp);
+	  len = len < size - 1 ? len : size - 1;
+	  strncpy (buffer, temp, len);
+	  buffer[len] = 0;
+	  free (temp);
+	  return;
+	}
+      }
+
+
+      const char *cs = SI::getCharacterTable (from, len, &singleByte);
+      // FIXME Need to make this UTF-8 aware (different control codes).
+      // However, there's yet to be found a broadcaster that actually
+      // uses UTF-8 for the SI data... (kls 2007-06-10)
+      for (int i = 0; i < len; i++) {
+	if (*from == 0)
+	  break;
+	if (((' ' <= *from) && (*from <= '~'))
+	    || (*from == '\n')
+	    || (0xA0 <= *from)
+	  )
+	  *to++ = *from;
+	else if (*from == 0x8A)
+	  *to++ = '\n';
+	from++;
+	if (to - buffer >= size - 1)
+	  break;
+      }
+      *to = '\0';
+      if (!singleByte || !SI::SystemCharacterTableIsSingleByte) {
+	char convBuffer[size];
+	if (SI::convertCharacterTable (buffer, strlen (buffer), convBuffer, sizeof (convBuffer), cs))
+	  strncpy (buffer, convBuffer, strlen (convBuffer) + 1);
+      }
 }
 
 //here all declarations for global variables over all devices
@@ -1087,9 +1148,11 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)	//ret
 	else {			//MHW2
 	  int lenName = Data[pName] & 0x0f;
 	  if (lenName < 256)	//TODO impossible, after & 0x0f lenName is always < 0x0f !!
-	    memcpy (C->Name, &Data[pName + 1], lenName);
+	    decodeText2(&Data[pName+1],lenName,(char*)C->Name,256);
+//	    memcpy (C->Name, &Data[pName + 1], lenName);
 	  else
-	    memcpy (C->Name, &Data[pName + 1], 256);
+	    decodeText2(&Data[pName+1],lenName,(char*)C->Name,256);
+	    //memcpy (C->Name, &Data[pName + 1], 256);
 	  pName += (lenName + 1);
 	}
 	C->NumberOfEquivalences = 1;	//there is always an original channel. every equivalence adds 1
@@ -1212,16 +1275,25 @@ int cFilterEEPG::GetThemesMHW2 (const u_char * Data, int Length)	//return code 0
 		    return 0;	//fatal error
 		}
 		if ((lenThemeName + 2) < 256) {
-		  memcpy (Themes[pThemeId], &Data[pThemeName], lenThemeName);
+		  int tlenThemeName=lenThemeName; //lenThemeName is equal for all subThemes
+		  decodeText2(&Data[pThemeName],lenThemeName,(char*)Themes[pThemeId],256);
+		  //memcpy (Themes[pThemeId], &Data[pThemeName], lenThemeName);
 		  if (Length >= (pSubThemeName + lenSubThemeName))
 		    if (lenSubThemeName > 0)
 		      if ((lenThemeName + lenSubThemeName + 2) < 256) {
-			Themes[pThemeId][lenThemeName] = ' ';
-			memcpy (&Themes[pThemeId][lenThemeName + 1], &Data[pSubThemeName], lenSubThemeName);
+			for(int i=lenThemeName-1;i<256;i++) {
+				if(Themes[pThemeId][i]==0) {
+					tlenThemeName=i;
+					break;
+				}
+			}
+			Themes[pThemeId][tlenThemeName] = ' ';
+			decodeText2(&Data[pSubThemeName],lenSubThemeName,(char*)&Themes[pThemeId][tlenThemeName + 1],256-1-tlenThemeName);
+			//memcpy (&Themes[pThemeId][lenThemeName + 1], &Data[pSubThemeName], lenSubThemeName);
 		      }
 		  CleanString (Themes[pThemeId]);
 		  if (VERBOSE >= 1)
-		    isyslog ("%.*s", lenThemeName + 1 + lenSubThemeName, Themes[pThemeId]);
+		    isyslog ("%.*s", tlenThemeName + 1 + lenSubThemeName, Themes[pThemeId]);
 		  //isyslog ("%.15s", (lThemes + pThemeId)->Name);
 		  nThemes++;
 		  if (nThemes > MAX_THEMES) {
@@ -2055,13 +2127,14 @@ int cFilterEEPG::GetTitlesMHW2 (const u_char * Data, int Length)	//return code 0
 	  + (((((Data[Pos + 3] & 0xf0) >> 4) * 10) + (Data[Pos + 3] & 0x0f)) * 60);
 	T->Duration = (((Data[Pos + 5] << 8) | Data[Pos + 6]) >> 4) * 60;
 	Len = Data[Pos + 7] & 0x3f;
-	T->Text = (unsigned char *) malloc (Len + 1);
+	T->Text = (unsigned char *) malloc (2*Len + 2);
 	if (T->Text == NULL) {
 	  esyslog ("EEPG: Titles memory allocation error.");
 	  return 0;		//fatal error
 	}
-	T->Text[Len] = NULL;	//end string with NULL character
-	memcpy (T->Text, &Data[Pos + 8], Len);
+	//T->Text[Len] = NULL;	//end string with NULL character
+	//memcpy (T->Text, &Data[Pos + 8], Len);
+	decodeText2(&Data[Pos + 8],Len, (char*)T->Text,2*Len + 1);
 	CleanString (T->Text);
 	Pos += Len + 8; // Sub Theme starts here
 	T->ThemeId = ((Data[7] & 0x3f) << 6) | (Data[Pos] & 0x3f);
@@ -2218,13 +2291,14 @@ int cFilterEEPG::GetSummariesMHW2 (const u_char * Data, int Length)	//return cod
 	    Loop--;
 	  }
 	}
-	S->Text = (unsigned char *) malloc (SummaryLength + 1);
-	S->Text[SummaryLength] = NULL;	//end string with NULL character
+	S->Text = (unsigned char *) malloc (2*SummaryLength + 2);
+	//S->Text[SummaryLength] = NULL;	//end string with NULL character
 	if (S->Text == NULL) {
 	  esyslog ("EEPG: Summaries memory allocation error.");
 	  return 0;		//fatal error
 	}
-	memcpy (S->Text, tmp, SummaryLength);
+	decodeText2(tmp,SummaryLength,(char*)S->Text,2*SummaryLength + 1);
+	//memcpy (S->Text, tmp, SummaryLength);
 	CleanString (S->Text);
 	if (VERBOSE >= 3)
 	  isyslog ("EEPG: EventId %04x Summnr %d:%.30s.", S->EventId, nSummaries, S->Text);
@@ -2726,65 +2800,7 @@ extern bool SystemCharacterTableIsSingleByte;*/
     cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const u_char * Data,
 	   bool OnlyRunningStatus = false);
 
-// originally from libdtv, Copyright Rolf Hakenes <hakenes@hippomi.de>
-//void decodeText2(char *from, char *buffer, int size) {
-    void decodeText2 (const unsigned char *from, int len, char *buffer, int size)
-    {
-//   const unsigned char *from=data.getData(0);
-      char *to = buffer;
-//   int len=getLength();
-      if (len < 0 || len >= size)
-      {
-	strncpy (buffer, "text error", size);
-	buffer[size - 1] = 0;
-	return;
-      }
-      if (len <= 0)
-      {
-	*to = '\0';
-	return;
-      }
-      bool singleByte;
 
-
-      if (from[0] == 0x1f) {
-	char *temp = freesat_huffman_decode (from, len);
-	if (temp) {
-	  len = strlen (temp);
-	  len = len < size - 1 ? len : size - 1;
-	  strncpy (buffer, temp, len);
-	  buffer[len] = 0;
-	  free (temp);
-	  return;
-	}
-      }
-
-
-      const char *cs = getCharacterTable (from, len, &singleByte);
-      // FIXME Need to make this UTF-8 aware (different control codes).
-      // However, there's yet to be found a broadcaster that actually
-      // uses UTF-8 for the SI data... (kls 2007-06-10)
-      for (int i = 0; i < len; i++) {
-	if (*from == 0)
-	  break;
-	if (((' ' <= *from) && (*from <= '~'))
-	    || (*from == '\n')
-	    || (0xA0 <= *from)
-	  )
-	  *to++ = *from;
-	else if (*from == 0x8A)
-	  *to++ = '\n';
-	from++;
-	if (to - buffer >= size - 1)
-	  break;
-      }
-      *to = '\0';
-      if (!singleByte || !SystemCharacterTableIsSingleByte) {
-	char convBuffer[size];
-	if (convertCharacterTable (buffer, strlen (buffer), convBuffer, sizeof (convBuffer), cs))
-	  strncpy (buffer, convBuffer, strlen (convBuffer) + 1);
-      }
-    }
 
 #ifdef USE_NOEPG
   private:
@@ -3302,6 +3318,8 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     AddFilter (pid, 0x4e, 0xfe);	//event info, actual(0x4e)/other(0x4f) TS, present/following
     AddFilter (pid, 0x50, 0xf0);	//event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
     AddFilter (pid, 0x60, 0xf0);	//event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
+    AddFilter (0x39, 0x50, 0xf0);	//event info, actual TS, Viasat 
+    AddFilter (0x39, 0x60, 0xf0);	//event info, other  TS, Viasat
   case NAGRA:
     //   isyslog ("EEPG: NagraGuide Extended EPG detected.");
     AddFilter (pid, 0xb0);	//perhaps TID is equal to first data byte?
@@ -3363,6 +3381,10 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
 	    bool prvData = false, usrData = false;
 	    bool prvOTV = false, prvFRV = false;
 	    int usrOTV = 0, usrFRV = 0;
+	    if(data[2]==0x39) {
+		prvFRV = true;
+		usrFRV = 1;
+	    }
 	    //Format = 0;               // 0 = premiere, 1 = MHW1, 2 = MHW2, 3 = Sky Italy (OpenTV), 4 = Sky UK (OpenTV), 5 = Freesat (Freeview), 6 = Nagraguide
 	    SI::Descriptor * d;
 	    for (SI::Loop::Iterator it; (d = stream.streamDescriptors.getNext (it));) {
@@ -3954,7 +3976,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
       // PID found: 3843 (0x0f03)  [SECTION: ATSC reserved] TODO find out what compressed text info is here!
       // PID found: 3844 (0x0f04)  [SECTION: Time Offset Table (TOT)]
 
-      if (Pid == 3842) {
+      if (Pid == 3842 || Pid == 0x39) { //0x39 Viasat
 	cSchedulesLock SchedulesLock (true, 10);
 	cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
 	if (Schedules)
