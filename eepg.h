@@ -3,7 +3,7 @@
 
 #define EEPG_FILE_EQUIV "eepg.equiv"
 
-#define MAX_THEMES 256 //this should always be >=256, or Nagra will go wrong!!
+#define MAX_THEMES 2046 //this should always be >=256, or Nagra will go wrong!! and must be over ~ 600 for MHW2
 #define MAX_CHANNELS 2048
 #define MAX_TITLES 262144
 
@@ -40,7 +40,7 @@ typedef struct
   unsigned short int ChannelId;
   unsigned short int SkyNumber;
   unsigned short int NumberOfEquivalences;//original channel sets this value to 1, every equivalent channel adds 1
-  unsigned short int Src[MAX_EQUIVALENCES];
+  unsigned int Src[MAX_EQUIVALENCES];
   unsigned short int Nid[MAX_EQUIVALENCES];
   unsigned short int Tid[MAX_EQUIVALENCES];
   unsigned short int Sid[MAX_EQUIVALENCES];
@@ -59,6 +59,7 @@ typedef struct {
   unsigned char Unknown1;//FIXME
   unsigned char Unknown2;//FIXME
   unsigned char Unknown3;//FIXME
+  unsigned char Rating;
 } Title_t;
 
 typedef struct {
