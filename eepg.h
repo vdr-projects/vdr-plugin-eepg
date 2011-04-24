@@ -22,7 +22,7 @@
 #define HIGHEST_FORMAT 	6 //the highest number of EPG-formats that is supported by this plugin
 
 #define NAGRA_TABLE_ID  	0x55 //the lower the table Id, the more "current" it is; table_id 0x00 never gets overwritten, now/next are at 0x4e or 0x4f!
-#define DEFAULT_TABLE_ID 	0x60
+#define DEFAULT_TABLE_ID 	0x30
 
 const char *FormatName[]= {"Premiere","FreeView","MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide"};
 
