@@ -635,20 +635,36 @@ void CleanString (unsigned char *String)
   }
 }
 
+// int aSprintF (char **strp, const char *fmt, const char *str1, const char *str2) {
+	// int ret = asprintf (&FileName, "%s/%s", ConfDir, "sky_uk.themes");
+	// if (ret < 0) {
+    // esyslog ("EEPG: Error, not enough memory to create string %s ...", str1);
+  // }
+  // return ret;
+// }
+
 bool cFilterEEPG::GetThemesSKYBOX (void)  	//TODO can't we read this from the DVB stream?
 {
   char *FileName;
   FILE *FileThemes;
   char *Line;
   char Buffer[256];
+  const char *themeFilename;
+
   if (Format == SKY_IT)
-    asprintf (&FileName, "%s/%s", ConfDir, "sky_it.themes");
+    themeFilename = "sky_it.themes";
   else if (Format == SKY_UK)
-    asprintf (&FileName, "%s/%s", ConfDir, "sky_uk.themes");
+    themeFilename = "sky_uk.themes";
   else {
     esyslog ("EEPG: Error, wrong format detected in GetThemesSKYBOX. Format = %i.", Format);
     return false;
   }
+
+  if (asprintf (&FileName, "%s/%s", ConfDir, themeFilename) < 0) {
+    esyslog ("EEPG: Error, not enough memory to create filename");
+    return false;
+  }
+
   //asprintf( &FileName, "%s/%s", ConfDir, ( lProviders + CurrentProvider )->Parm3 );
   FileThemes = fopen (FileName, "r");
   if (FileThemes == NULL) {
@@ -962,7 +978,7 @@ void cFilterEEPG::LoadEquivalentChannels (void)
                 tChannelID OriginalChID = tChannelID (cSource::FromString (string3), int1, int2, int3, int4);
                 bool found = false;
                 int i = 0;
-                sChannel *C;
+                sChannel *C = NULL;
                 while (i < nChannels && (!found)) {
                   C = &sChannels[i];
                   if (C->Src[0] == cSource::FromString (string3) && C->Nid[0] == int1
