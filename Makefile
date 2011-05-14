@@ -31,7 +31,7 @@ VERSION = $(shell grep 'static const char \*VERSION *=' $(PLUGIN).c | awk '{ pri
 ### The C++ compiler and options:
 
 CXX      ?= g++
-CXXFLAGS ?= -O2 -fPIC -Wall -Woverloaded-virtual -Wno-unused-result
+CXXFLAGS ?= -O2 -fPIC -Wall -Woverloaded-virtual
 
 ### The directory environment:
 
@@ -42,6 +42,7 @@ TMPDIR = /tmp
 ### Allow user defined options to overwrite defaults:
 
 -include $(VDRDIR)/Make.config
+-include Make.config
 
 ### The version number of VDR (taken from VDR's "config.h"):
 

@@ -1,4 +1,4 @@
-#define DEBUG false
+//#define DEBUG false
 //#define DEBUG_STARTTIME false
 
 #define EEPG_FILE_EQUIV "eepg.equiv"
@@ -60,6 +60,7 @@ typedef struct {
   unsigned char Unknown2;//FIXME
   unsigned char Unknown3;//FIXME
   unsigned char Rating;
+  unsigned short int TableId;
 } Title_t;
 
 typedef struct {
