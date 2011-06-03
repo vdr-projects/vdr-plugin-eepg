@@ -40,6 +40,7 @@
 
 #include <map>
 #include <string>
+#include <stdarg.h>
 
 #define VERBOSE 1
 /* 0 = only print errors, 1 = print channels and themes, 2 = print channels, themes, titles, summaries 3 = debug mode */
@@ -2587,7 +2588,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
       if (!foundtitle)		//no more titles with summaries
         break;			//TODO: does this work???
       if ((T->EventId == S->EventId) && (T->MjdTime == S->Replays[0].MjdTime) && ((T->ChannelId == S->Replays[0].ChannelId) || ((Format != SKY_IT) && (Format != SKY_UK)))) {	//should always be true, titles and summaries are broadcasted in order...
-        isyslog("T->EventId == S->EventId");
+        LogD(3, prep("T->EventId == S->EventId"));
         //MjdTime = 0 for all but SKY
         //S->ChannelId must be equal to T->ChannelId only for SKY; in MHW1 S->ChannelId overrides T->ChannelId when NumReplays > 1
         remembersummary = -1;	//reset summary searcher
@@ -2955,6 +2956,7 @@ cEIT2::cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const 
         }
       }
       break;
+#if APIVERSNUM > 10711
       case SI::ContentDescriptorTag: {
         SI::ContentDescriptor *cd = (SI::ContentDescriptor *)d;
         SI::ContentDescriptor::Nibble Nibble;
@@ -2969,6 +2971,7 @@ cEIT2::cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const 
         pEvent->SetContents(Contents);
       }
       break;
+#endif
       case SI::ParentalRatingDescriptorTag: {
         int LanguagePreferenceRating = -1;
         SI::ParentalRatingDescriptor *prd = (SI::ParentalRatingDescriptor *)d;
