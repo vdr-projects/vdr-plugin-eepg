@@ -2999,6 +2999,7 @@ extern bool SystemCharacterTableIsSingleByte;*/
 	    }
 	  }
 	  break;
+#if APIVERSNUM > 10711
 	case SI::ContentDescriptorTag:{
 	  SI::ContentDescriptor *cd = (SI::ContentDescriptor *)d;
 	  SI::ContentDescriptor::Nibble Nibble;
@@ -3013,6 +3014,7 @@ extern bool SystemCharacterTableIsSingleByte;*/
 	   pEvent->SetContents(Contents);
 	  }
 	  break;
+#endif
 	case SI::ParentalRatingDescriptorTag:{
 	  int LanguagePreferenceRating = -1;
 	  SI::ParentalRatingDescriptor *prd = (SI::ParentalRatingDescriptor *)d;
