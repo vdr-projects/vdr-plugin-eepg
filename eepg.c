@@ -2617,7 +2617,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
           }
           unsigned short int TableId = DEFAULT_TABLE_ID;
           if (T->TableId) {
-            TableId = TableId;
+            TableId = T->TableId;
           }
 
           WriteToSchedule (p, C->NumberOfEquivalences, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
