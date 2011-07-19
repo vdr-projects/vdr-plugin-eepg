@@ -3478,6 +3478,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
           cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
           if (Schedules) {
             int nCount = 0;
+            int nRating = 0;
             SI::ExtendedEventDescriptors * ExtendedEventDescriptors = 0;
             SI::ShortEventDescriptor * ShortEventDescriptor = 0;
             char *order = 0, *rating = 0;
@@ -3516,8 +3517,8 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                     char buff[512];
                     int p = 0;
                     const unsigned char *data = d->getData ().getData () + 2;
-                    p +=
-                      snprintf (&buff[p], sizeof (buff) - p, "\n%s: %d %s", tr ("Rating"), data[0] + 3, tr ("years"));
+                    nRating = data[0] + 3;
+                    p += snprintf (&buff[p], sizeof (buff) - p, "\n%s: %d %s", tr ("Rating"), nRating, tr ("years"));
                     data += 7;
                     int l = data[0];
                     if (l > 0)
@@ -3704,8 +3705,10 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                       buffer[0] = 0;
                       if (pEvent->Description ())
                         strcat (buffer, pEvent->Description ());
-                      if (rating)
+                      if (rating) {
                         strcat (buffer, rating);
+                        pEvent->SetParentalRating(nRating);
+                      }
                       if (order)
                         strcat (buffer, order);
                       pEvent->SetDescription (buffer);
