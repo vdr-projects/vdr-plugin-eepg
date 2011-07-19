@@ -331,7 +331,7 @@ bool cFilterEEPG::allowedEPG (tChannelID kanalID)
  */
 
 #ifndef FREEVIEW_NO_SYSLOG
-#include "../tools.h"
+#include <vdr/tools.h>
 /* Logging via vdr */
 #ifndef isyslog
 #define isyslog(a...) void( (SysLogLevel > 1) ? syslog_with_tid(LOG_INFO,  a) : void() )
@@ -939,6 +939,18 @@ nextloop1:
 }
 
 void decodeText2 (const unsigned char *from, int len, char *buffer, int buffsize) {
+
+  if (from[0] == 0x1f) {
+    char *temp = freesat_huffman_decode (from, len);
+    if (temp) {
+      len = strlen (temp);
+      len = len < buffsize - 1 ? len : buffsize - 1;
+      strncpy (buffer, temp, len);
+      buffer[len] = 0;
+      free (temp);
+      return;
+    }
+  }
 
   SI::String convStr;
   SI::CharArray charArray;
@@ -2766,7 +2778,7 @@ extern bool SystemCharacterTableIsSingleByte;*/
   class cEIT2:public SI::EIT
   {
   public:
-    cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const u_char * Data,
+    cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data,
 	   bool OnlyRunningStatus = false);
 
 #ifdef USE_NOEPG
@@ -2795,7 +2807,7 @@ extern bool SystemCharacterTableIsSingleByte;*/
   }
 #endif /* NOEPG */
 
-  cEIT2::cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus)
+  cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus)
 :  SI::EIT (Data, false) {
     if (!CheckCRCAndParse ())
       return;
