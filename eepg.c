@@ -403,7 +403,7 @@ bool cFilterEEPG::allowedEPG (tChannelID kanalID)
  */
 
 #ifndef FREEVIEW_NO_SYSLOG
-#include "../tools.h"
+#include <vdr/tools.h>
 /* Logging via vdr */
 #ifndef isyslog
 #define isyslog(a...) void( (SysLogLevel > 1) ? syslog_with_tid(LOG_INFO,  a) : void() )
@@ -769,6 +769,7 @@ bool cFilterEEPG::ReadFileDictionary (void)
   case FREEVIEW:
     FileName += "/freesat.t1";
     load_file (1, FileName.c_str());
+    FileName = ConfDir;
     FileName += "/freesat.t2";
     load_file (2, FileName.c_str());
     break;
@@ -986,6 +987,17 @@ nextloop1:
 
 void decodeText2 (const unsigned char *from, int len, char *buffer, int buffsize)
 {
+  if (from[0] == 0x1f) {
+    char *temp = freesat_huffman_decode (from, len);
+    if (temp) {
+    len = strlen (temp);
+    len = len < buffsize - 1 ? len : buffsize - 1;
+    strncpy (buffer, temp, len);
+    buffer[len] = 0;
+    free (temp);
+    return;
+    }
+  }
 
   SI::String convStr;
   SI::CharArray charArray;
@@ -2725,7 +2737,7 @@ extern bool SystemCharacterTableIsSingleByte;*/
 class cEIT2:public SI::EIT
 {
 public:
-  cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const u_char * Data,
+  cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data,
          bool OnlyRunningStatus = false);
 
 #ifdef USE_NOEPG
@@ -2753,7 +2765,7 @@ bool cEIT2::allowedEPG (tChannelID kanalID)
 }
 #endif /* NOEPG */
 
-cEIT2::cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus)
+cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus)
     :  SI::EIT (Data, false)
 {
   if (!CheckCRCAndParse ())
@@ -3078,7 +3090,8 @@ cEIT2::cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const 
         SI::ComponentDescriptor * cd = (SI::ComponentDescriptor *) d;
         uchar Stream = cd->getStreamContent ();
         uchar Type = cd->getComponentType ();
-        if (1 <= Stream && Stream <= 3 && Type != 0) {	// 1=video, 2=audio, 3=subtitles
+        //if (1 <= Stream && Stream <= 3 && Type != 0) {	// 1=video, 2=audio, 3=subtitles
+        if (1 <= Stream && Stream <= 6 && Type != 0) { // 1=MPEG2-video, 2=MPEG1-audio, 3=subtitles, 4=AC3-audio, 5=H.264-video, 6=HEAAC-audio
           if (!Components)
             Components = new cComponents;
           char buffer[Utf8BufSize (256)];
@@ -3089,7 +3102,7 @@ cEIT2::cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const 
       }
       break;
       default:
-        ;
+        break;
       }
       delete d;
     }
@@ -3097,14 +3110,16 @@ cEIT2::cEIT2 (cSchedules::cSchedules * Schedules, int Source, u_char Tid, const 
     if (!rEvent) {
       if (ShortEventDescriptor) {
         char buffer[Utf8BufSize (256)];
-        unsigned char *f;
-        int l = ShortEventDescriptor->name.getLength ();
-        f = (unsigned char *) ShortEventDescriptor->name.getData ().getData ();
-        decodeText2 (f, l, buffer, sizeof (buffer));
+        //unsigned char *f;
+        //int l = ShortEventDescriptor->name.getLength ();
+        //f = (unsigned char *) ShortEventDescriptor->name.getText();
+        //decodeText2 (f, l, buffer, sizeof (buffer));
+        ShortEventDescriptor->name.getText(buffer, sizeof(buffer));
         pEvent->SetTitle (buffer);
-        l = ShortEventDescriptor->text.getLength ();
-        f = (unsigned char *) ShortEventDescriptor->text.getData ().getData ();
-        decodeText2 (f, l, buffer, sizeof (buffer));
+        //l = ShortEventDescriptor->text.getLength ();
+        //f = (unsigned char *) ShortEventDescriptor->text.getText();
+        //decodeText2 (f, l, buffer, sizeof (buffer));
+        ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
         pEvent->SetShortText (buffer);
       } else if (!HasExternalData) {
         pEvent->SetTitle (NULL);
@@ -3299,6 +3314,7 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
   case NAGRA:
     //   isyslog ("EEPG: NagraGuide Extended EPG detected.");
     AddFilter (pid, 0xb0);	//perhaps TID is equal to first data byte?
+    break;
   default:
     break;
   }
