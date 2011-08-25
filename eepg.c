@@ -3186,16 +3186,16 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     if (!rEvent) {
       if (ShortEventDescriptor) {
         char buffer[Utf8BufSize (256)];
-        //unsigned char *f;
-        //int l = ShortEventDescriptor->name.getLength ();
-        //f = (unsigned char *) ShortEventDescriptor->name.getText();
-        //decodeText2 (f, l, buffer, sizeof (buffer));
-        ShortEventDescriptor->name.getText(buffer, sizeof(buffer));
+        unsigned char *f;
+        int l = ShortEventDescriptor->name.getLength ();
+        f = (unsigned char *) ShortEventDescriptor->name.getText();
+        decodeText2 (f, l, buffer, sizeof (buffer));
+        //ShortEventDescriptor->name.getText(buffer, sizeof(buffer));
         pEvent->SetTitle (buffer);
-        //l = ShortEventDescriptor->text.getLength ();
-        //f = (unsigned char *) ShortEventDescriptor->text.getText();
-        //decodeText2 (f, l, buffer, sizeof (buffer));
-        ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
+        l = ShortEventDescriptor->text.getLength ();
+        f = (unsigned char *) ShortEventDescriptor->text.getText();
+        decodeText2 (f, l, buffer, sizeof (buffer));
+        //ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
         pEvent->SetShortText (buffer);
       } else if (!HasExternalData) {
         pEvent->SetTitle (NULL);
