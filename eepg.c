@@ -3188,12 +3188,12 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         char buffer[Utf8BufSize (256)];
         unsigned char *f;
         int l = ShortEventDescriptor->name.getLength ();
-        f = (unsigned char *) ShortEventDescriptor->name.getText();
+        f = (unsigned char *) ShortEventDescriptor->name.getData().getData();
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->name.getText(buffer, sizeof(buffer));
         pEvent->SetTitle (buffer);
         l = ShortEventDescriptor->text.getLength ();
-        f = (unsigned char *) ShortEventDescriptor->text.getText();
+        f = (unsigned char *) ShortEventDescriptor->text.getData().getData();
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
         pEvent->SetShortText (buffer);
@@ -3387,6 +3387,7 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
     AddFilter (0x39, 0x50, 0xf0); //event info, actual TS, Viasat
     AddFilter (0x39, 0x60, 0xf0); //event info, other  TS, Viasat
+    break;
   case NAGRA:
     //   isyslog ("EEPG: NagraGuide Extended EPG detected.");
     AddFilter (pid, 0xb0); //perhaps TID is equal to first data byte?
