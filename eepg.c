@@ -1145,6 +1145,7 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
           memcpy (C->Name, &Channel->Name, 16); //MHW1
         else {   //MHW2
           int lenName = Data[pName] & 0x0f;
+          LogD (1, prep("EEPGDebug: MHW2 lenName:%d"), lenName);
           if (lenName < 256) //TODO impossible, after & 0x0f lenName is always < 0x0f !!
             decodeText2(&Data[pName+1],lenName,(char*)C->Name,256);
           //memcpy (C->Name, &Data[pName + 1], lenName);
@@ -1236,7 +1237,7 @@ int cFilterEEPG::GetThemesMHW1 (const u_char * Data, int Length)
  */
 int cFilterEEPG::GetThemesMHW2 (const u_char * Data, int Length)
 {
-  if (!EndThemes) { //only proces if not processed
+  if (!EndThemes) { //only process if not processed
     int p1;
     int p2;
     int pThemeName = 0;
@@ -1676,7 +1677,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
   } while (p < DataEnd); //end of TitleBlock
 }
 
-int cFilterEEPG::GetThemesNagra (const u_char * Data, int Length, unsigned short TableIdExtension) //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+int cFilterEEPG::GetThemesNagra (const u_char * Data, int Length, unsigned short TableIdExtension) //return code 0 = fatal error, code 1 = success, code 2 = last item processed
 {
   u_char *DataStart = (u_char *) Data;
   u_char *p = DataStart; //TODO Language code terminated by 0 is ignored
@@ -2807,6 +2808,13 @@ void cFilterEEPG::AddFilter (u_short Pid, u_char Tid, unsigned char Mask)
 
 namespace SI
 {
+  enum DescriptorTagExt {
+    DishRatingDescriptorTag = 0x89,
+    DishShortEventDescriptorTag = 0x91,
+    DishExtendedEventDescriptorTag = 0x92 };
+
+  typedef InheritEnum< DescriptorTagExt, SI::DescriptorTag > ExtendedDescriptorTag;
+
 /*extern const char *getCharacterTable(const unsigned char *&buffer, int &length, bool *isSingleByte = NULL);
 extern bool convertCharacterTable(const char *from, size_t fromLength, char *to, size_t toLength, const char *fromCode);
 extern bool SystemCharacterTableIsSingleByte;*/
@@ -3018,6 +3026,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         continue;
       }
       switch (d->getDescriptorTag ()) {
+      case SI::DishExtendedEventDescriptorTag:
       case SI::ExtendedEventDescriptorTag: {
         SI::ExtendedEventDescriptor * eed = (SI::ExtendedEventDescriptor *) d;
         if (I18nIsPreferredLanguage (Setup.EPGLanguages, eed->languageCode, LanguagePreferenceExt)
@@ -3034,6 +3043,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
           UseExtendedEventDescriptor = false;
       }
       break;
+      case SI::DishShortEventDescriptorTag:
       case SI::ShortEventDescriptorTag: {
         SI::ShortEventDescriptor * sed = (SI::ShortEventDescriptor *) d;
         if (I18nIsPreferredLanguage (Setup.EPGLanguages, sed->languageCode, LanguagePreferenceShort)
@@ -3149,7 +3159,6 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
                 link =
                   Channels.NewChannel (transponder, linkName, "", "", ld->getOriginalNetworkId (),
                                        ld->getTransportStreamId (), ld->getServiceId ());
-                //XXX patFilter->Trigger();
               }
               if (link) {
                 if (!LinkChannels)
@@ -3177,6 +3186,17 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         }
       }
       break;
+      case SI::DishRatingDescriptorTag: {
+        if (d->getLength() == 4) {
+           uint16_t rating = d->getData().TwoBytes(2);
+           uint16_t newRating = (rating >> 10) & 0x07;
+           if (newRating == 0) newRating = 5;
+           if (newRating == 6) newRating = 0;
+           pEvent->SetParentalRating((newRating << 10) | (rating & 0x3FF));
+//           pEvent->SetStarRating((rating >> 13) & 0x07);
+           }
+      }
+      break;
       default:
         break;
       }
@@ -3187,12 +3207,12 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       if (ShortEventDescriptor) {
         char buffer[Utf8BufSize (256)];
         unsigned char *f;
-        int l = ShortEventDescriptor->name.getLength ();
+        int l = ShortEventDescriptor->name.getLength();
         f = (unsigned char *) ShortEventDescriptor->name.getData().getData();
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->name.getText(buffer, sizeof(buffer));
         pEvent->SetTitle (buffer);
-        l = ShortEventDescriptor->text.getLength ();
+        l = ShortEventDescriptor->text.getLength();
         f = (unsigned char *) ShortEventDescriptor->text.getData().getData();
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
@@ -3387,6 +3407,12 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
     AddFilter (0x39, 0x50, 0xf0); //event info, actual TS, Viasat
     AddFilter (0x39, 0x60, 0xf0); //event info, other  TS, Viasat
+
+    AddFilter (0x0300, 0x50, 0xf0); // Dish Network EEPG
+    AddFilter (0x0300, 0x60, 0xf0); // Dish Network EEPG
+    AddFilter (0x0441, 0x50, 0xf0); // Bell ExpressVU EEPG
+    AddFilter (0x0441, 0x60, 0xf0); // Bell ExpressVU EEPG
+
     break;
   case NAGRA:
     //   isyslog ("EEPG: NagraGuide Extended EPG detected.");
@@ -3441,7 +3467,6 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
     if (pmt.CheckCRCAndParse () && pmt.getServiceId () == pmtsid) {
       SI::PMT::Stream stream;
       for (SI::Loop::Iterator it; pmt.streamLoop.getNext (stream, it);) {
-//        if(stream.getStreamType()==0x05) {
         if (stream.getStreamType () == 0x05 || stream.getStreamType () == 0xc1) { //0x05 = Premiere, SKY, Freeview, Nagra 0xc1 = MHW1,MHW2
           SI::CharArray data = stream.getData ();
           if ((data[1] & 0xE0) == 0xE0 && (data[3] & 0xF0) == 0xF0) {
@@ -3451,6 +3476,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             if (data[2]==0x39) {//TODO Test This
               prvFRV = true;
               usrFRV = 1;
+              LogD(1, prep("if (data[2]==0x39) {//TODO Test This"));
             }
             //Format = 0;               // 0 = premiere, 1 = MHW1, 2 = MHW2, 3 = Sky Italy (OpenTV), 4 = Sky UK (OpenTV), 5 = Freesat (Freeview), 6 = Nagraguide
             SI::Descriptor * d;
@@ -3470,7 +3496,6 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                 //if (d->getLength () == 3 && d->getData ().FourBytes (2) == 0xb07ea882) {
                 if (d->getLength () == 3 && ((d->getData ().TwoBytes (2) & 0xff00) == 0xb000))
                   UnprocessedFormat[NAGRA] = stream.getPid ();
-                //int nop;    //FIXME
                 break;
               case 0x90:
                 //esyslog ("usr: %d %08x\n", d->getLength (), d->getData ().FourBytes (2));
@@ -3480,9 +3505,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                   //if (d->getLength () == 3 && (d->getData ().TwoBytes (2) == 0xb6a5))   //SKY IT //TODO ugly!
                   usrOTV = SKY_IT;
                 //Format = SKY_IT;
-
                 if (d->getLength () == 3 && d->getData ().FourBytes (2) == 0xc004e288)       //SKY UK
-                  //if (d->getLength () == 3 && ((d->getData ().TwoBytes (2) & 0xff00) == 0x9d00)) //SKY UK //TODO ugly!
                   usrOTV = SKY_UK;
                 //Format = SKY_UK;
                 break;
@@ -3494,12 +3517,12 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
               case 0xc2: //MHW1, MHW2
                 if (d->getLength () == 10 && d->getData ().FourBytes (2) == 0x45504700) //MHw1 CanDigNL and CSat
                   UnprocessedFormat[MHW1] = stream.getPid ();
-                //int nop;//FIXME
                 else if (d->getLength () == 10 && d->getData ().FourBytes (2) == 0x46494348) { //MHW2
                   UnprocessedFormat[MHW2] = stream.getPid ();
                 }
                 break;
               case 0xd1: //Freeview
+                LogD(1, prep("case 0xd1: //Freeview"));
                 if (d->getLength () == 3 && ((d->getData ().TwoBytes (2) & 0xff00) == 0x0100))
                   usrFRV = 0x01;
                 //01 = EIT pid 3842
@@ -3547,7 +3570,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
   else if (Source ()) {
     int Result;
     switch (Tid) {
-    case 0xA0:
+    case 0xA0: //TODO DPE test this missing break but it seems a bug
       if ((Pid < 0x30) || (Pid > 0x37)) {
         SI::PremiereCIT cit (Data, false);
         if (cit.CheckCRCAndParse ()) {
@@ -4028,7 +4051,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
       // PID found: 3843 (0x0f03)  [SECTION: ATSC reserved] TODO find out what compressed text info is here!
       // PID found: 3844 (0x0f04)  [SECTION: Time Offset Table (TOT)]
 
-      if (Pid == 3842 || Pid ==0x39) {//0x39 Viasat
+      if (Pid == 3842 || Pid == 0x39 || Pid == 0x0300 || Pid == 0x0441 ) {//0x39 Viasat, 0x0300 Dish Network EEPG, 0x0441 Bell ExpressVU EEPG
         cSchedulesLock SchedulesLock (true, 10);
         cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
         if (Schedules)
