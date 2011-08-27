@@ -258,6 +258,26 @@ static int AvailableSources[32];
 static int NumberOfAvailableSources = 0;
 static int LastVersionNagra = -1; //currently only used for Nagra, should be stored per transponder, per system
 
+#ifdef USE_NOEPG
+bool allowedEPG (tChannelID kanalID)
+{
+  bool rc;
+
+  if (Setup.noEPGMode == 1) {
+    rc = false;
+    if (strstr (::Setup.noEPGList, kanalID.ToString ()) != NULL)
+      rc = true;
+  } else {
+    rc = true;
+    if (strstr (::Setup.noEPGList, kanalID.ToString ()) != NULL)
+      rc = false;
+  }
+
+  return rc;
+}
+#endif /* NOEPG */
+
+
 class cFilterEEPG:public cFilter
 {
 private:
@@ -369,25 +389,6 @@ void cFilterEEPG::NextPmt (void)
   LogE(3, prep("PMT next\n"));
 }
 
-//TODO next routine is also in cEIT2, make this simpler
-#ifdef USE_NOEPG
-bool cFilterEEPG::allowedEPG (tChannelID kanalID)
-{
-  bool rc;
-
-  if (Setup.noEPGMode == 1) {
-    rc = false;
-    if (strstr (::Setup.noEPGList, kanalID.ToString ()) != NULL)
-      rc = true;
-  } else {
-    rc = true;
-    if (strstr (::Setup.noEPGList, kanalID.ToString ()) != NULL)
-      rc = false;
-  }
-
-  return rc;
-}
-#endif /* NOEPG */
 
 
 // -------------------  Freesat -------------------
@@ -666,6 +667,9 @@ void GetLocalTimeOffset (void)
 
 void CleanString (unsigned char *String)
 {
+
+  LogD (1, prep("Unclean: %s"), String);
+
   unsigned char *Src;
   unsigned char *Dst;
   int Spaces;
@@ -696,10 +700,10 @@ void CleanString (unsigned char *String)
     }
     if (Spaces < 2) {
       *Dst = *Src;
-      *Dst++;
+      Dst++;
       pC++;
     }
-    *Src++;
+    Src++;
   }
   if (Spaces > 0) {
     Dst--;
@@ -707,6 +711,7 @@ void CleanString (unsigned char *String)
   } else {
     *Dst = 0;
   }
+  LogD (1, prep("Clean: %s"), String);
 }
 
 bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB stream?
@@ -1146,7 +1151,7 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
         else {   //MHW2
           int lenName = Data[pName] & 0x0f;
           //LogD (1, prep("EEPGDebug: MHW2 lenName:%d"), lenName);
-            decodeText2(&Data[pName+1],lenName,(char*)C->Name,256);
+          decodeText2(&Data[pName+1],lenName,(char*)C->Name,256);
           //memcpy (C->Name, &Data[pName + 1], lenName);
           //else
           //memcpy (C->Name, &Data[pName + 1], 256);
@@ -2822,31 +2827,7 @@ class cEIT2:public SI::EIT
 public:
   cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data,
          bool OnlyRunningStatus = false);
-
-#ifdef USE_NOEPG
-private:
-  bool allowedEPG (tChannelID kanalID);
-#endif /* NOEPG */
 };
-
-#ifdef USE_NOEPG
-bool cEIT2::allowedEPG (tChannelID kanalID)
-{
-  bool rc;
-
-  if (Setup.noEPGMode == 1) {
-    rc = false;
-    if (strstr (::Setup.noEPGList, kanalID.ToString ()) != NULL)
-      rc = true;
-  } else {
-    rc = true;
-    if (strstr (::Setup.noEPGList, kanalID.ToString ()) != NULL)
-      rc = false;
-  }
-
-  return rc;
-}
-#endif /* NOEPG */
 
 cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus)
     :  SI::EIT (Data, false)
@@ -3195,7 +3176,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
 //           pEvent->SetStarRating((rating >> 13) & 0x07);
            }
       }
-      break;
+        break;
       default:
         break;
       }
