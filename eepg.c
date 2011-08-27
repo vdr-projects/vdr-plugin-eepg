@@ -42,7 +42,7 @@
 #include <string>
 #include <stdarg.h>
 
-#define VERBOSE 1
+#define VERBOSE 3
 /* 0 = only print errors, 1 = print channels and themes, 2 = print channels, themes, titles, summaries 3 = debug mode */
 /* all is logged into /var/log/syslog */
 
