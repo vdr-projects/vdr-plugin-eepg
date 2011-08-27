@@ -1145,8 +1145,7 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
           memcpy (C->Name, &Channel->Name, 16); //MHW1
         else {   //MHW2
           int lenName = Data[pName] & 0x0f;
-          LogD (1, prep("EEPGDebug: MHW2 lenName:%d"), lenName);
-          if (lenName < 256) //TODO impossible, after & 0x0f lenName is always < 0x0f !!
+          //LogD (1, prep("EEPGDebug: MHW2 lenName:%d"), lenName);
             decodeText2(&Data[pName+1],lenName,(char*)C->Name,256);
           //memcpy (C->Name, &Data[pName + 1], lenName);
           //else
@@ -1214,7 +1213,7 @@ int cFilterEEPG::GetThemesMHW1 (const u_char * Data, int Length)
           ThemeId++;
         }
         memcpy (&Themes[Offset][0], &Theme->Name, 15);
-        Themes[Offset][15] = NULL; //trailing null
+        Themes[Offset][15] = '\0'; //trailing null
         CleanString (Themes[Offset]);
         LogI(1, prep("%.15s"), Themes[Offset]);
         Offset++;
@@ -1390,7 +1389,7 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
         LastTextBlock = ((ST->LastTextNr == 0) || (ST->TextNr >= ST->LastTextNr));
       } while (!LastTextBlock);
       Text = (unsigned char *) realloc (Text, 1 + TotLength); //allocate 1 extra byte
-      Text[TotLength] = NULL; //terminate string by NULL char
+      Text[TotLength] = '\0'; //terminate string by NULL char
       LogD(5, prep("DEBUG: Full Text:%s."), Text);
 
       break;
@@ -1751,7 +1750,7 @@ int cFilterEEPG::GetThemesNagra (const u_char * Data, int Length, unsigned short
         continue;
       }
       memcpy (&Themes[ThemeId], Text, Textlength);
-      Themes[ThemeId][Textlength] = NULL; //trailing NULL
+      Themes[ThemeId][Textlength] = '\0'; //trailing NULL
       CleanString (Themes[ThemeId]);
       nThemes++;
       LogI(1, prep("%02x %s"), ThemeId, Themes[ThemeId]);
@@ -1812,7 +1811,7 @@ int cFilterEEPG::GetChannelsNagra (const u_char * Data, int Length)
     if (IsFound)
       strncpy ((char *) C->Name, VC->Name (), 64);
     else
-      C->Name[0] = NULL; //empty string
+      C->Name[0] = '\0'; //empty string
     CleanString (C->Name);
 
     LogI(1, "|% 5d | %-26.26s | %-22.22s | %-3.3s |  % 6d  |\n", C->ChannelId
@@ -1976,7 +1975,7 @@ int cFilterEEPG::GetNagra (const u_char * Data, int Length)
 void cFilterEEPG::ProcessNagra ()
 {
   for (int i = 0; i < MAX_THEMES; i++) //clear all themes
-    Themes[i][0] = NULL;
+    Themes[i][0] = '\0';
 
   for (int i = 0; i < NagraCounter; i++) { //first prcoess all themes, since they all use the same codes
     unsigned short int TableIdExtension = NagraTIE[i];
@@ -2061,7 +2060,7 @@ int cFilterEEPG::GetTitlesMHW1 (const u_char * Data, int Length)
           LogE(0, prep("Titles memory allocation error."));
           return 0;
         }
-        T->Text[46] = NULL; //end string with NULL character
+        T->Text[46] = '\0'; //end string with NULL character
         //memcpy (T->Text, &Title->Title, 23);
         decodeText2((unsigned char *)&Title->Title, 23, (char*)T->Text, 47);
         CleanString (T->Text);
@@ -2142,7 +2141,7 @@ int cFilterEEPG::GetTitlesMHW2 (const u_char * Data, int Length)
           LogE(0, prep("Titles memory allocation error."));
           return 0; //fatal error
         }
-        T->Text[Len] = NULL; //end string with NULL character
+        T->Text[Len] = '\0'; //end string with NULL character
         decodeText2(&Data[Pos + 8],Len,(char*)T->Text,Len+1);
         //memcpy (T->Text, &Data[Pos + 8], Len);
         CleanString (T->Text);
@@ -2189,7 +2188,7 @@ int cFilterEEPG::GetSummariesMHW1 (const u_char * Data, int Length)
               LogE(0, prep("Summaries memory allocation error."));
               return 0;
             }
-            Text[SummaryLength+1] = NULL; //end string with NULL character
+            Text[SummaryLength+1] = '\0'; //end string with NULL character
             //memcpy (Text, &Data[SummaryOffset], SummaryLength);
             decodeText2(&Data[SummaryOffset], SummaryLength, (char*)Text, 2*SummaryLength + 1);
 //     CleanString (Text);
@@ -2313,7 +2312,7 @@ int cFilterEEPG::GetSummariesMHW2 (const u_char * Data, int Length)
           }
         }
         S->Text = (unsigned char *) malloc (SummaryLength + 2);
-        S->Text[SummaryLength] = NULL; //end string with NULL character
+        S->Text[SummaryLength] = '\0'; //end string with NULL character
         if (S->Text == NULL) {
           LogE(0, prep("Summaries memory allocation error."));
           return 0; //fatal error
@@ -2400,7 +2399,7 @@ int cFilterEEPG::GetChannelsSKYBOX (const u_char * Data, int Length)
                   if (IsFound)
                     strncpy ((char *) C->Name, VC->Name (), 64);
                   else
-                    C->Name[0] = NULL; //empty string
+                    C->Name[0] = '\0'; //empty string
 
                   LogI(1, "|% 5d | %-26.26s | %-22.22s | %-3.3s |  % 6d  |\n", C->ChannelId
                        , *channelID.ToString(), C->Name, IsFound ? "YES" : "NO", C->SkyNumber);
@@ -2509,7 +2508,7 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)
             LogE(0, prep("Titles memory allocation error."));
             return 0;
           }
-          T->Text[Len2] = NULL; //end string with NULL character
+          T->Text[Len2] = '\0'; //end string with NULL character
           memcpy (T->Text, tmp, Len2);
           CleanString (T->Text);
           T->SummaryAvailable = 1; //TODO I assume this is true?
@@ -2588,7 +2587,7 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
             return 0;
           }
           memcpy (S->Text, tmp, Len2);
-          S->Text[Len2] = NULL; //end string with NULL character
+          S->Text[Len2] = '\0'; //end string with NULL character
           CleanString (S->Text);
           LogI(3, prep("EventId %08x Summnr %d:%.30s."), S->EventId, nSummaries, S->Text);
           p += Len1;
@@ -3426,7 +3425,8 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
 void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Length)
 {
   int now = time (0);
-  //LogD(5, prep("PMT pid now 0x%04x pid now 0x%04x"), Pid, Tid);
+  LogD(2, prep("Pid: 0x%02x Tid: %d Length: %d PMT pid: 0x%04x"), Pid, Tid, Length, pmtpid);
+  LogD(2, prep("Source: %d Transponder: %d"), Source () , Transponder ());
   if (Pid == 0 && Tid == SI::TableIdPAT) {
     if (!pmtnext || now > pmtnext) {
       if (pmtpid)
@@ -3467,6 +3467,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
     if (pmt.CheckCRCAndParse () && pmt.getServiceId () == pmtsid) {
       SI::PMT::Stream stream;
       for (SI::Loop::Iterator it; pmt.streamLoop.getNext (stream, it);) {
+        LogD(2, prep("StreamType: 0x%02x"), stream.getStreamType ());
         if (stream.getStreamType () == 0x05 || stream.getStreamType () == 0xc1) { //0x05 = Premiere, SKY, Freeview, Nagra 0xc1 = MHW1,MHW2
           SI::CharArray data = stream.getData ();
           if ((data[1] & 0xE0) == 0xE0 && (data[3] & 0xF0) == 0xF0) {
@@ -3481,7 +3482,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             //Format = 0;               // 0 = premiere, 1 = MHW1, 2 = MHW2, 3 = Sky Italy (OpenTV), 4 = Sky UK (OpenTV), 5 = Freesat (Freeview), 6 = Nagraguide
             SI::Descriptor * d;
             for (SI::Loop::Iterator it; (d = stream.streamDescriptors.getNext (it));) {
-              //esyslog ("EEPGDEBUG:d->getDescriptorTAG():%x,SI::PrivateTag:%x\n", d->getDescriptorTag (), SI::PrivateDataSpecifierDescriptorTag);
+              LogD(2, prep("EEPGDEBUG:d->getDescriptorTAG():%x,SI::PrivateTag:%x\n"), d->getDescriptorTag (), SI::PrivateDataSpecifierDescriptorTag);
               switch (d->getDescriptorTag ()) {
               case SI::PrivateDataSpecifierDescriptorTag:
                 //esyslog ("prv: %d %08x\n", d->getLength (), d->getData ().FourBytes (2));
