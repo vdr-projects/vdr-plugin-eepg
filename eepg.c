@@ -668,8 +668,7 @@ void GetLocalTimeOffset (void)
 void CleanString (unsigned char *String)
 {
 
-  LogD (1, prep("Unclean: %s"), String);
-
+//  LogD (1, prep("Unclean: %s"), String);
   unsigned char *Src;
   unsigned char *Dst;
   int Spaces;
@@ -711,7 +710,7 @@ void CleanString (unsigned char *String)
   } else {
     *Dst = 0;
   }
-  LogD (1, prep("Clean: %s"), String);
+//  LogD (1, prep("Clean: %s"), String);
 }
 
 bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB stream?
