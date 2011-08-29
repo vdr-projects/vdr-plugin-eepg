@@ -10,21 +10,34 @@
 #define MAX_EQUIVALENCES 8 //the number of equivalences one channel can have
 
 //Formats (need to be consecutively numbered):
-//First all CONTinuous protocols, so they will be processed LAST:
-#define PREMIERE	0
-#define FREEVIEW 	1
-//Then all batchmode, load ONCE protocols:
-#define MHW1 		2
-#define MHW2 		3
-#define SKY_IT 		4
-#define SKY_UK 		5
-#define NAGRA 		6
-#define HIGHEST_FORMAT 	6 //the highest number of EPG-formats that is supported by this plugin
+//#define PREMIERE	0
+//#define FREEVIEW 	1
+//#define MHW1 		2
+//#define MHW2 		3
+//#define SKY_IT 		4
+//#define SKY_UK 		5
+//#define NAGRA 		6
+//#define HIGHEST_FORMAT 	6
+
+enum EFormat {
+//First all batchmode, load ONCE protocols:
+  MHW1  = 0,
+  MHW2     ,
+  SKY_IT   ,
+  SKY_UK   ,
+  NAGRA    ,
+//Than all CONTinuous protocols, so they will be processed LAST:
+  PREMIERE ,
+  FREEVIEW ,
+  DISH_BEV ,
+//the highest number of EPG-formats that is supported by this plugin
+  HIGHEST_FORMAT = DISH_BEV
+} Format;
 
 #define NAGRA_TABLE_ID  	0x55 //the lower the table Id, the more "current" it is; table_id 0x00 never gets overwritten, now/next are at 0x4e or 0x4f!
 #define DEFAULT_TABLE_ID 	0x30
 
-const char *FormatName[]= {"Premiere","FreeView","MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide"};
+const char *FormatName[]= {"Premiere","FreeView","MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide","Dish/Bev"};
 
 struct sNode
 {

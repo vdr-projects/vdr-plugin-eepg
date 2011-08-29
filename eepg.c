@@ -3346,7 +3346,11 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     if (UnprocessedFormat[i]) {
       isyslog ("EEPG: %s Extended EPG detected on pid %x.", FormatName[i], UnprocessedFormat[i]);
       Format = i;
-    } //highest format is processed first this way;; TODO make sure that CONT protocols like Premiere, Freesat are processed AFTER ONCE protocols like MHW, SKY and NAGRA
+      // highest format is processed first this way
+      // make sure that CONT protocols like Premiere, Freesat are processed
+      // AFTER ONCE protocols like MHW, SKY and NAGRA
+      break;
+    }
 
   if (Format == -1) { //there are no formats left to process
     isyslog ("EEPG: Ended all processing");
@@ -3387,16 +3391,15 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
     AddFilter (0x39, 0x50, 0xf0); //event info, actual TS, Viasat
     AddFilter (0x39, 0x60, 0xf0); //event info, other  TS, Viasat
-
+    break;
+  case NAGRA:
+    AddFilter (pid, 0xb0); //perhaps TID is equal to first data byte?
+    break;
+  case DISH_BEV:
     AddFilter (0x0300, 0x50, 0xf0); // Dish Network EEPG
     AddFilter (0x0300, 0x60, 0xf0); // Dish Network EEPG
     AddFilter (0x0441, 0x50, 0xf0); // Bell ExpressVU EEPG
     AddFilter (0x0441, 0x60, 0xf0); // Bell ExpressVU EEPG
-
-    break;
-  case NAGRA:
-    //   isyslog ("EEPG: NagraGuide Extended EPG detected.");
-    AddFilter (pid, 0xb0); //perhaps TID is equal to first data byte?
     break;
   default:
     break;
@@ -3407,7 +3410,8 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
 {
   int now = time (0);
   LogD(2, prep("Pid: 0x%02x Tid: %d Length: %d PMT pid: 0x%04x"), Pid, Tid, Length, pmtpid);
-  LogD(2, prep("Source: %d Transponder: %d"), Source () , Transponder ());
+//  LogD(2, prep("Source: %d Transponder: %d"), Source () , Transponder ());
+
   if (Pid == 0 && Tid == SI::TableIdPAT) {
     if (!pmtnext || now > pmtnext) {
       if (pmtpid)
@@ -3449,7 +3453,9 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
       SI::PMT::Stream stream;
       for (SI::Loop::Iterator it; pmt.streamLoop.getNext (stream, it);) {
         LogD(2, prep("StreamType: 0x%02x"), stream.getStreamType ());
-        if (stream.getStreamType () == 0x05 || stream.getStreamType () == 0xc1) { //0x05 = Premiere, SKY, Freeview, Nagra 0xc1 = MHW1,MHW2
+        if (stream.getStreamType () == 0x05 || stream.getStreamType () == 0xc1
+            /*|| stream.getStreamType () == 0x04 || stream.getStreamType () == 0x02
+            || stream.getStreamType () == 0xd1*/) { //0x05 = Premiere, SKY, Freeview, Nagra 0xc1 = MHW1,MHW2; 0x04 DISH BEV ?
           SI::CharArray data = stream.getData ();
           if ((data[1] & 0xE0) == 0xE0 && (data[3] & 0xF0) == 0xF0) {
             bool prvData = false, usrData = false;
@@ -3531,8 +3537,12 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                 UnprocessedFormat[FREEVIEW] = stream.getPid ();
             if (prvData && usrData)
               UnprocessedFormat[PREMIERE] = stream.getPid ();
-          } //if data[1] && data [3]
-        } //if streamtype
+            //TODO DPE this is not good since the DISH/BEV filters are always on, but have to test somehow.
+            if (!UnprocessedFormat[DISH_BEV]) {
+              UnprocessedFormat[DISH_BEV] = stream.getPid ();
+            }
+          }   //if data[1] && data [3]
+        }   //if streamtype
         /*if (Format != PREMIERE)       //any format found
            break;               //break out for loop */
       } //for loop that walks through streams
