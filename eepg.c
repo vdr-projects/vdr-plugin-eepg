@@ -2869,7 +2869,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
   }
 
   tChannelID channelID (Source, getOriginalNetworkId (), getTransportStreamId (), getServiceId ());
-  LogD(2, prep("channelID: %s"), channelID.ToString());
+  LogD(2, prep("channelID: %s"), *channelID.ToString());
   cChannel *channel = Channels.GetByChannelID (channelID, true);
   if (!channel) {
     LogD(2, prep("!channel"));
