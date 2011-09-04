@@ -2869,7 +2869,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
   }
 
   tChannelID channelID (Source, getOriginalNetworkId (), getTransportStreamId (), getServiceId ());
-  LogD(2, prep("channelID: %s"), channelID.ToString());
+  LogD(2, prep("channelID: %s"), *channelID.ToString());
   cChannel *channel = Channels.GetByChannelID (channelID, true);
   if (!channel) {
     LogD(2, prep("!channel"));
@@ -3246,6 +3246,17 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     }
 
     if (!rEvent) {
+      if (DishShortEventDescriptor) {
+         pEvent->SetTitle(DishShortEventDescriptor->getText());
+         LogD(2, prep("DishTitle: %s"), DishShortEventDescriptor->getText());
+
+         }
+      if (DishExtendedEventDescriptor) {
+         pEvent->SetDescription(DishExtendedEventDescriptor->getText());
+         pEvent->SetShortText(DishExtendedEventDescriptor->getShortText());
+         LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
+         LogD(2, prep("DishShortText: %s"), DishExtendedEventDescriptor->getShortText());
+         }
       if (ShortEventDescriptor) {
         char buffer[Utf8BufSize (256)];
         unsigned char *f;
@@ -3271,6 +3282,8 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     }
     delete ExtendedEventDescriptors;
     delete ShortEventDescriptor;
+    delete DishExtendedEventDescriptor;
+    delete DishShortEventDescriptor;
 
     pEvent->SetComponents (Components);
 
@@ -3401,7 +3414,8 @@ DishDescriptor::DishDescriptor(void)
 
 DishDescriptor::~DishDescriptor()
 {
-   free(decompressed);
+   delete[] decompressed;
+   decompressed = NULL;
 }
 
 void DishDescriptor::Decompress(unsigned char Tid)
@@ -3425,7 +3439,7 @@ void DishDescriptor::Decompress(unsigned char Tid)
    if (length <= 0 || !dLength)
      return;
 
-   decompressed = (unsigned char*)malloc(dLength+1);
+   decompressed = new unsigned char[2*dLength+1];
 
    HuffmanTable *table;
    unsigned int tableSize, numBits;
