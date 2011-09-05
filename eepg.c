@@ -2814,7 +2814,7 @@ namespace SI
     DishShortEventDescriptorTag = 0x91,
     DishExtendedEventDescriptorTag = 0x92 };
 
-  typedef InheritEnum< DescriptorTagExt, SI::DescriptorTag > ExtendedDescriptorTag;
+  // typedef InheritEnum< DescriptorTagExt, SI::DescriptorTag > ExtendedDescriptorTag;
 
 #ifndef LIBSI_DISH_H
 #define LIBSI_DISH_H
@@ -2822,9 +2822,9 @@ namespace SI
 #define SIZE_TABLE_128 128
 #define SIZE_TABLE_255 255
 
-class DishDescriptor : public Descriptor {
+class DishDescriptor : public UnimplementedDescriptor {
 public:
-   DishDescriptor(void);
+   DishDescriptor(UnimplementedDescriptor*);
    virtual ~DishDescriptor();
    const char* getText(void) const { return text; }
    const char* getShortText(void) const { return shortText; }
@@ -2836,6 +2836,7 @@ protected:
    const char* text; // name or description of the event
    const char* shortText; // usually the episode name
    unsigned char* decompressed;
+   UnimplementedDescriptor* unimplementedDesc;
 
    struct HuffmanTable {
       unsigned int  startingAddress;
@@ -2861,7 +2862,7 @@ public:
 cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus)
     :  SI::EIT (Data, false)
 {
-  LogD(2, prep("cEIT2::cEIT2"));
+  //LogD(2, prep("cEIT2::cEIT2"));
 
   if (!CheckCRCAndParse ()) {
     LogD(2, prep("!CheckCRCAndParse ()"));
@@ -3047,7 +3048,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         continue;
       }
 
-      LogD(2, prep("EEPGDEBUG:d->getDescriptorTAG():%x)"), d->getDescriptorTag ());
+      //LogD(2, prep("EEPGDEBUG:d->getDescriptorTAG():%x)"), d->getDescriptorTag ());
 
       switch (d->getDescriptorTag ()) {
       case SI::ExtendedEventDescriptorTag: {
@@ -3209,25 +3210,25 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       }
       break;
       case SI::DishExtendedEventDescriptorTag: {
-           SI::DishDescriptor *deed = (SI::DishDescriptor *)d;
-           deed->Decompress(Tid);
-           if (!DishExtendedEventDescriptor) {
-              DishExtendedEventDescriptor = deed;
-              d = NULL; // so that it is not deleted
-              }
-           HasExternalData = true;
-           }
-           break;
+        SI::DishDescriptor *deed = new SI::DishDescriptor((SI::UnimplementedDescriptor *)d);
+        deed->Decompress(Tid);
+        if (!DishExtendedEventDescriptor) {
+           DishExtendedEventDescriptor = deed;
+           d = NULL; // so that it is not deleted
+        }
+        HasExternalData = true;
+      }
+      break;
       case SI::DishShortEventDescriptorTag: {
-           SI::DishDescriptor *dsed = (SI::DishDescriptor *)d;
-           dsed->Decompress(Tid);
-           if (!DishShortEventDescriptor) {
-             DishShortEventDescriptor = dsed;
-             d = NULL; // so that it is not deleted
-             }
-           HasExternalData = true;
-           }
-           break;
+        SI::DishDescriptor *dsed = new SI::DishDescriptor((SI::UnimplementedDescriptor *)d);
+        dsed->Decompress(Tid);
+        if (!DishShortEventDescriptor) {
+          DishShortEventDescriptor = dsed;
+          d = NULL; // so that it is not deleted
+        }
+        HasExternalData = true;
+      }
+      break;
       case SI::DishRatingDescriptorTag: {
         if (d->getLength() == 4) {
            uint16_t rating = d->getData().TwoBytes(2);
@@ -3405,17 +3406,19 @@ static unsigned int getBits(int bitIndex, int bitCount, const unsigned char *byt
    return (unsigned int)((chunk.val & (0xFFFFFFFF >> bitnum)) >> rightend);
 }
 
-DishDescriptor::DishDescriptor(void)
+DishDescriptor::DishDescriptor(UnimplementedDescriptor* unimplementedDesc)
 {
    text = NULL;
    shortText = NULL;
    decompressed = NULL;
+   this->unimplementedDesc = unimplementedDesc;
 }
 
 DishDescriptor::~DishDescriptor()
 {
    delete[] decompressed;
    decompressed = NULL;
+   delete unimplementedDesc;
 }
 
 void DishDescriptor::Decompress(unsigned char Tid)
@@ -3439,7 +3442,7 @@ void DishDescriptor::Decompress(unsigned char Tid)
    if (length <= 0 || !dLength)
      return;
 
-   decompressed = new unsigned char[2*dLength+1];
+   decompressed = new unsigned char[dLength+1];
 
    HuffmanTable *table;
    unsigned int tableSize, numBits;
@@ -3472,6 +3475,7 @@ void DishDescriptor::Decompress(unsigned char Tid)
    decompressed[count] = 0;
 
    char* split = strchr((char*)decompressed, 0x0D); // Look for carriage return
+   LogD(2, prep("dLength:%d, length:%d, count:%d, decompressed: %s"), dLength, length, count, decompressed);
    if (split) {
       *split = 0;
       shortText = (char*) decompressed;
@@ -3758,7 +3762,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
 void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Length)
 {
   int now = time (0);
-  LogD(2, prep("Pid: 0x%02x Tid: %d Length: %d PMT pid: 0x%04x"), Pid, Tid, Length, pmtpid);
+//  LogD(2, prep("Pid: 0x%02x Tid: %d Length: %d PMT pid: 0x%04x"), Pid, Tid, Length, pmtpid);
 //  LogD(2, prep("Source: %d Transponder: %d"), Source () , Transponder ());
 
   if (Pid == 0 && Tid == SI::TableIdPAT) {
