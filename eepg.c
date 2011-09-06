@@ -2676,7 +2676,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
 //esyslog("foundtitle %x for next title that has a summary:%d",foundtitle,i);
 
       if (!foundtitle)  //no more titles with summaries
-        break; //TODO: does this work???
+        break;
       if ((T->EventId == S->EventId) && (T->MjdTime == S->Replays[0].MjdTime) && ((T->ChannelId == S->Replays[0].ChannelId) || ((Format != SKY_IT) && (Format != SKY_UK)))) { //should always be true, titles and summaries are broadcasted in order...
         LogD(3, prep("T->EventId == S->EventId"));
         //MjdTime = 0 for all but SKY
@@ -3285,6 +3285,10 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
 
     pEvent->SetComponents (Components);
 
+    if (pEvent->ChannelID() == tChannelID::FromString("S119.0W-4100-6-110-110")) {
+      LogD(2, prep("ID: %d Title: %s Time: %d Tid: 0x%x"), pEvent->EventID(), pEvent->Title(), pEvent->StartTime(), pEvent->TableID());
+    }
+
     if (!HasExternalData)
       pEvent->FixEpgBugs ();
     if (LinkChannels)
@@ -3472,7 +3476,7 @@ void DishDescriptor::Decompress(unsigned char Tid)
    decompressed[count] = 0;
 
    char* split = strchr((char*)decompressed, 0x0D); // Look for carriage return
-   LogD(2, prep("dLength:%d, length:%d, count:%d, decompressed: %s"), dLength, length, count, decompressed);
+   //LogD(2, prep("dLength:%d, length:%d, count:%d, decompressed: %s"), dLength, length, count, decompressed);
    if (split) {
       *split = 0;
       shortText = (char*) decompressed;
@@ -3721,11 +3725,11 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     AddFilter (pid, 0xb0); //perhaps TID is equal to first data byte?
     break;
   case DISH_BEV:
-    AddFilter (0x0300, 0x50, 0xf0); // Dish Network EEPG
-    AddFilter (0x0300, 0x60, 0xf0); // Dish Network EEPG
-    AddFilter (0x0300, 0x90, 0xf0); // Dish Network EEPG
-    AddFilter (0x0441, 0x50, 0xf0); // Bell ExpressVU EEPG
-    AddFilter (0x0441, 0x60, 0xf0); // Bell ExpressVU EEPG
+    AddFilter (0x12, 0, 0); // event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (0x0300, 0, 0); // Dish Network EEPG event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (0x0441, 0, 0); // Dish Network EEPG event info, actual(0x4e)/other(0x4f) TS, present/following
+//    AddFilter (0x0441, 0x50, 0xf0); // Bell ExpressVU EEPG
+//    AddFilter (0x0441, 0x60, 0xf0); // Bell ExpressVU EEPG
     break;
   default:
     break;
@@ -3805,9 +3809,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
       SI::PMT::Stream stream;
       for (SI::Loop::Iterator it; pmt.streamLoop.getNext (stream, it);) {
         LogD(2, prep("StreamType: 0x%02x"), stream.getStreamType ());
-        if (stream.getStreamType () == 0x05 || stream.getStreamType () == 0xc1
-            /*|| stream.getStreamType () == 0x04 || stream.getStreamType () == 0x02
-            || stream.getStreamType () == 0xd1*/) { //0x05 = Premiere, SKY, Freeview, Nagra 0xc1 = MHW1,MHW2; 0x04 DISH BEV ?
+        if (stream.getStreamType () == 0x05 || stream.getStreamType () == 0xc1) { //0x05 = Premiere, SKY, Freeview, Nagra 0xc1 = MHW1,MHW2;
           SI::CharArray data = stream.getData ();
           if ((data[1] & 0xE0) == 0xE0 && (data[3] & 0xF0) == 0xF0) {
             bool prvData = false, usrData = false;
@@ -3890,7 +3892,12 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             if (prvData && usrData)
               UnprocessedFormat[PREMIERE] = stream.getPid ();
             //TODO DPE this is not good since the DISH/BEV filters are always on, but have to test somehow.
-            if (!UnprocessedFormat[DISH_BEV]) {
+            //EEPG:12472:H:S119.0W:20000:0:0:0:0:36862:4100:18:36862
+            if (((Source() == cSource::FromString("S119.0W")
+                && Transponder() == cChannel::Transponder(12472,'H'))
+                || (Source() == cSource::FromString("S91.0W")
+            && Transponder() == cChannel::Transponder(12224,'R')))
+                && !UnprocessedFormat[DISH_BEV]) {
               UnprocessedFormat[DISH_BEV] = stream.getPid ();
             }
           }   //if data[1] && data [3]
@@ -3913,8 +3920,9 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
   } //if pmtpid
   else if (Source ()) {
 
-    if ( Pid == 0x0300 || Pid == 0x0441 ) {
-      ProccessContinuous(Pid, Tid, Length, Data);
+    if ( Pid == 0x12 || Pid == 0x0300 || Pid == 0x0441 ) {
+      if (Tid >= 0x4E)
+        ProccessContinuous(Pid, Tid, Length, Data);
       return;
     }
     int Result;
