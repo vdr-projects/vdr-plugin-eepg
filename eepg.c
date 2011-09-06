@@ -711,6 +711,24 @@ void CleanString (unsigned char *String)
 //  LogD (1, prep("Clean: %s"), String);
 }
 
+cChannel *GetChannelByID(tChannelID & channelID, bool searchOtherPos)
+{
+    cChannel *VC = Channels.GetByChannelID(channelID, true);
+    if(!VC && searchOtherPos){
+        //look on other satpositions
+        for(int i = 0;i < NumberOfAvailableSources;i++){
+            channelID = tChannelID(AvailableSources[i], channelID.Nid(), channelID.Tid(), channelID.Sid());
+            VC = Channels.GetByChannelID(channelID, true);
+            if(VC){
+                //found this actually on satellite nextdoor...
+                break;
+            }
+        }
+    }
+
+    return VC;
+}
+
 bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB stream?
 {
   string FileName = ConfDir;
@@ -1160,18 +1178,10 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
         C->Tid[0] = HILO16 (Channel->TransportId);
         C->Sid[0] = HILO16 (Channel->ServiceId);
         tChannelID channelID = tChannelID (C->Src[0], C->Nid[0], C->Tid[0], C->Sid[0]);
-        cChannel *VC = Channels.GetByChannelID (channelID, true);
+        cChannel *VC = GetChannelByID(channelID, true);
         bool IsFound = (VC);
-        if (!IsFound) {  //look on other satpositions
-          for (int i = 0; i < NumberOfAvailableSources; i++) {
-            channelID = tChannelID (AvailableSources[i], C->Nid[0], C->Tid[0], C->Sid[0]);
-            VC = Channels.GetByChannelID (channelID, true);
-            IsFound = (VC);
-            if (IsFound) { //found this actually on satellite nextdoor...
-              C->Src[0] = AvailableSources[i];
-              break;
-            }
-          }
+        if(IsFound) {
+            C->Src[0] = VC->Source();
         }
         CleanString (C->Name);
 
@@ -1791,30 +1801,20 @@ int cFilterEEPG::GetChannelsNagra (const u_char * Data, int Length)
     ChannelSeq[C->ChannelId] = j; //fill lookup table to go from channel-id to sequence nr in table; lookuptable starts with 0
     C->SkyNumber = 0;
     C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
-    C->Src[0] = Source (); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
+    C->Src[0] = Source(); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
     C->Nid[0] = HILO16 (Channel->NetworkId);
     C->Tid[0] = HILO16 (Channel->TransportId);
     C->Sid[0] = HILO16 (Channel->ServiceId);
-    tChannelID channelID = tChannelID (C->Src[0], C->Nid[0], C->Tid[0], C->Sid[0]);
-    cChannel *VC = Channels.GetByChannelID (channelID, true);
+    tChannelID channelID = tChannelID(C->Src[0], C->Nid[0], C->Tid[0], C->Sid[0]);
+    cChannel *VC = GetChannelByID(channelID, true);
     bool IsFound = (VC);
-
-    if (!IsFound) { //look on other satpositions
-      for (int i = 0; i < NumberOfAvailableSources; i++) {
-        channelID = tChannelID (AvailableSources[i], C->Nid[0], C->Tid[0], C->Sid[0]);
-        VC = Channels.GetByChannelID (channelID, true);
-        IsFound = (VC);
-        if (IsFound) { //found this actually on satellite nextdoor...
-          C->Src[0] = AvailableSources[i];
-          break;
-        }
-      }
+    if(IsFound) {
+        strncpy((char*)(C->Name), VC->Name (), 64);
+        C->Src[0] = VC->Source();
+        CleanString (C->Name);
     }
-    if (IsFound)
-      strncpy ((char *) C->Name, VC->Name (), 64);
     else
       C->Name[0] = '\0'; //empty string
-    CleanString (C->Name);
 
     LogI(1, "|% 5d | %-26.26s | %-22.22s | %-3.3s |  % 6d  |\n", C->ChannelId
          , *channelID.ToString(), C->Name, IsFound ? "YES" : "NO", C->SkyNumber);
@@ -2822,7 +2822,7 @@ namespace SI
 #define SIZE_TABLE_128 128
 #define SIZE_TABLE_255 255
 
-class DishDescriptor : public UnimplementedDescriptor {
+class DishDescriptor {
 public:
    DishDescriptor(UnimplementedDescriptor*);
    virtual ~DishDescriptor();
@@ -2831,8 +2831,6 @@ public:
    // Decompress the byte arrary and stores the result to a text string
    void Decompress(unsigned char Tid);
 protected:
-   virtual void Parse() {};
-
    const char* text; // name or description of the event
    const char* shortText; // usually the episode name
    unsigned char* decompressed;
@@ -2856,10 +2854,10 @@ class cEIT2:public SI::EIT
 {
 public:
   cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data,
-         bool OnlyRunningStatus = false);
+        bool searchOtherSatPositions = false, bool OnlyRunningStatus = false);
 };
 
-cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus)
+cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool searchOtherSatPositions, bool OnlyRunningStatus)
     :  SI::EIT (Data, false)
 {
   //LogD(2, prep("cEIT2::cEIT2"));
@@ -2870,10 +2868,9 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
   }
 
   tChannelID channelID (Source, getOriginalNetworkId (), getTransportStreamId (), getServiceId ());
-  LogD(2, prep("channelID: %s"), *channelID.ToString());
-  cChannel *channel = Channels.GetByChannelID (channelID, true);
+  cChannel *channel = GetChannelByID (channelID, searchOtherSatPositions);
   if (!channel) {
-    LogD(2, prep("!channel"));
+    LogD(3, prep("!channel channelID: %s"), *channelID.ToString());
     return; // only collect data for known channels
   }
 
@@ -3247,17 +3244,6 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     }
 
     if (!rEvent) {
-      if (DishShortEventDescriptor) {
-         pEvent->SetTitle(DishShortEventDescriptor->getText());
-         LogD(2, prep("DishTitle: %s"), DishShortEventDescriptor->getText());
-
-         }
-      if (DishExtendedEventDescriptor) {
-         pEvent->SetDescription(DishExtendedEventDescriptor->getText());
-         pEvent->SetShortText(DishExtendedEventDescriptor->getShortText());
-         LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
-         LogD(2, prep("DishShortText: %s"), DishExtendedEventDescriptor->getShortText());
-         }
       if (ShortEventDescriptor) {
         char buffer[Utf8BufSize (256)];
         unsigned char *f;
@@ -3280,6 +3266,17 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         pEvent->SetDescription (ExtendedEventDescriptors->getText (buffer, sizeof (buffer), ": "));
       } else if (!HasExternalData)
         pEvent->SetDescription (NULL);
+
+      if (DishShortEventDescriptor) {
+         pEvent->SetTitle(DishShortEventDescriptor->getText());
+         //LogD(2, prep("DishTitle: %s"), DishShortEventDescriptor->getText());
+      }
+      if (DishExtendedEventDescriptor) {
+         pEvent->SetDescription(DishExtendedEventDescriptor->getText());
+         pEvent->SetShortText(DishExtendedEventDescriptor->getShortText());
+         //LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
+         //LogD(2, prep("DishShortText: %s"), DishExtendedEventDescriptor->getShortText());
+      }
     }
     delete ExtendedEventDescriptors;
     delete ShortEventDescriptor;
@@ -3423,7 +3420,7 @@ DishDescriptor::~DishDescriptor()
 
 void DishDescriptor::Decompress(unsigned char Tid)
 {
-   const unsigned char *str = data.getData();
+   const unsigned char *str = unimplementedDesc->getData().getData();
    const unsigned char *cmp = NULL; // Compressed data
    int length = 0;  // Length of compressed data
    unsigned int dLength = 0; // Length of decompressed data
@@ -3741,8 +3738,10 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
     LogD(2, prep("Pid: 0x%02x Tid: %d Length: %d"), Pid, Tid, Length);
     cSchedulesLock SchedulesLock(true, 10);
     cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
+    //Look for other satelite positions only if Dish/Bell ExpressVU for the moment hardcoded pid check
+    bool searchOtherSatPositions = Pid == 0x0300 || Pid == 0x0441;
     if(Schedules)
-        SI::cEIT2 EIT(Schedules, Source(), Tid, Data);
+        SI::cEIT2 EIT(Schedules, Source(), Tid, Data, searchOtherSatPositions);
 
     else//cEIT EIT (Schedules, Source (), Tid, Data);
     {
@@ -3753,7 +3752,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
         cSchedulesLock SchedulesLock;
         cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
         if(Schedules)
-            SI::cEIT2 EIT(Schedules, Source(), Tid, Data, true);
+            SI::cEIT2 EIT(Schedules, Source(), Tid, Data, searchOtherSatPositions, true);
 
         //cEIT EIT (Schedules, Source (), Tid, Data, true);
     }
