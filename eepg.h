@@ -37,7 +37,7 @@ enum EFormat {
 #define NAGRA_TABLE_ID  	0x55 //the lower the table Id, the more "current" it is; table_id 0x00 never gets overwritten, now/next are at 0x4e or 0x4f!
 #define DEFAULT_TABLE_ID 	0x30
 
-const char *FormatName[]= {"Premiere","FreeView","MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide","Dish/Bev"};
+const char *FormatName[]= {"MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide","Premiere","FreeView","Dish/Bev"};
 
 struct sNode
 {
