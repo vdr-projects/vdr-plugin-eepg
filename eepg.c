@@ -322,6 +322,8 @@ protected:
                     unsigned short int Version, char Rating = 0x00);
   virtual void LoadIntoSchedule (void);
   virtual void LoadEquivalentChannels (void);
+
+  void ProcessPremiere(const u_char *& Data);
 public:
   cFilterEEPG (void);
   virtual void SetStatus (bool On);
@@ -3547,273 +3549,10 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
   else if (Source ()) {
     int Result;
     switch (Tid) {
-    case 0xA0:
+    case 0xA0: //TODO DPE test this missing break but it seems a bug
       if ((Pid < 0x30) || (Pid > 0x37)) {
-        SI::PremiereCIT cit (Data, false);
-        if (cit.CheckCRCAndParse ()) {
-          cSchedulesLock SchedulesLock (true, 10);
-          cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
-          if (Schedules) {
-            int nCount = 0;
-            int nRating = 0;
-            SI::ExtendedEventDescriptors * ExtendedEventDescriptors = 0;
-            SI::ShortEventDescriptor * ShortEventDescriptor = 0;
-            char *order = 0, *rating = 0;
-            {
-              time_t firstTime = 0;
-              SI::Descriptor * d;
-              bool UseExtendedEventDescriptor = false;
-              int LanguagePreferenceShort = -1;
-              int LanguagePreferenceExt = -1;
-              for (SI::Loop::Iterator it; (d = cit.eventDescriptors.getNext (it));) {
-                switch (d->getDescriptorTag ()) {
-                case 0xF0: // order information
-                  if (SetupPE.OrderInfo) {
-                    static const char *text[] = {
-                      trNOOP ("Ordernumber"),
-                      trNOOP ("Price"),
-                      trNOOP ("Ordering"),
-                      trNOOP ("SMS"),
-                      trNOOP ("WWW")
-                    };
-                    char buff[512];
-                    int p = 0;
-                    const unsigned char *data = d->getData ().getData () + 2;
-                    for (int i = 0; i < 5; i++) {
-                      int l = data[0];
-                      if (l > 0)
-                        p += snprintf (&buff[p], sizeof (buff) - p, "\n%s: %.*s", tr (text[i]), l, &data[1]);
-                      data += l + 1;
-                    }
-                    if (p > 0)
-                      order = strdup (buff);
-                  }
-                  break;
-                case 0xF1: // parental rating
-                  if (SetupPE.RatingInfo) {
-                    char buff[512];
-                    int p = 0;
-                    const unsigned char *data = d->getData ().getData () + 2;
-                    nRating = data[0] + 3;
-                    p += snprintf (&buff[p], sizeof (buff) - p, "\n%s: %d %s", tr ("Rating"), nRating, tr ("years"));
-                    data += 7;
-                    int l = data[0];
-                    if (l > 0)
-                      p += snprintf (&buff[p], sizeof (buff) - p, " (%.*s)", l, &data[1]);
-                    if (p > 0)
-                      rating = strdup (buff);
-                  }
-                  break;
-                case SI::PremiereContentTransmissionDescriptorTag:
-                  if (nCount >= 0) {
-                    SI::PremiereContentTransmissionDescriptor * pct = (SI::PremiereContentTransmissionDescriptor *) d;
-                    nCount++;
-                    SI::PremiereContentTransmissionDescriptor::StartDayEntry sd;
-                    SI::Loop::Iterator it;
-                    if (pct->startDayLoop.getNext (sd, it)) {
-                      SI::PremiereContentTransmissionDescriptor::StartDayEntry::StartTimeEntry st;
-                      SI::Loop::Iterator it2;
-                      if (sd.startTimeLoop.getNext (st, it2)) {
-                        time_t StartTime = st.getStartTime (sd.getMJD ());
-                        if (nCount == 1)
-                          firstTime = StartTime;
-                        else if (firstTime < StartTime - 5 * 50 || firstTime > StartTime + 5 * 60)
-                          nCount = -1;
-                      }
-                    }
-                  }
-                  break;
-                case SI::ExtendedEventDescriptorTag: {
-                  SI::ExtendedEventDescriptor * eed = (SI::ExtendedEventDescriptor *) d;
-                  if (I18nIsPreferredLanguage (Setup.EPGLanguages, eed->languageCode, LanguagePreferenceExt)
-                      || !ExtendedEventDescriptors) {
-                    delete ExtendedEventDescriptors;
-                    ExtendedEventDescriptors = new SI::ExtendedEventDescriptors;
-                    UseExtendedEventDescriptor = true;
-                  }
-                  if (UseExtendedEventDescriptor) {
-                    ExtendedEventDescriptors->Add (eed);
-                    d = NULL; // so that it is not deleted
-                  }
-                  if (eed->getDescriptorNumber () == eed->getLastDescriptorNumber ())
-                    UseExtendedEventDescriptor = false;
-                }
-                break;
-                case SI::ShortEventDescriptorTag: {
-                  SI::ShortEventDescriptor * sed = (SI::ShortEventDescriptor *) d;
-                  if (I18nIsPreferredLanguage (Setup.EPGLanguages, sed->languageCode, LanguagePreferenceShort)
-                      || !ShortEventDescriptor) {
-                    delete ShortEventDescriptor;
-                    ShortEventDescriptor = sed;
-                    d = NULL; // so that it is not deleted
-                  }
-                }
-                break;
-                default:
-                  break;
-                }
-                delete d;
-              }
-            }
 
-            {
-              bool Modified = false;
-              int optCount = 0;
-              unsigned int crc[3];
-              crc[0] = cit.getContentId ();
-              SI::PremiereContentTransmissionDescriptor * pct;
-              for (SI::Loop::Iterator it;
-                   (pct =
-                      (SI::PremiereContentTransmissionDescriptor *) cit.eventDescriptors.getNext (it,
-                          SI::
-                          PremiereContentTransmissionDescriptorTag));) {
-                int nid = pct->getOriginalNetworkId ();
-                int tid = pct->getTransportStreamId ();
-                int sid = pct->getServiceId ();
-                if (SetupPE.FixEpg) {
-                  if (nid == 133) {
-                    if (tid == 0x03 && sid == 0xf0) {
-                      tid = 0x02;
-                      sid = 0xe0;
-                    } else if (tid == 0x03 && sid == 0xf1) {
-                      tid = 0x02;
-                      sid = 0xe1;
-                    } else if (tid == 0x03 && sid == 0xf5) {
-                      tid = 0x03;
-                      sid = 0xdc;
-                    } else if (tid == 0x04 && sid == 0xd2) {
-                      tid = 0x11;
-                      sid = 0xe2;
-                    } else if (tid == 0x11 && sid == 0xd3) {
-                      tid = 0x11;
-                      sid = 0xe3;
-                    }
-                  }
-                }
-                tChannelID channelID (Source (), nid, tid, sid);
-                cChannel *channel = Channels.GetByChannelID (channelID, true);
-#ifdef USE_NOEPG
-                // only use epg from channels not blocked by noEPG-patch
-                if (!allowedEPG (channelID))
-                  continue;
-#endif /* NOEPG */
-
-                if (!channel)
-                  continue;
-
-                cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (channelID);
-                if (!pSchedule) {
-                  pSchedule = new cSchedule (channelID);
-                  Schedules->Add (pSchedule);
-                }
-
-                optCount++;
-                SI::PremiereContentTransmissionDescriptor::StartDayEntry sd;
-                int index = 0;
-                for (SI::Loop::Iterator it; pct->startDayLoop.getNext (sd, it);) {
-                  int mjd = sd.getMJD ();
-                  SI::PremiereContentTransmissionDescriptor::StartDayEntry::StartTimeEntry st;
-                  for (SI::Loop::Iterator it2; sd.startTimeLoop.getNext (st, it2);) {
-                    time_t StartTime = st.getStartTime (mjd);
-                    time_t EndTime = StartTime + cit.getDuration ();
-                    int runningStatus = (StartTime < now
-                                         && now < EndTime) ? SI::RunningStatusRunning : ((StartTime - 30 < now
-                                             && now <
-                                             StartTime) ? SI::
-                                             RunningStatusStartsInAFewSeconds
-                                             : SI::RunningStatusNotRunning);
-                    bool isOpt = false;
-                    if (index++ == 0 && nCount > 1)
-                      isOpt = true;
-                    crc[1] = isOpt ? optCount : 0;
-                    crc[2] = StartTime / STARTTIME_BIAS;
-                    tEventID EventId = ((('P' << 8) | 'W') << 16) | crc16 (0, (unsigned char *) crc, sizeof (crc));
-                    LogI(2, "%s R%d %04x/%.4x %d %d/%d %s +%d ", *channelID.ToString (), runningStatus,
-                         EventId & 0xFFFF, cit.getContentId (), index, isOpt, optCount,
-                         stripspace (ctime (&StartTime)), (int) cit.getDuration () / 60);
-                    if (EndTime + Setup.EPGLinger * 60 < now) {
-                      LogI(2, "(old)\n");
-                      continue;
-                    }
-
-                    bool newEvent = false;
-                    cEvent *pEvent = (cEvent *) pSchedule->GetEvent (EventId, -1);
-                    if (!pEvent) {
-                      LogI(2, "(new)\n");
-                      pEvent = new cEvent (EventId);
-                      if (!pEvent)
-                        continue;
-                      newEvent = true;
-                    } else {
-                      LogI(2, "(upd)\n");
-                      pEvent->SetSeen ();
-                      if (pEvent->TableID () == 0x00 || pEvent->Version () == cit.getVersionNumber ()) {
-                        if (pEvent->RunningStatus () != runningStatus)
-                          pSchedule->SetRunningStatus (pEvent, runningStatus, channel);
-                        continue;
-                      }
-                    }
-                    pEvent->SetEventID (EventId);
-                    pEvent->SetTableID (Tid);
-                    pEvent->SetVersion (cit.getVersionNumber ());
-                    pEvent->SetStartTime (StartTime);
-                    pEvent->SetDuration (cit.getDuration ());
-
-                    if (ShortEventDescriptor) {
-                      char buffer[256];
-                      ShortEventDescriptor->name.getText (buffer, sizeof (buffer));
-                      if (isOpt) {
-                        char buffer2[sizeof (buffer) + 32];
-                        snprintf (buffer2, sizeof (buffer2), optPats[SetupPE.OptPat], buffer, optCount);
-                        pEvent->SetTitle (buffer2);
-                      } else
-                        pEvent->SetTitle (buffer);
-                      LogI(2, "title: %s\n", pEvent->Title ());
-                      pEvent->SetShortText (ShortEventDescriptor->text.getText (buffer, sizeof (buffer)));
-                    }
-                    if (ExtendedEventDescriptors) {
-                      char buffer[ExtendedEventDescriptors->getMaximumTextLength (": ") + 1];
-                      pEvent->SetDescription (ExtendedEventDescriptors->getText (buffer, sizeof (buffer), ": "));
-                    }
-                    if (order || rating) {
-                      int len = (pEvent->Description ()? strlen (pEvent->Description ()) : 0) +
-                                (order ? strlen (order) : 0) + (rating ? strlen (rating) : 0);
-                      char buffer[len + 32];
-                      buffer[0] = 0;
-                      if (pEvent->Description ())
-                        strcat (buffer, pEvent->Description ());
-                      if (rating) {
-                        strcat (buffer, rating);
-                        pEvent->SetParentalRating(nRating);
-                      }
-                      if (order)
-                        strcat (buffer, order);
-                      pEvent->SetDescription (buffer);
-                    }
-
-                    if (newEvent)
-                      pSchedule->AddEvent (pEvent);
-
-                    pEvent->FixEpgBugs ();
-                    if (pEvent->RunningStatus () != runningStatus)
-                      pSchedule->SetRunningStatus (pEvent, runningStatus, channel);
-                    pSchedule->DropOutdated (StartTime, EndTime, Tid, cit.getVersionNumber ());
-                    Modified = true;
-                  }
-                }
-                if (Modified) {
-                  pSchedule->Sort ();
-                  Schedules->SetModified (pSchedule);
-                }
-                delete pct;
-              }
-            }
-            delete ExtendedEventDescriptors;
-            delete ShortEventDescriptor;
-            free (order);
-            free (rating);
-          }
-        } //if checkcrcandpars
+        ProcessPremiere(Data);
         break;
       } //if citpid == 0xb11 Premiere
     case 0xa1:
@@ -4055,6 +3794,282 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
 } //end of closing
 
 // --- cPluginEEPG ------------------------------------------------------
+
+void cFilterEEPG::ProcessPremiere(const u_char *& Data)
+
+{
+
+  SI::PremiereCIT cit(Data, false);
+
+  if (cit.CheckCRCAndParse ()) {
+    cSchedulesLock SchedulesLock (true, 10);
+    cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
+    if (Schedules) {
+      int now = time (0);
+      int nCount = 0;
+      int nRating = 0;
+      unsigned char Tid = 0xa0; // TODO maybe default TableID
+      SI::ExtendedEventDescriptors * ExtendedEventDescriptors = 0;
+      SI::ShortEventDescriptor * ShortEventDescriptor = 0;
+      char *order = 0, *rating = 0;
+      {
+        time_t firstTime = 0;
+        SI::Descriptor * d;
+        bool UseExtendedEventDescriptor = false;
+        int LanguagePreferenceShort = -1;
+        int LanguagePreferenceExt = -1;
+        for (SI::Loop::Iterator it; (d = cit.eventDescriptors.getNext (it));) {
+          switch (d->getDescriptorTag ()) {
+          case 0xF0: // order information
+            if (SetupPE.OrderInfo) {
+              static const char *text[] = {
+                trNOOP ("Ordernumber"),
+                trNOOP ("Price"),
+                trNOOP ("Ordering"),
+                trNOOP ("SMS"),
+                trNOOP ("WWW")
+              };
+              char buff[512];
+              int p = 0;
+              const unsigned char *data = d->getData ().getData () + 2;
+              for (int i = 0; i < 5; i++) {
+                int l = data[0];
+                if (l > 0)
+                  p += snprintf (&buff[p], sizeof (buff) - p, "\n%s: %.*s", tr (text[i]), l, &data[1]);
+                data += l + 1;
+              }
+              if (p > 0)
+                order = strdup (buff);
+            }
+            break;
+          case 0xF1: // parental rating
+            if (SetupPE.RatingInfo) {
+              char buff[512];
+              int p = 0;
+              const unsigned char *data = d->getData ().getData () + 2;
+              nRating = data[0] + 3;
+              p += snprintf (&buff[p], sizeof (buff) - p, "\n%s: %d %s", tr ("Rating"), nRating, tr ("years"));
+              data += 7;
+              int l = data[0];
+              if (l > 0)
+                p += snprintf (&buff[p], sizeof (buff) - p, " (%.*s)", l, &data[1]);
+              if (p > 0)
+                rating = strdup (buff);
+            }
+            break;
+          case SI::PremiereContentTransmissionDescriptorTag:
+            if (nCount >= 0) {
+              SI::PremiereContentTransmissionDescriptor * pct = (SI::PremiereContentTransmissionDescriptor *) d;
+              nCount++;
+              SI::PremiereContentTransmissionDescriptor::StartDayEntry sd;
+              SI::Loop::Iterator it;
+              if (pct->startDayLoop.getNext (sd, it)) {
+                SI::PremiereContentTransmissionDescriptor::StartDayEntry::StartTimeEntry st;
+                SI::Loop::Iterator it2;
+                if (sd.startTimeLoop.getNext (st, it2)) {
+                  time_t StartTime = st.getStartTime (sd.getMJD ());
+                  if (nCount == 1)
+                    firstTime = StartTime;
+                  else if (firstTime < StartTime - 5 * 50 || firstTime > StartTime + 5 * 60)
+                    nCount = -1;
+                }
+              }
+            }
+            break;
+          case SI::ExtendedEventDescriptorTag: {
+            SI::ExtendedEventDescriptor * eed = (SI::ExtendedEventDescriptor *) d;
+            if (I18nIsPreferredLanguage (Setup.EPGLanguages, eed->languageCode, LanguagePreferenceExt)
+                || !ExtendedEventDescriptors) {
+              delete ExtendedEventDescriptors;
+              ExtendedEventDescriptors = new SI::ExtendedEventDescriptors;
+              UseExtendedEventDescriptor = true;
+            }
+            if (UseExtendedEventDescriptor) {
+              ExtendedEventDescriptors->Add (eed);
+              d = NULL; // so that it is not deleted
+            }
+            if (eed->getDescriptorNumber () == eed->getLastDescriptorNumber ())
+              UseExtendedEventDescriptor = false;
+          }
+          break;
+          case SI::ShortEventDescriptorTag: {
+            SI::ShortEventDescriptor * sed = (SI::ShortEventDescriptor *) d;
+            if (I18nIsPreferredLanguage (Setup.EPGLanguages, sed->languageCode, LanguagePreferenceShort)
+                || !ShortEventDescriptor) {
+              delete ShortEventDescriptor;
+              ShortEventDescriptor = sed;
+              d = NULL; // so that it is not deleted
+            }
+          }
+          break;
+          default:
+            break;
+          }
+          delete d;
+        }
+      }
+
+      {
+        bool Modified = false;
+        int optCount = 0;
+        unsigned int crc[3];
+        crc[0] = cit.getContentId ();
+        SI::PremiereContentTransmissionDescriptor * pct;
+        for (SI::Loop::Iterator it;
+             (pct =
+                (SI::PremiereContentTransmissionDescriptor *) cit.eventDescriptors.getNext (it,
+                    SI::
+                    PremiereContentTransmissionDescriptorTag));) {
+          int nid = pct->getOriginalNetworkId ();
+          int tid = pct->getTransportStreamId ();
+          int sid = pct->getServiceId ();
+          if (SetupPE.FixEpg) {
+            if (nid == 133) {
+              if (tid == 0x03 && sid == 0xf0) {
+                tid = 0x02;
+                sid = 0xe0;
+              } else if (tid == 0x03 && sid == 0xf1) {
+                tid = 0x02;
+                sid = 0xe1;
+              } else if (tid == 0x03 && sid == 0xf5) {
+                tid = 0x03;
+                sid = 0xdc;
+              } else if (tid == 0x04 && sid == 0xd2) {
+                tid = 0x11;
+                sid = 0xe2;
+              } else if (tid == 0x11 && sid == 0xd3) {
+                tid = 0x11;
+                sid = 0xe3;
+              }
+            }
+          }
+          tChannelID channelID (Source (), nid, tid, sid);
+          cChannel *channel = Channels.GetByChannelID (channelID, true);
+#ifdef USE_NOEPG
+          // only use epg from channels not blocked by noEPG-patch
+          if (!allowedEPG (channelID))
+            continue;
+#endif /* NOEPG */
+
+          if (!channel)
+            continue;
+
+          cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (channelID);
+          if (!pSchedule) {
+            pSchedule = new cSchedule (channelID);
+            Schedules->Add (pSchedule);
+          }
+
+          optCount++;
+          SI::PremiereContentTransmissionDescriptor::StartDayEntry sd;
+          int index = 0;
+          for (SI::Loop::Iterator it; pct->startDayLoop.getNext (sd, it);) {
+            int mjd = sd.getMJD ();
+            SI::PremiereContentTransmissionDescriptor::StartDayEntry::StartTimeEntry st;
+            for (SI::Loop::Iterator it2; sd.startTimeLoop.getNext (st, it2);) {
+              time_t StartTime = st.getStartTime (mjd);
+              time_t EndTime = StartTime + cit.getDuration ();
+              int runningStatus = (StartTime < now
+                                   && now < EndTime) ? SI::RunningStatusRunning : ((StartTime - 30 < now
+                                       && now <
+                                       StartTime) ? SI::
+                                       RunningStatusStartsInAFewSeconds
+                                       : SI::RunningStatusNotRunning);
+              bool isOpt = false;
+              if (index++ == 0 && nCount > 1)
+                isOpt = true;
+              crc[1] = isOpt ? optCount : 0;
+              crc[2] = StartTime / STARTTIME_BIAS;
+              tEventID EventId = ((('P' << 8) | 'W') << 16) | crc16 (0, (unsigned char *) crc, sizeof (crc));
+              LogI(2, "%s R%d %04x/%.4x %d %d/%d %s +%d ", *channelID.ToString (), runningStatus,
+                   EventId & 0xFFFF, cit.getContentId (), index, isOpt, optCount,
+                   stripspace (ctime (&StartTime)), (int) cit.getDuration () / 60);
+              if (EndTime + Setup.EPGLinger * 60 < now) {
+                LogI(2, "(old)\n");
+                continue;
+              }
+
+              bool newEvent = false;
+              cEvent *pEvent = (cEvent *) pSchedule->GetEvent (EventId, -1);
+              if (!pEvent) {
+                LogI(2, "(new)\n");
+                pEvent = new cEvent (EventId);
+                if (!pEvent)
+                  continue;
+                newEvent = true;
+              } else {
+                LogI(2, "(upd)\n");
+                pEvent->SetSeen ();
+                if (pEvent->TableID () == 0x00 || pEvent->Version () == cit.getVersionNumber ()) {
+                  if (pEvent->RunningStatus () != runningStatus)
+                    pSchedule->SetRunningStatus (pEvent, runningStatus, channel);
+                  continue;
+                }
+              }
+              pEvent->SetEventID (EventId);
+              pEvent->SetTableID (Tid);
+              pEvent->SetVersion (cit.getVersionNumber ());
+              pEvent->SetStartTime (StartTime);
+              pEvent->SetDuration (cit.getDuration ());
+
+              if (ShortEventDescriptor) {
+                char buffer[256];
+                ShortEventDescriptor->name.getText (buffer, sizeof (buffer));
+                if (isOpt) {
+                  char buffer2[sizeof (buffer) + 32];
+                  snprintf (buffer2, sizeof (buffer2), optPats[SetupPE.OptPat], buffer, optCount);
+                  pEvent->SetTitle (buffer2);
+                } else
+                  pEvent->SetTitle (buffer);
+                LogI(2, "title: %s\n", pEvent->Title ());
+                pEvent->SetShortText (ShortEventDescriptor->text.getText (buffer, sizeof (buffer)));
+              }
+              if (ExtendedEventDescriptors) {
+                char buffer[ExtendedEventDescriptors->getMaximumTextLength (": ") + 1];
+                pEvent->SetDescription (ExtendedEventDescriptors->getText (buffer, sizeof (buffer), ": "));
+              }
+              if (order || rating) {
+                int len = (pEvent->Description ()? strlen (pEvent->Description ()) : 0) +
+                          (order ? strlen (order) : 0) + (rating ? strlen (rating) : 0);
+                char buffer[len + 32];
+                buffer[0] = 0;
+                if (pEvent->Description ())
+                  strcat (buffer, pEvent->Description ());
+                if (rating) {
+                  strcat (buffer, rating);
+                  pEvent->SetParentalRating(nRating);
+                }
+                if (order)
+                  strcat (buffer, order);
+                pEvent->SetDescription (buffer);
+              }
+
+              if (newEvent)
+                pSchedule->AddEvent (pEvent);
+
+              pEvent->FixEpgBugs ();
+              if (pEvent->RunningStatus () != runningStatus)
+                pSchedule->SetRunningStatus (pEvent, runningStatus, channel);
+              pSchedule->DropOutdated (StartTime, EndTime, Tid, cit.getVersionNumber ());
+              Modified = true;
+            }
+          }
+          if (Modified) {
+            pSchedule->Sort ();
+            Schedules->SetModified (pSchedule);
+          }
+          delete pct;
+        }
+      }
+      delete ExtendedEventDescriptors;
+      delete ShortEventDescriptor;
+      free (order);
+      free (rating);
+    }
+  }
+
+}
+
 
 class cPluginEEPG:public cPlugin
 {
