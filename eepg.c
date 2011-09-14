@@ -367,7 +367,7 @@ void cFilterEEPG::SetStatus (bool On)
   if (!On) {
     FreeSummaries ();
     FreeTitles ();
-    Format = 0;
+    //Format = 0;
     ChannelsOk = false;
     NumberOfTables = 0;
   } else {
@@ -3259,7 +3259,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
                , DishExtendedEventDescriptor->getTheme(DishTheme)
                , DishExtendedEventDescriptor->getCategory(DishCategory));
            pEvent->SetShortText(tmp);
-           free tmp;
+           free(tmp);
          } else
            pEvent->SetShortText(DishExtendedEventDescriptor->getShortText());
          //LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
@@ -3416,7 +3416,7 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
   for (int i = 0; i <= HIGHEST_FORMAT; i++){ //find first format that is detected
     if (UnprocessedFormat[i]) {
       isyslog ("EEPG: %s Extended EPG detected on pid %x.", FormatName[i], UnprocessedFormat[i]);
-      Format = i;
+      Format = (EFormat)i;
       // highest format is processed first this way
       // make sure that CONT protocols like Premiere, Freesat are processed
       // AFTER ONCE protocols like MHW, SKY and NAGRA

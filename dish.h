@@ -13,36 +13,6 @@
 namespace SI
 {
 
-#define SIZE_TABLE_128 128
-#define SIZE_TABLE_255 255
-
-class UnimplementedDescriptor;
-
-class DishDescriptor {
-public:
-   DishDescriptor(UnimplementedDescriptor*);
-   virtual ~DishDescriptor();
-   const char* getText(void) const { return text; }
-
-   const char* getShortText(void) const { return shortText; }
-   const char* getTheme(int contentNibleLvl2);
-   const char* getCategory(int userNible);
-   // Decompress the byte arrary and stores the result to a text string
-   void Decompress(unsigned char Tid);
-protected:
-   const char* text; // name or description of the event
-   const char* shortText; // usually the episode name
-   unsigned char* decompressed;
-   UnimplementedDescriptor* unimplementedDesc;
-
-   struct HuffmanTable {
-      unsigned int  startingAddress;
-      unsigned char character;
-      unsigned char numberOfBits;
-   };
-   static HuffmanTable Table128[SIZE_TABLE_128];
-   static HuffmanTable Table255[SIZE_TABLE_255];
-
    namespace DISH_THEMES {
      enum eDishThemes {
       Movie           = 0x01,
@@ -266,6 +236,36 @@ protected:
         DishNetwork              = 0xff
      };
    };
+#define SIZE_TABLE_128 128
+#define SIZE_TABLE_255 255
+
+class UnimplementedDescriptor;
+
+class DishDescriptor {
+public:
+   DishDescriptor(UnimplementedDescriptor*);
+   virtual ~DishDescriptor();
+   const char* getText(void) const { return text; }
+
+   const char* getShortText(void) const { return shortText; }
+   const char* getTheme(int contentNibleLvl2);
+   const char* getCategory(int userNible);
+   // Decompress the byte arrary and stores the result to a text string
+   void Decompress(unsigned char Tid);
+protected:
+   const char* text; // name or description of the event
+   const char* shortText; // usually the episode name
+   unsigned char* decompressed;
+   UnimplementedDescriptor* unimplementedDesc;
+
+   struct HuffmanTable {
+      unsigned int  startingAddress;
+      unsigned char character;
+      unsigned char numberOfBits;
+   };
+   static HuffmanTable Table128[SIZE_TABLE_128];
+   static HuffmanTable Table255[SIZE_TABLE_255];
+
 };
 
 } /* namespace SI */

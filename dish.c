@@ -12,6 +12,7 @@
 
 #include "dish.h"
 #include <libsi/si.h>
+#include <libsi/descriptor.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -58,8 +59,7 @@ namespace SI
       const char* theme;
       using namespace DISH_THEMES;
 
-      eDishThemes t;
-      switch (t) {
+      switch (contentNibleLvl2) {
         case Movie:
           theme = "Movie";
           break;
