@@ -10,7 +10,6 @@
  * -Freesat patch written by dom /at/ suborbital.org.uk
  *
  *
- * This code is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
@@ -2847,7 +2846,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     return; // only collect data for known channels
   }
 
-  LogD(4, prep("channelID: %s"), *channel->GetChannelID().ToString());
+  LogD(4, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
 
 #ifdef USE_NOEPG
   // only use epg from channels not blocked by noEPG-patch
@@ -3009,7 +3008,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     SI::ShortEventDescriptor * ShortEventDescriptor = NULL;
     SI::DishDescriptor *DishExtendedEventDescriptor = NULL;
     SI::DishDescriptor *DishShortEventDescriptor = NULL;
-    uchar DishTheme = -1, DishCategory = -1;
+    uchar DishTheme = 0, DishCategory = 0;
 
 
     cLinkChannels *LinkChannels = NULL;
@@ -3061,10 +3060,14 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
             Contents[NumContents] = ((Nibble.getContentNibbleLevel1() & 0xF) << 4) | (Nibble.getContentNibbleLevel2() & 0xF);
             NumContents++;
           }
-          if (Format == DISH_BEV && DishTheme == -1) {
+          if (Format == DISH_BEV && NumContents == 1) {
             DishTheme = Nibble.getContentNibbleLevel2() & 0xF;
             DishCategory = ((Nibble.getUserNibble1() & 0xF) << 4) | (Nibble.getUserNibble2() & 0xF);
+            //LogD(2, prep("EEPGDEBUG:DishTheme:%x-DishCategory:%x)"), DishTheme, DishCategory);
           }
+          //LogD(2, prep("EEPGDEBUG:Nibble:%x-%x-%x-%x)"), Nibble.getContentNibbleLevel1(),Nibble.getContentNibbleLevel2()
+          //    , Nibble.getUserNibble1(), Nibble.getUserNibble2());
+
         }
         pEvent->SetContents(Contents);
       }
@@ -3259,6 +3262,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
                , DishExtendedEventDescriptor->getTheme(DishTheme)
                , DishExtendedEventDescriptor->getCategory(DishCategory));
            pEvent->SetShortText(tmp);
+           //LogD(2, prep("EEPGDEBUG:DishTheme:%x-DishCategory:%x)"), DishTheme, DishCategory);
            free(tmp);
          } else
            pEvent->SetShortText(DishExtendedEventDescriptor->getShortText());
