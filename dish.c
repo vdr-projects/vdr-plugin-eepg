@@ -12,9 +12,10 @@
 
 #include "dish.h"
 #include <libsi/si.h>
-#include <libsi/descriptor.h>
+//#include <libsi/descriptor.h>
 #include <string.h>
 #include <stdlib.h>
+#include <vdr/tools.h>
 
 namespace SI
 {
@@ -306,8 +307,8 @@ namespace SI
     const char *DishDescriptor::getDescription(void) {
       string tmp = "";
       if (description != NULL) tmp += *description;
-      char* rating = getRating();
-      if (rating && rating != "") {
+      const char* rating = getRating();
+      if (rating && strcmp(rating,"") != 0) {
         if(tmp != "") tmp += "|";
         tmp += rating;
       }

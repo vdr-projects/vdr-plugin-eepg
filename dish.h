@@ -10,6 +10,10 @@
 #ifndef LIBSI_DISH_H
 #define LIBSI_DISH_H
 
+#include <string>
+#include <libsi/util.h>
+#include <libsi/descriptor.h>
+
 namespace SI
 {
 
@@ -267,8 +271,8 @@ protected:
     string *shortText; // usually the episode name
     string *description; // description of the event
     unsigned char *decompressed;
-    uchar DishTheme;
-    uchar DishCategory;
+    unsigned char DishTheme;
+    unsigned char DishCategory;
     uint16_t mpaaRating;
     uint16_t starRating;
 
