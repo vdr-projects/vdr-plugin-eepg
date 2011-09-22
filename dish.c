@@ -266,6 +266,18 @@ namespace SI
       }
     }
 
+    void DishDescriptor::setShortData(unsigned char Tid, CharArray data)
+    {
+      Decompress(Tid, data);
+      if (decompressed) {
+        name = new string((char*)decompressed);
+        delete[] decompressed;
+        decompressed = NULL;
+      } else {
+        name = new string();
+      }
+    }
+
     void DishDescriptor::setExtendedtData(unsigned char Tid, CharArray data)
     {
         Decompress(Tid, data);
