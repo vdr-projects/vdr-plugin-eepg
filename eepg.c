@@ -10,6 +10,7 @@
  * -Freesat patch written by dom /at/ suborbital.org.uk
  *
  *
+ * This code is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
@@ -344,6 +345,7 @@ public:
   cFilterEEPG (void);
   virtual void SetStatus (bool On);
   void Trigger (void);
+    static const int EIT_PID = 0x12;
 };
 
 cFilterEEPG::cFilterEEPG (void)
@@ -2823,15 +2825,13 @@ extern bool SystemCharacterTableIsSingleByte;*/
 class cEIT2:public SI::EIT
 {
 public:
-  cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus = false);
+  cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid = false, bool OnlyRunningStatus = false);
 };
 
-cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus)
+cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid, bool OnlyRunningStatus)
     :  SI::EIT (Data, false)
 {
   //LogD(2, prep("cEIT2::cEIT2"));
-  if (Tid > 0 && Format == DISH_BEV) Tid--;
-
   if (!CheckCRCAndParse ()) {
     LogD(2, prep("!CheckCRCAndParse ()"));
     return;
@@ -2846,7 +2846,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     return; // only collect data for known channels
   }
 
-  LogD(4, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
+  //LogD(4, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
 
 #ifdef USE_NOEPG
   // only use epg from channels not blocked by noEPG-patch
@@ -2874,6 +2874,11 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     if (!SegmentStart)
       SegmentStart = SiEitEvent.getStartTime ();
     SegmentEnd = SiEitEvent.getStartTime () + SiEitEvent.getDuration ();
+    int versionNumber = getVersionNumber();
+    // increase version number for DISH_BEV EIT so it does not get overwriten by VDR.
+    // TODO check the same for other providers.
+    if (Format == DISH_BEV && isEITPid) versionNumber++;
+
     cEvent *newEvent = NULL;
     cEvent *rEvent = NULL;
     cEvent *pEvent = (cEvent *) pSchedule->GetEvent (SiEitEvent.getEventId (), SiEitEvent.getStartTime ());
@@ -2962,7 +2967,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
           continue;
         }
 #else
-        if (pEvent->Version () == getVersionNumber ())
+        if (pEvent->Version () == versionNumber)
           continue;
 #endif /* DDEPGENTRY */
         HasExternalData = ExternalData = true;
@@ -2977,7 +2982,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       // the actual Premiere transponder and the Sat.1/Pro7 transponder), but use different version numbers on
       // each of them :-( So if one DVB card is tuned to the Premiere transponder, while an other one is tuned
       // to the Sat.1/Pro7 transponder, events will keep toggling because of the bogus version numbers.
-      else if (Tid == pEvent->TableID() && pEvent->Version() == getVersionNumber())
+      else if (Tid == pEvent->TableID() && pEvent->Version() == versionNumber)
         continue;
     }
     if (!ExternalData) {
@@ -2998,7 +3003,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     }
     if (OnlyRunningStatus)
       continue;  // do this before setting the version, so that the full update can be done later
-    pEvent->SetVersion (getVersionNumber());
+    pEvent->SetVersion (versionNumber);
 
     int LanguagePreferenceShort = -1;
     int LanguagePreferenceExt = -1;
@@ -3006,9 +3011,9 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     SI::Descriptor * d;
     SI::ExtendedEventDescriptors * ExtendedEventDescriptors = NULL;
     SI::ShortEventDescriptor * ShortEventDescriptor = NULL;
-    SI::DishDescriptor *DishExtendedEventDescriptor = NULL;
-    SI::DishDescriptor *DishShortEventDescriptor = NULL;
-    uchar DishTheme = 0, DishCategory = 0;
+    //SI::DishDescriptor *DishExtendedEventDescriptor = NULL;
+    SI::DishDescriptor *DishEventDescriptor = NULL;
+    //uchar DishTheme = 0, DishCategory = 0;
 
 
     cLinkChannels *LinkChannels = NULL;
@@ -3060,13 +3065,11 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
             Contents[NumContents] = ((Nibble.getContentNibbleLevel1() & 0xF) << 4) | (Nibble.getContentNibbleLevel2() & 0xF);
             NumContents++;
           }
-          if (Format == DISH_BEV && NumContents == 1) {
-            DishTheme = Nibble.getContentNibbleLevel2() & 0xF;
-            DishCategory = ((Nibble.getUserNibble1() & 0xF) << 4) | (Nibble.getUserNibble2() & 0xF);
-            //LogD(2, prep("EEPGDEBUG:DishTheme:%x-DishCategory:%x)"), DishTheme, DishCategory);
+          if (DishEventDescriptor && NumContents == 1) {
+            DishEventDescriptor->setContent(Nibble);
           }
-          //LogD(2, prep("EEPGDEBUG:Nibble:%x-%x-%x-%x)"), Nibble.getContentNibbleLevel1(),Nibble.getContentNibbleLevel2()
-          //    , Nibble.getUserNibble1(), Nibble.getUserNibble2());
+//          LogD(2, prep("EEPGDEBUG:Nibble:%x-%x-%x-%x)"), Nibble.getContentNibbleLevel1(),Nibble.getContentNibbleLevel2()
+//              , Nibble.getUserNibble1(), Nibble.getUserNibble2());
 
         }
         pEvent->SetContents(Contents);
@@ -3190,33 +3193,27 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       }
       break;
       case SI::DishExtendedEventDescriptorTag: {
-        SI::DishDescriptor *deed = new SI::DishDescriptor((SI::UnimplementedDescriptor *)d);
-        deed->Decompress(Tid);
-        if (!DishExtendedEventDescriptor) {
-           DishExtendedEventDescriptor = deed;
-           d = NULL; // so that it is not deleted
+        SI::UnimplementedDescriptor *deed = (SI::UnimplementedDescriptor *)d;
+        if (!DishEventDescriptor) {
+           DishEventDescriptor = new SI::DishDescriptor();
         }
+        DishEventDescriptor->setExtendedtData(Tid, deed->getData());
         HasExternalData = true;
       }
       break;
       case SI::DishShortEventDescriptorTag: {
-        SI::DishDescriptor *dsed = new SI::DishDescriptor((SI::UnimplementedDescriptor *)d);
-        dsed->Decompress(Tid);
-        if (!DishShortEventDescriptor) {
-          DishShortEventDescriptor = dsed;
-          d = NULL; // so that it is not deleted
+        SI::UnimplementedDescriptor *dsed = (SI::UnimplementedDescriptor *)d;
+        if (!DishEventDescriptor) {
+           DishEventDescriptor = new SI::DishDescriptor();
         }
+        DishEventDescriptor->setShortData(Tid, dsed->getData());
         HasExternalData = true;
       }
       break;
       case SI::DishRatingDescriptorTag: {
-        if (d->getLength() == 4) {
+        if (d->getLength() == 4 && DishEventDescriptor) {
            uint16_t rating = d->getData().TwoBytes(2);
-           uint16_t newRating = (rating >> 10) & 0x07;
-           if (newRating == 0) newRating = 5;
-           if (newRating == 6) newRating = 0;
-           pEvent->SetParentalRating((newRating << 10) | (rating & 0x3FF));
-//           pEvent->SetStarRating((rating >> 13) & 0x07);
+           DishEventDescriptor->setRating(rating);
            }
       }
         break;
@@ -3250,30 +3247,19 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       } else if (!HasExternalData)
         pEvent->SetDescription (NULL);
 
-      if (DishShortEventDescriptor) {
-         pEvent->SetTitle(DishShortEventDescriptor->getText());
-         //LogD(2, prep("channelID: %s DishTitle: %s"), *channel->GetChannelID().ToString(), DishShortEventDescriptor->getText());
-      }
-      if (DishExtendedEventDescriptor) {
-         pEvent->SetDescription(DishExtendedEventDescriptor->getText());
-         char *tmp;
-         if (DishTheme >= 0) {
-           Asprintf (&tmp, "%s - %s ~ %s", DishExtendedEventDescriptor->getShortText()
-               , DishExtendedEventDescriptor->getTheme(DishTheme)
-               , DishExtendedEventDescriptor->getCategory(DishCategory));
-           pEvent->SetShortText(tmp);
-           //LogD(2, prep("EEPGDEBUG:DishTheme:%x-DishCategory:%x)"), DishTheme, DishCategory);
-           free(tmp);
-         } else
-           pEvent->SetShortText(DishExtendedEventDescriptor->getShortText());
+      if (DishEventDescriptor) {
+         pEvent->SetTitle(DishEventDescriptor->getName());
+         pEvent->SetDescription(DishEventDescriptor->getDescription());
+         pEvent->SetShortText(DishEventDescriptor->getShortText());
+         //LogD(2, prep("channelID: %s DishTitle: %s"), *channel->GetChannelID().ToString(), DishEventDescriptor->getName());
          //LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
          //LogD(2, prep("DishShortText: %s"), DishExtendedEventDescriptor->getShortText());
       }
+
     }
     delete ExtendedEventDescriptors;
     delete ShortEventDescriptor;
-    delete DishExtendedEventDescriptor;
-    delete DishShortEventDescriptor;
+    delete DishEventDescriptor;
 
     pEvent->SetComponents (Components);
 
@@ -3471,7 +3457,7 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     AddFilter (pid, 0xb0); //perhaps TID is equal to first data byte?
     break;
   case DISH_BEV:
-    AddFilter (0x12, 0, 0); // event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (EIT_PID, 0, 0); // event info, actual(0x4e)/other(0x4f) TS, present/following
     AddFilter (0x0300, 0, 0); // Dish Network EEPG event info, actual(0x4e)/other(0x4f) TS, present/following
     AddFilter (0x0441, 0, 0); // Dish Network EEPG event info, actual(0x4e)/other(0x4f) TS, present/following
 //    AddFilter (0x0441, 0x50, 0xf0); // Bell ExpressVU EEPG
@@ -3490,7 +3476,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
     cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
     //Look for other satelite positions only if Dish/Bell ExpressVU for the moment hardcoded pid check
     if(Schedules)
-        SI::cEIT2 EIT(Schedules, Source(), Tid, Data);
+        SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Pid == EIT_PID);
 
     else//cEIT EIT (Schedules, Source (), Tid, Data);
     {
@@ -3501,7 +3487,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
         cSchedulesLock SchedulesLock;
         cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
         if(Schedules)
-            SI::cEIT2 EIT(Schedules, Source(), Tid, Data, true);
+            SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Pid == EIT_PID, true);
 
         //cEIT EIT (Schedules, Source (), Tid, Data, true);
     }
@@ -3665,7 +3651,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
   } //if pmtpid
   else if (Source ()) {
 
-    if ( Pid == 0x12 || Pid == 0x0300 || Pid == 0x0441 ) {
+    if ( Pid == EIT_PID || Pid == 0x0300 || Pid == 0x0441 ) {
       if (Tid >= 0x4E)
         ProccessContinuous(Pid, Tid, Length, Data);
       return;

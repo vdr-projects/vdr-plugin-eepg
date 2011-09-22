@@ -239,33 +239,47 @@ namespace SI
 #define SIZE_TABLE_128 128
 #define SIZE_TABLE_255 255
 
-class UnimplementedDescriptor;
+using namespace std;
 
 class DishDescriptor {
 public:
-   DishDescriptor(UnimplementedDescriptor*);
-   virtual ~DishDescriptor();
-   const char* getText(void) const { return text; }
+    DishDescriptor();
+    virtual ~DishDescriptor();
+    const char* getName(void) const { return name?name->c_str():""; }
+    const char* getShortText(void);
+    const char *getDescription(void);
+    //   const char* getShortText(void) const { return shortText?shortText->c_str():""; }
+    //   const char* getDescription(void) const { return description?description->c_str():""; }
+    const char *getTheme();
+    const char *getCategory();
+    const char *getRating();
+    const char *getStarRating();
+    void setShortData(unsigned char Tid, CharArray data);
+    void setExtendedtData(unsigned char Tid, CharArray data);
+    void setRating(uint16_t value);
+    void setContent(ContentDescriptor::Nibble Nibble);
 
-   const char* getShortText(void) const { return shortText; }
-   const char* getTheme(int contentNibleLvl2);
-   const char* getCategory(int userNible);
-   // Decompress the byte arrary and stores the result to a text string
-   void Decompress(unsigned char Tid);
+
 protected:
-   const char* text; // name or description of the event
-   const char* shortText; // usually the episode name
-   unsigned char* decompressed;
-   UnimplementedDescriptor* unimplementedDesc;
+    // Decompress the byte array and stores the result to a text string
+    void Decompress(unsigned char Tid, CharArray data);
+    string *name; // name of the event
+    string *shortText; // usually the episode name
+    string *description; // description of the event
+    unsigned char *decompressed;
+    uchar DishTheme;
+    uchar DishCategory;
+    uint16_t mpaaRating;
+    uint16_t starRating;
 
-   struct HuffmanTable {
-      unsigned int  startingAddress;
-      unsigned char character;
-      unsigned char numberOfBits;
-   };
-   static HuffmanTable Table128[SIZE_TABLE_128];
-   static HuffmanTable Table255[SIZE_TABLE_255];
-
+    struct HuffmanTable
+    {
+        unsigned int startingAddress;
+        unsigned char character;
+        unsigned char numberOfBits;
+    };
+    static HuffmanTable Table128[SIZE_TABLE_128];
+    static HuffmanTable Table255[SIZE_TABLE_255];
 };
 
 } /* namespace SI */

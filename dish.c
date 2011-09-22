@@ -20,82 +20,92 @@ namespace SI
 {
 
   // returns the value of a sequence of bits in the byte array
-  static unsigned int getBits(int bitIndex, int bitCount, const unsigned char *byteptr, int length)
-  {
-     union {
-        unsigned char b[4];
-        unsigned long val;
-     } chunk;
+  static unsigned int getBits(int bitIndex, int bitCount, const unsigned char *byteptr,
+      int length) {
+    union
+    {
+      unsigned char b[4];
+      unsigned long val;
+    } chunk;
 
-     int offset = bitIndex >> 3;
-     int bitnum = bitIndex - (offset << 3);
-     int rightend = 32 - bitnum - bitCount;
+    int offset = bitIndex >> 3;
+    int bitnum = bitIndex - (offset << 3);
+    int rightend = 32 - bitnum - bitCount;
 
-     chunk.b[3] = byteptr[offset];
-     chunk.b[2] = (offset+1 < length) ? byteptr[offset+1] : 0;
-     chunk.b[1] = (offset+2 < length) ? byteptr[offset+2] : 0;
-     chunk.b[0] = 0; // Never need to look this far ahead.
+    chunk.b[3] = byteptr[offset];
+    chunk.b[2] = (offset + 1 < length) ? byteptr[offset + 1] : 0;
+    chunk.b[1] = (offset + 2 < length) ? byteptr[offset + 2] : 0;
+    chunk.b[0] = 0;  // Never need to look this far ahead.
 
-     return (unsigned int)(((chunk.val & (0xFFFFFFFF >> bitnum)) >> rightend));
+    return (unsigned int) ((((((chunk.val & (0xFFFFFFFF >> bitnum)) >> rightend)))));
     }
 
-    DishDescriptor::DishDescriptor(UnimplementedDescriptor *unimplementedDesc)
+    DishDescriptor::DishDescriptor()
     {
-        text = NULL;
+        name = NULL;
         shortText = NULL;
+        description = NULL;
         decompressed = NULL;
-        this->unimplementedDesc = unimplementedDesc;
+        DishTheme = 0;
+        DishCategory = 0;
+        mpaaRating = 0;
+        starRating = 0;
     }
 
     DishDescriptor::~DishDescriptor()
     {
         delete [] decompressed;
         decompressed = NULL;
-        delete unimplementedDesc;
+        delete name;
+        name = NULL;
+        delete shortText;
+        shortText = NULL;
+        delete description;
+        description = NULL;
     }
 
-    const char *DishDescriptor::getTheme(int contentNibleLvl2)
+    const char *DishDescriptor::getTheme()
     {
-      const char* theme;
-      using namespace DISH_THEMES;
+        const char *theme;
+        using namespace DISH_THEMES;
 
-      switch (contentNibleLvl2) {
-        case Movie:
-          theme = "Movie";
-          break;
-        case Sports:
-          theme = "Sports";
-            break;
-        case News_Business:
-          theme = "News/Business";
-            break;
-        case Family_Children:
-          theme = "Family/Children";
-            break;
-        case Education:
-          theme = "Education";
-            break;
-        case Series_Special:
-          theme = "Series/Special";
-            break;
-        case Music_Art:
-          theme = "Music/Art";
-            break;
-        case Religious:
-          theme = "Religious";
-            break;
-        default:
-          theme = "";
-          break;
-      }
-      return theme;
+        switch (DishTheme){
+            case Movie:
+                theme = "Movie";
+                break;
+            case Sports:
+                theme = "Sports";
+                break;
+            case News_Business:
+                theme = "News/Business";
+                break;
+            case Family_Children:
+                theme = "Family/Children";
+                break;
+            case Education:
+                theme = "Education";
+                break;
+            case Series_Special:
+                theme = "Series/Special";
+                break;
+            case Music_Art:
+                theme = "Music/Art";
+                break;
+            case Religious:
+                theme = "Religious";
+                break;
+            default:
+                theme = "";
+                break;
+        }
+        return theme;
     }
 
-    const char *DishDescriptor::getCategory(int userNible)
+    const char *DishDescriptor::getCategory()
     {
-      using namespace DISH_CATEGORIES;
+        using namespace DISH_CATEGORIES;
 
-      switch (userNible) {
+      switch (DishCategory) {
       case Action: return "Action";
       case ActionSports:              return "Action Sports";
       case Adults_only:               return "Adults only";
@@ -253,13 +263,108 @@ namespace SI
       case Yoga:                      return "Yoga";
       default: return "";
       }
-
     }
 
-    void DishDescriptor::Decompress(unsigned char Tid)
+    void DishDescriptor::setExtendedtData(unsigned char Tid, CharArray data)
     {
-        const unsigned char *str = unimplementedDesc->getData().getData();
-        const unsigned char *cmp = NULL; // Compressed data
+        Decompress(Tid, data);
+        if (decompressed) {
+        char *split = strchr((char*)((decompressed)), 0x0D); // Look for carriage return
+        //LogD(2, prep("dLength:%d, length:%d, count:%d, decompressed: %s"), dLength, length, count, decompressed);
+        if(split){
+            *split = 0;
+            shortText = new string((char*)decompressed);
+            description = new string((split[1] == 0x20) ? split + 2 : split + 1);
+        }else{
+          description = new string((char*)decompressed);
+        }
+        delete[] decompressed;
+        decompressed = NULL;
+      } else {
+        shortText = new string();
+        description = new string();
+      }
+    }
+
+    const char *DishDescriptor::getShortText(void)
+    {
+        string tmp = "";
+        if (shortText != NULL) tmp += *shortText;
+        if(DishTheme > 0){
+            if(tmp != "") tmp += " - ";
+
+            tmp += getTheme();
+        }
+        if(DishCategory > 0){
+            if(tmp != "") tmp += " - ";
+
+            tmp += getCategory();
+        }
+        return tmp.c_str();
+    }
+
+    const char *DishDescriptor::getDescription(void) {
+      string tmp = "";
+      if (description != NULL) tmp += *description;
+      char* rating = getRating();
+      if (rating && rating != "") {
+        if(tmp != "") tmp += "|";
+        tmp += rating;
+      }
+      if (starRating > 0) {
+        if(tmp != "") tmp += "|";
+        tmp += getStarRating();
+      }
+      return tmp.c_str();
+    }
+
+    void DishDescriptor::setContent(ContentDescriptor::Nibble Nibble)
+    {
+      DishTheme = Nibble.getContentNibbleLevel2() & 0xF;
+      DishCategory = ((Nibble.getUserNibble1() & 0xF) << 4) | (Nibble.getUserNibble2() & 0xF);
+    }
+
+    void DishDescriptor::setRating(uint16_t rating)
+    {
+      uint16_t newRating = (rating >> 10) & 0x07;
+      if (newRating == 0) newRating = 5;
+      if (newRating == 6) newRating = 0;
+      mpaaRating = (newRating << 10) | (rating & 0x3FF);
+      starRating = (rating >> 13) & 0x07;
+    }
+
+    const char* DishDescriptor::getRating(){
+      static const char *const ratings[8] =  { "", "G", "PG", "PG-13", "R", "NR/AO", "", "NC-17" };
+      char buffer[19];
+      buffer[0] = 0;
+      strcpy(buffer, ratings[(mpaaRating >> 10) & 0x07]);
+      if (mpaaRating & 0x3A7F) {
+         strcat(buffer, " [");
+         if (mpaaRating & 0x0230)
+            strcat(buffer, "V,");
+         if (mpaaRating & 0x000A)
+            strcat(buffer, "L,");
+         if (mpaaRating & 0x0044)
+            strcat(buffer, "N,");
+         if (mpaaRating & 0x0101)
+            strcat(buffer, "SC,");
+         if (char *s = strrchr(buffer, ','))
+            s[0] = ']';
+         }
+
+      return isempty(buffer) ? NULL : buffer;
+    }
+
+    const char* DishDescriptor::getStarRating(){
+      static const char *const critiques[8] = { "", "*", "*+", "**", "**+", "***", "***+", "****" };
+      return critiques[starRating & 0x07];
+    }
+
+
+    void DishDescriptor::Decompress(unsigned char Tid, CharArray data)
+    {
+        const unsigned char *str = data.getData();
+        const unsigned char *cmp = NULL;
         int length = 0; // Length of compressed data
         unsigned int dLength = 0; // Length of decompressed data
         if((str[3] & 0xFC) == 0x80){
@@ -278,15 +383,14 @@ namespace SI
         HuffmanTable *table;
         unsigned int tableSize, numBits;
         if (Tid > 0x80) {
-        table = Table255;
-        tableSize = SIZE_TABLE_255;
-        numBits = 13;
-     }
-     else {
-        table = Table128;
-        tableSize = SIZE_TABLE_128;
-        numBits = 11;
-     }
+      table = Table255;
+      tableSize = SIZE_TABLE_255;
+      numBits = 13;
+    } else {
+      table = Table128;
+      tableSize = SIZE_TABLE_128;
+      numBits = 11;
+    }
         unsigned int bLength = length << 3; // number of bits
         unsigned int currentBit = 0, count = 0;
         while(currentBit < bLength - 1 && count < dLength){
@@ -305,17 +409,7 @@ namespace SI
         }
 
         decompressed[count] = 0;
-        char *split = strchr((char*)(decompressed), 0x0D); // Look for carriage return
-        //LogD(2, prep("dLength:%d, length:%d, count:%d, decompressed: %s"), dLength, length, count, decompressed);
-        if(split){
-            *split = 0;
-            shortText = (char*)(decompressed);
-            text = (split[1] == 0x20) ? split + 2 : split + 1;
-        }else{
-            text = (char*)(decompressed);
-        }
     }
-
 
 struct DishDescriptor::HuffmanTable DishDescriptor::Table128[SIZE_TABLE_128] = {
    { 0x0000, 0x20, 0x03 }, { 0x0100, 0x65, 0x04 }, { 0x0180, 0x74, 0x04 }, 
@@ -451,4 +545,4 @@ struct DishDescriptor::HuffmanTable DishDescriptor::Table255[SIZE_TABLE_255] = {
    { 0x1FFD, 0x02, 0x0D }, { 0x1FFE, 0x01, 0x0D }, { 0x1FFF, 0x00, 0x0D }
 };
 
-} //end of namespace
+}  //end of namespace
