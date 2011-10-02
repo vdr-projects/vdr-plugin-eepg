@@ -3463,6 +3463,11 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
 //    AddFilter (0x0441, 0x50, 0xf0); // Bell ExpressVU EEPG
 //    AddFilter (0x0441, 0x60, 0xf0); // Bell ExpressVU EEPG
     break;
+  case EIT:
+    AddFilter (pid, 0x4e, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (pid, 0x50, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
+    AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
+    break;
   default:
     break;
   }
@@ -3630,6 +3635,12 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             && Transponder() == cChannel::Transponder(12224,'R')))
                 && !UnprocessedFormat[DISH_BEV]) {
               UnprocessedFormat[DISH_BEV] = stream.getPid ();
+            }
+
+            // Enable EIT scan for all except DISH_BEV since it is already enabled
+            // TODO add setup option
+            if (!UnprocessedFormat[DISH_BEV]) {
+                UnprocessedFormat[EIT] = EIT_PID;
             }
           }   //if data[1] && data [3]
         }   //if streamtype

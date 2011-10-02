@@ -30,14 +30,15 @@ enum EFormat {
   PREMIERE ,
   FREEVIEW ,
   DISH_BEV ,
+  EIT ,
 //the highest number of EPG-formats that is supported by this plugin
-  HIGHEST_FORMAT = DISH_BEV
+  HIGHEST_FORMAT = EIT
 } Format;
 
 #define NAGRA_TABLE_ID  	0x55 //the lower the table Id, the more "current" it is; table_id 0x00 never gets overwritten, now/next are at 0x4e or 0x4f!
 #define DEFAULT_TABLE_ID 	0x30
 
-const char *FormatName[]= {"MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide","Premiere","FreeView","Dish/Bev"};
+const char *FormatName[]= {"MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide","Premiere","FreeView","Dish/Bev","EIT"};
 
 struct sNode
 {
