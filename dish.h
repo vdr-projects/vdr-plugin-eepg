@@ -249,7 +249,7 @@ class DishDescriptor {
 public:
     DishDescriptor();
     virtual ~DishDescriptor();
-    const char* getName(void) const { return name?name->c_str():""; }
+    const char* getName(void) const { return name.c_str(); }
     const char* getShortText(void);
     const char *getDescription(void);
     //   const char* getShortText(void) const { return shortText?shortText->c_str():""; }
@@ -267,9 +267,9 @@ public:
 protected:
     // Decompress the byte array and stores the result to a text string
     void Decompress(unsigned char Tid, CharArray data);
-    string *name; // name of the event
-    string *shortText; // usually the episode name
-    string *description; // description of the event
+    string name; // name of the event
+    string shortText; // usually the episode name
+    string description; // description of the event
     unsigned char *decompressed;
     unsigned char DishTheme;
     unsigned char DishCategory;

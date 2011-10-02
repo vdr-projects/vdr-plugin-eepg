@@ -43,9 +43,9 @@ namespace SI
 
     DishDescriptor::DishDescriptor()
     {
-        name = NULL;
-        shortText = NULL;
-        description = NULL;
+        name = "";
+        shortText = "";
+        description = "";
         decompressed = NULL;
         DishTheme = 0;
         DishCategory = 0;
@@ -57,12 +57,12 @@ namespace SI
     {
         delete [] decompressed;
         decompressed = NULL;
-        delete name;
-        name = NULL;
-        delete shortText;
-        shortText = NULL;
-        delete description;
-        description = NULL;
+//        delete name;
+//        name = NULL;
+//        delete shortText;
+//        shortText = NULL;
+//        delete description;
+//        description = NULL;
     }
 
     const char *DishDescriptor::getTheme()
@@ -270,11 +270,11 @@ namespace SI
     {
       Decompress(Tid, data);
       if (decompressed) {
-        name = new string((char*)decompressed);
+        name = string((char*)decompressed);
         delete[] decompressed;
         decompressed = NULL;
       } else {
-        name = new string();
+//        name = new string();
       }
     }
 
@@ -286,23 +286,24 @@ namespace SI
         //LogD(2, prep("dLength:%d, length:%d, count:%d, decompressed: %s"), dLength, length, count, decompressed);
         if(split){
             *split = 0;
-            shortText = new string((char*)decompressed);
-            description = new string((split[1] == 0x20) ? split + 2 : split + 1);
+            shortText = string((char*)decompressed);
+            description = string((split[1] == 0x20) ? split + 2 : split + 1);
         }else{
-          description = new string((char*)decompressed);
+          description = string((char*)decompressed);
         }
         delete[] decompressed;
         decompressed = NULL;
       } else {
-        shortText = new string();
-        description = new string();
+//        shortText = new string();
+//        description = new string();
       }
     }
 
     const char *DishDescriptor::getShortText(void)
     {
         string tmp = "";
-        if (shortText != NULL) tmp += *shortText;
+//        if (shortText != NULL) tmp += *shortText;
+        tmp += shortText;
         if(DishTheme > 0){
             if(tmp != "") tmp += " - ";
 
@@ -318,14 +319,15 @@ namespace SI
 
     const char *DishDescriptor::getDescription(void) {
       string tmp = "";
-      if (description != NULL) tmp += *description;
+//      if (description != NULL) tmp += *description;
+      tmp += description;
       const char* rating = getRating();
       if (rating && strcmp(rating,"") != 0) {
-        if(tmp != "") tmp += "|";
+        if(tmp != "") tmp += " ~ ";
         tmp += rating;
       }
       if (starRating > 0) {
-        if(tmp != "") tmp += "|";
+        if(tmp != "") tmp += " ~ ";
         tmp += getStarRating();
       }
       return tmp.c_str();
@@ -348,6 +350,11 @@ namespace SI
 
     const char* DishDescriptor::getRating(){
       static const char *const ratings[8] =  { "", "G", "PG", "PG-13", "R", "NR/AO", "", "NC-17" };
+
+      if (mpaaRating == 0) {
+        return ratings[mpaaRating];
+      }
+
       char buffer[19];
       buffer[0] = 0;
       strcpy(buffer, ratings[(mpaaRating >> 10) & 0x07]);
