@@ -110,6 +110,7 @@ public:
   int RatingInfo;
   int FixEpg;
   int DisplayMessage;
+  int ProcessEIT;
 #ifdef DEBUG
   int LogLevel;
 #endif
@@ -127,6 +128,7 @@ cSetupEEPG::cSetupEEPG (void)
   RatingInfo = 1;
   FixEpg = 0;
   DisplayMessage = 1;
+  ProcessEIT = 0;
 #ifdef DEBUG
   LogLevel = 0;
 #endif
@@ -163,6 +165,7 @@ cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
   Add (new cMenuEditBoolItem (tr ("Display summary message"), &data.DisplayMessage));
 #ifdef DEBUG
   Add (new cMenuEditIntItem (tr ("Level of logging verbosity"), &data.LogLevel, 0, 5));
+  Add (new cMenuEditBoolItem (tr ("Process EIT info with EEPG"), &data.ProcessEIT));
 #endif
 }
 
@@ -176,6 +179,7 @@ void cMenuSetupPremiereEpg::Store (void)
   SetupStore ("DisplayMessage", SetupPE.DisplayMessage);
 #ifdef DEBUG
   SetupStore ("LogLevel", SetupPE.LogLevel);
+  SetupStore ("ProcessEIT", SetupPE.ProcessEIT);
 #endif
 }
 
@@ -2879,7 +2883,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     int versionNumber = getVersionNumber();
     // increase version number for DISH_BEV EIT so it does not get overwriten by VDR.
     // TODO check the same for other providers.
-    if (Format == DISH_BEV && isEITPid) versionNumber++;
+    if ((Format == DISH_BEV || SetupPE.ProcessEIT )&& isEITPid) versionNumber++;
 
     cEvent *newEvent = NULL;
     cEvent *rEvent = NULL;
@@ -2978,7 +2982,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       // If the new event has a higher table ID, let's skip it.
       // The lower the table ID, the more "current" the information.
       // if the Table ID is DEFAULT_TABLE_ID it is most probably EEPG event so we can overwrite
-      else if (Tid > pEvent->TableID() && pEvent->TableID () != DEFAULT_TABLE_ID)
+      else if (Tid > pEvent->TableID() && (SetupPE.ProcessEIT ? pEvent->TableID () != DEFAULT_TABLE_ID : true))
         continue;
       // If the new event comes from the same table and has the same version number
       // as the existing one, let's skip it to avoid unnecessary work.
@@ -3646,8 +3650,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             }
 
             // Enable EIT scan for all except DISH_BEV since it is already enabled
-            // TODO add setup option
-            if (!UnprocessedFormat[DISH_BEV]) {
+            if (SetupPE.ProcessEIT && !UnprocessedFormat[DISH_BEV]) {
                 UnprocessedFormat[EIT] = EIT_PID;
             }
           }   //if data[1] && data [3]
@@ -4328,6 +4331,8 @@ bool cPluginEEPG::SetupParse (const char *Name, const char *Value)
 #ifdef DEBUG
   else if (!strcasecmp (Name, "LogLevel"))
     SetupPE.LogLevel = atoi (Value);
+  else if (!strcasecmp (Name, "ProcessEIT"))
+    SetupPE.ProcessEIT = atoi (Value);
 #endif
   else
     return false;
