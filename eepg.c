@@ -2151,6 +2151,7 @@ int cFilterEEPG::GetTitlesMHW2 (const u_char * Data, int Length)
         CleanString (T->Text);
         Pos += Len + 8; // Sub Theme starts here
         T->ThemeId = ((Data[7] & 0x3f) << 6) | (Data[Pos] & 0x3f);
+        T->TableId = DEFAULT_TABLE_ID; //TODO locate the actual table id
         T->EventId = (Data[Pos + 1] << 8) | Data[Pos + 2];
         T->SummaryAvailable = (T->EventId != 0xFFFF);
         LogI(3, prep("EventId %04x Titlenr %d:SummAv:%x,Name:%s."), T->EventId,
@@ -2476,6 +2477,7 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)
           T->StartTime = ((MjdTime - 40587) * 86400) + ((Data[p + 2] << 9) | (Data[p + 3] << 1));
           T->Duration = ((Data[p + 4] << 9) | (Data[p + 5] << 1));
           T->ThemeId = Data[p + 6];
+          T->TableId = DEFAULT_TABLE_ID; //TODO locate the actual table id
           //TODO Data[p + 7] is Quality value add it to description
           //int quality = Data[p + 7];
           switch (Data[p + 8] & 0x0F) {
@@ -2846,7 +2848,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     return; // only collect data for known channels
   }
 
-  //LogD(4, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
+  //LogD(5, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
 
 #ifdef USE_NOEPG
   // only use epg from channels not blocked by noEPG-patch
@@ -2891,6 +2893,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       if (!pEvent)
         continue;
     } else {
+      //LogD(3, prep("existing event channelID: %s Title: %s TableID 0x%02X new TID 0x%02X Version %i, new version %i"), *channel->GetChannelID().ToString(), pEvent->Title(), pEvent->TableID(), Tid, pEvent->Version(), versionNumber);
       // We have found an existing event, either through its event ID or its start time.
       pEvent->SetSeen ();
       // If the existing event has a zero table ID it was defined externally and shall
@@ -3025,7 +3028,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         continue;
       }
 
-      //LogD(2, prep("EEPGDEBUG:d->getDescriptorTAG():%x)"), d->getDescriptorTag ());
+      LogD(2, prep("EEPGDEBUG:d->getDescriptorTAG():%x)"), d->getDescriptorTag ());
 
       switch (d->getDescriptorTag ()) {
       case SI::ExtendedEventDescriptorTag: {
@@ -3232,18 +3235,22 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->name.getText(buffer, sizeof(buffer));
         pEvent->SetTitle (buffer);
+        LogD(3, prep("channelID: %s Title: %s"), *channel->GetChannelID().ToString(), pEvent->Title());
         l = ShortEventDescriptor->text.getLength();
         f = (unsigned char *) ShortEventDescriptor->text.getData().getData();
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
         pEvent->SetShortText (buffer);
+        LogD(3, prep("ShortText: %s"), pEvent->ShortText());
       } else if (!HasExternalData) {
         pEvent->SetTitle (NULL);
         pEvent->SetShortText (NULL);
+        LogD(3, prep("SetTitle (NULL)"));
       }
       if (ExtendedEventDescriptors) {
         char buffer[Utf8BufSize (ExtendedEventDescriptors->getMaximumTextLength (": ")) + 1];
         pEvent->SetDescription (ExtendedEventDescriptors->getText (buffer, sizeof (buffer), ": "));
+        LogD(3, prep("Description: %s"), pEvent->Description());
       } else if (!HasExternalData)
         pEvent->SetDescription (NULL);
 
