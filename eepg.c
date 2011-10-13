@@ -3256,8 +3256,10 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         char buffer[Utf8BufSize (ExtendedEventDescriptors->getMaximumTextLength (": ")) + 1];
         pEvent->SetDescription (ExtendedEventDescriptors->getText (buffer, sizeof (buffer), ": "));
         LogD(3, prep("Description: %s"), pEvent->Description());
-      } else if (!HasExternalData)
+      } else if (!HasExternalData) {
         pEvent->SetDescription (NULL);
+        LogD(3, prep("SetDescription (NULL)"));
+      }
 
       if (DishEventDescriptor) {
          pEvent->SetTitle(DishEventDescriptor->getName());

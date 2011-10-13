@@ -270,7 +270,7 @@ namespace SI
     {
       Decompress(Tid, data);
       if (decompressed) {
-        name = string((char*)decompressed);
+        name = string(reinterpret_cast<char*>(decompressed));
         delete[] decompressed;
         decompressed = NULL;
       } else {
@@ -282,14 +282,15 @@ namespace SI
     {
         Decompress(Tid, data);
         if (decompressed) {
-        char *split = strchr((char*)((decompressed)), 0x0D); // Look for carriage return
+            string str;
+        char *split = strchr(reinterpret_cast<char*>(decompressed), 0x0D); // Look for carriage return
         //LogD(2, prep("dLength:%d, length:%d, count:%d, decompressed: %s"), dLength, length, count, decompressed);
         if(split){
             *split = 0;
-            shortText = string((char*)decompressed);
+            shortText = string(reinterpret_cast<char*>(decompressed));
             description = string((split[1] == 0x20) ? split + 2 : split + 1);
         }else{
-          description = string((char*)decompressed);
+          description = string(reinterpret_cast<char*>(decompressed));
         }
         delete[] decompressed;
         decompressed = NULL;
@@ -301,35 +302,43 @@ namespace SI
 
     const char *DishDescriptor::getShortText(void)
     {
-        string tmp = "";
+        isyslog("EEPG DISH: shortText: %s", shortText.c_str());
+        string tmp = shortText;
 //        if (shortText != NULL) tmp += *shortText;
-        tmp += shortText;
+        //if (shortText != NULL) tmp.append(shortText);
         if(DishTheme > 0){
             if(tmp != "") tmp += " - ";
 
-            tmp += getTheme();
+            tmp.append(getTheme());
+            isyslog("EEPG DISH: theme: %s", getTheme());
         }
         if(DishCategory > 0){
             if(tmp != "") tmp += " - ";
 
-            tmp += getCategory();
+            isyslog("EEPG DISH: category: %s", getCategory());
+            tmp.append(getCategory());
         }
+        isyslog("EEPG DISH: full shorttext: %s", tmp.c_str());
         return tmp.c_str();
     }
 
     const char *DishDescriptor::getDescription(void) {
-      string tmp = "";
+      string tmp = description;
 //      if (description != NULL) tmp += *description;
       tmp += description;
+      isyslog("EEPG DISH: description: %s", description.c_str());
       const char* rating = getRating();
       if (rating && strcmp(rating,"") != 0) {
         if(tmp != "") tmp += " ~ ";
         tmp += rating;
+        isyslog("EEPG DISH: rating: %s", rating);
       }
       if (starRating > 0) {
         if(tmp != "") tmp += " ~ ";
         tmp += getStarRating();
+        isyslog("EEPG DISH: star: %s", getStarRating());
       }
+      isyslog("EEPG DISH: full description: %s", tmp.c_str());
       return tmp.c_str();
     }
 
