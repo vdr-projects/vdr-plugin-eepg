@@ -10,6 +10,8 @@
 #ifndef LIBSI_DISH_H
 #define LIBSI_DISH_H
 
+#include <vdr/tools.h>
+
 namespace SI
 {
 
@@ -243,7 +245,7 @@ class UnimplementedDescriptor;
 
 class DishDescriptor {
 public:
-   DishDescriptor(UnimplementedDescriptor*);
+    DishDescriptor();
    virtual ~DishDescriptor();
    const char* getText(void) const { return text; }
 
@@ -251,12 +253,11 @@ public:
    const char* getTheme(int contentNibleLvl2);
    const char* getCategory(int userNible);
    // Decompress the byte arrary and stores the result to a text string
-   void Decompress(unsigned char Tid);
+   void Decompress(unsigned char Tid, CharArray data);
 protected:
    const char* text; // name or description of the event
    const char* shortText; // usually the episode name
    unsigned char* decompressed;
-   UnimplementedDescriptor* unimplementedDesc;
 
    struct HuffmanTable {
       unsigned int  startingAddress;

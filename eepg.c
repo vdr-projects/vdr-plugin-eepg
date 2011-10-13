@@ -3190,21 +3190,17 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       }
       break;
       case SI::DishExtendedEventDescriptorTag: {
-        SI::DishDescriptor *deed = new SI::DishDescriptor((SI::UnimplementedDescriptor *)d);
-        deed->Decompress(Tid);
         if (!DishExtendedEventDescriptor) {
-           DishExtendedEventDescriptor = deed;
-           d = NULL; // so that it is not deleted
+           DishExtendedEventDescriptor = new SI::DishDescriptor();
+           DishExtendedEventDescriptor->Decompress(Tid, d->getData());
         }
         HasExternalData = true;
       }
       break;
       case SI::DishShortEventDescriptorTag: {
-        SI::DishDescriptor *dsed = new SI::DishDescriptor((SI::UnimplementedDescriptor *)d);
-        dsed->Decompress(Tid);
         if (!DishShortEventDescriptor) {
-          DishShortEventDescriptor = dsed;
-          d = NULL; // so that it is not deleted
+          DishShortEventDescriptor = new SI::DishDescriptor();
+          DishShortEventDescriptor->Decompress(Tid, d->getData());
         }
         HasExternalData = true;
       }

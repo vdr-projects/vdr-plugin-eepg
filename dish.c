@@ -39,19 +39,17 @@ namespace SI
      return (unsigned int)(((chunk.val & (0xFFFFFFFF >> bitnum)) >> rightend));
     }
 
-    DishDescriptor::DishDescriptor(UnimplementedDescriptor *unimplementedDesc)
+    DishDescriptor::DishDescriptor()
     {
         text = NULL;
         shortText = NULL;
         decompressed = NULL;
-        this->unimplementedDesc = unimplementedDesc;
     }
 
     DishDescriptor::~DishDescriptor()
     {
         delete [] decompressed;
         decompressed = NULL;
-        delete unimplementedDesc;
     }
 
     const char *DishDescriptor::getTheme(int contentNibleLvl2)
@@ -256,10 +254,10 @@ namespace SI
 
     }
 
-    void DishDescriptor::Decompress(unsigned char Tid)
+    void DishDescriptor::Decompress(unsigned char Tid, CharArray data)
     {
-        const unsigned char *str = unimplementedDesc->getData().getData();
-        const unsigned char *cmp = NULL; // Compressed data
+        const unsigned char *str = data.getData();
+        const unsigned char *cmp = NULL;
         int length = 0; // Length of compressed data
         unsigned int dLength = 0; // Length of decompressed data
         if((str[3] & 0xFC) == 0x80){
