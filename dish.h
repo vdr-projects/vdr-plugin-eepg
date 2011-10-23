@@ -10,7 +10,7 @@
 #ifndef LIBSI_DISH_H
 #define LIBSI_DISH_H
 
-#include <vdr/tools.h>
+#include <libsi/util.h>
 
 namespace SI
 {
