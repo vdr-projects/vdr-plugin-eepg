@@ -10,7 +10,7 @@
 #ifndef LIBSI_DISH_H
 #define LIBSI_DISH_H
 
-#include <vdr/tools.h>
+#include <libsi/util.h>
 
 namespace SI
 {
@@ -247,17 +247,35 @@ class DishDescriptor {
 public:
     DishDescriptor();
    virtual ~DishDescriptor();
-   const char* getText(void) const { return text; }
+    const char* getName(void) const { return name; }
+    const char* getShortText(void);
+    const char *getDescription(void);
+    //   const char* getShortText(void) const { return shortText?shortText->c_str():""; }
+    //   const char* getDescription(void) const { return description?description->c_str():""; }
+    const char *getTheme();
+    const char *getCategory();
+    const char *getRating();
+    const char *getStarRating();
+    bool hasTheme() {return DishTheme > 0;}
+    bool hasCategory() {return DishCategory > 0;}
+    void setShortData(unsigned char Tid, CharArray data);
+    void setExtendedtData(unsigned char Tid, CharArray data);
+    void setRating(uint16_t value);
+    void setContent(ContentDescriptor::Nibble Nibble);
 
-   const char* getShortText(void) const { return shortText; }
-   const char* getTheme(int contentNibleLvl2);
-   const char* getCategory(int userNible);
-   // Decompress the byte arrary and stores the result to a text string
-   void Decompress(unsigned char Tid, CharArray data);
 protected:
-   const char* text; // name or description of the event
-   const char* shortText; // usually the episode name
-   unsigned char* decompressed;
+    // Decompress the byte array and stores the result to a text string
+    const char *Decompress(unsigned char Tid, CharArray data);
+    const char* name; // name of the event
+    const char* shortText; // usually the episode name
+    const char* description; // description of the event
+    unsigned char* decompressedShort;
+    unsigned char* decompressedExtended;
+    unsigned char DishTheme;
+    unsigned char DishCategory;
+    uint16_t mpaaRating;
+    uint16_t starRating;
+
 
    struct HuffmanTable {
       unsigned int  startingAddress;

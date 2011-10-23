@@ -3006,9 +3006,9 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     SI::Descriptor * d;
     SI::ExtendedEventDescriptors * ExtendedEventDescriptors = NULL;
     SI::ShortEventDescriptor * ShortEventDescriptor = NULL;
-    SI::DishDescriptor *DishExtendedEventDescriptor = NULL;
-    SI::DishDescriptor *DishShortEventDescriptor = NULL;
-    uchar DishTheme = 0, DishCategory = 0;
+    //SI::DishDescriptor *DishExtendedEventDescriptor = NULL;
+    SI::DishDescriptor *DishEventDescriptor = NULL;
+    //uchar DishTheme = 0, DishCategory = 0;
 
 
     cLinkChannels *LinkChannels = NULL;
@@ -3060,10 +3060,8 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
             Contents[NumContents] = ((Nibble.getContentNibbleLevel1() & 0xF) << 4) | (Nibble.getContentNibbleLevel2() & 0xF);
             NumContents++;
           }
-          if (Format == DISH_BEV && NumContents == 1) {
-            DishTheme = Nibble.getContentNibbleLevel2() & 0xF;
-            DishCategory = ((Nibble.getUserNibble1() & 0xF) << 4) | (Nibble.getUserNibble2() & 0xF);
-            //LogD(2, prep("EEPGDEBUG:DishTheme:%x-DishCategory:%x)"), DishTheme, DishCategory);
+          if (DishEventDescriptor && NumContents == 1) {
+            DishEventDescriptor->setContent(Nibble);
           }
           //LogD(2, prep("EEPGDEBUG:Nibble:%x-%x-%x-%x)"), Nibble.getContentNibbleLevel1(),Nibble.getContentNibbleLevel2()
           //    , Nibble.getUserNibble1(), Nibble.getUserNibble2());
@@ -3190,29 +3188,27 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       }
       break;
       case SI::DishExtendedEventDescriptorTag: {
-        if (!DishExtendedEventDescriptor) {
-           DishExtendedEventDescriptor = new SI::DishDescriptor();
-           DishExtendedEventDescriptor->Decompress(Tid, d->getData());
+        SI::UnimplementedDescriptor *deed = (SI::UnimplementedDescriptor *)d;
+        if (!DishEventDescriptor) {
+           DishEventDescriptor = new SI::DishDescriptor();
         }
+        DishEventDescriptor->setExtendedtData(Tid, deed->getData());
         HasExternalData = true;
       }
       break;
       case SI::DishShortEventDescriptorTag: {
-        if (!DishShortEventDescriptor) {
-          DishShortEventDescriptor = new SI::DishDescriptor();
-          DishShortEventDescriptor->Decompress(Tid, d->getData());
+        SI::UnimplementedDescriptor *dsed = (SI::UnimplementedDescriptor *)d;
+        if (!DishEventDescriptor) {
+           DishEventDescriptor = new SI::DishDescriptor();
         }
+        DishEventDescriptor->setShortData(Tid, dsed->getData());
         HasExternalData = true;
       }
       break;
       case SI::DishRatingDescriptorTag: {
-        if (d->getLength() == 4) {
+        if (d->getLength() == 4 && DishEventDescriptor) {
            uint16_t rating = d->getData().TwoBytes(2);
-           uint16_t newRating = (rating >> 10) & 0x07;
-           if (newRating == 0) newRating = 5;
-           if (newRating == 6) newRating = 0;
-           pEvent->SetParentalRating((newRating << 10) | (rating & 0x3FF));
-//           pEvent->SetStarRating((rating >> 13) & 0x07);
+           DishEventDescriptor->setRating(rating);
            }
       }
         break;
@@ -3246,30 +3242,47 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       } else if (!HasExternalData)
         pEvent->SetDescription (NULL);
 
-      if (DishShortEventDescriptor) {
-         pEvent->SetTitle(DishShortEventDescriptor->getText());
+      if (DishEventDescriptor) {
+         if (DishEventDescriptor->getName())
+           pEvent->SetTitle(DishEventDescriptor->getName());
          //LogD(2, prep("channelID: %s DishTitle: %s"), *channel->GetChannelID().ToString(), DishShortEventDescriptor->getText());
-      }
-      if (DishExtendedEventDescriptor) {
-         pEvent->SetDescription(DishExtendedEventDescriptor->getText());
+//         pEvent->SetDescription(DishExtendedEventDescriptor->getText());
          char *tmp;
-         if (DishTheme >= 0) {
-           Asprintf (&tmp, "%s - %s ~ %s", DishExtendedEventDescriptor->getShortText()
-               , DishExtendedEventDescriptor->getTheme(DishTheme)
-               , DishExtendedEventDescriptor->getCategory(DishCategory));
-           pEvent->SetShortText(tmp);
-           //LogD(2, prep("EEPGDEBUG:DishTheme:%x-DishCategory:%x)"), DishTheme, DishCategory);
-           free(tmp);
-         } else
-           pEvent->SetShortText(DishExtendedEventDescriptor->getShortText());
+         string fmt;
+         fmt = "%s";
+         if (0 != strcmp(DishEventDescriptor->getShortText(),"") && DishEventDescriptor->hasTheme()) {
+             fmt += " - ";
+         }
+         fmt += "%s";
+         if (DishEventDescriptor->hasTheme() && DishEventDescriptor->hasCategory()) {
+             fmt += " ~ ";
+         }
+         fmt += "%s";
+
+         Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getShortText()
+             , DishEventDescriptor->getTheme()
+             , DishEventDescriptor->getCategory());
+         pEvent->SetShortText(tmp);
+         //LogD(2, prep("EEPGDEBUG:DishTheme:%x-DishCategory:%x)"), DishTheme, DishCategory);
+         free(tmp);
+
+         fmt = "%s";
+         if (0 != strcmp(DishEventDescriptor->getDescription(),"") && (0 != strcmp(DishEventDescriptor->getRating(),"") || 0 != strcmp(DishEventDescriptor->getStarRating(),""))) {
+           fmt += "|";
+         }
+         fmt += "%s %s";
+         Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getDescription()
+             , DishEventDescriptor->getRating()
+             , DishEventDescriptor->getStarRating());
+         pEvent->SetDescription(tmp);
+         free(tmp);
          //LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
          //LogD(2, prep("DishShortText: %s"), DishExtendedEventDescriptor->getShortText());
       }
     }
     delete ExtendedEventDescriptors;
     delete ShortEventDescriptor;
-    delete DishExtendedEventDescriptor;
-    delete DishShortEventDescriptor;
+    delete DishEventDescriptor;
 
     pEvent->SetComponents (Components);
 

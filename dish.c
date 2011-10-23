@@ -41,23 +41,31 @@ namespace SI
 
     DishDescriptor::DishDescriptor()
     {
-        text = NULL;
+        name = NULL;
         shortText = NULL;
-        decompressed = NULL;
+        description = NULL;
+        decompressedShort = NULL;
+        decompressedExtended = NULL;
+        DishTheme = 0;
+        DishCategory = 0;
+        mpaaRating = 0;
+        starRating = 0;
     }
 
     DishDescriptor::~DishDescriptor()
     {
-        delete [] decompressed;
-        decompressed = NULL;
+        delete [] decompressedShort;
+        decompressedShort = NULL;
+        delete [] decompressedExtended;
+        decompressedExtended = NULL;
     }
 
-    const char *DishDescriptor::getTheme(int contentNibleLvl2)
+    const char *DishDescriptor::getTheme()
     {
       const char* theme;
       using namespace DISH_THEMES;
 
-      switch (contentNibleLvl2) {
+        switch (DishTheme){
         case Movie:
           theme = "Movie";
           break;
@@ -89,11 +97,11 @@ namespace SI
       return theme;
     }
 
-    const char *DishDescriptor::getCategory(int userNible)
+    const char *DishDescriptor::getCategory()
     {
       using namespace DISH_CATEGORIES;
 
-      switch (userNible) {
+      switch (DishCategory) {
       case Action: return "Action";
       case ActionSports:              return "Action Sports";
       case Adults_only:               return "Adults only";
@@ -251,10 +259,116 @@ namespace SI
       case Yoga:                      return "Yoga";
       default: return "";
       }
-
     }
 
-    void DishDescriptor::Decompress(unsigned char Tid, CharArray data)
+    void DishDescriptor::setShortData(unsigned char Tid, CharArray data)
+    {
+      decompressedShort = Decompress(Tid, data);
+      if (decompressedShort) {
+        name = decompressedShort;
+      }
+    }
+
+    void DishDescriptor::setExtendedtData(unsigned char Tid, CharArray data)
+    {
+      decompressedExtended = Decompress(Tid, data);
+        if (decompressedExtended) {
+        char *split = strchr((char*)((decompressedExtended)), 0x0D); // Look for carriage return
+        //LogD(2, prep("dLength:%d, length:%d, count:%d, decompressed: %s"), dLength, length, count, decompressed);
+        if(split){
+            *split = 0;
+            shortText = (char*)decompressedExtended;
+            description = (split[1] == 0x20) ? split + 2 : split + 1;
+        }else{
+          description = (char*)decompressedExtended;
+        }
+      }
+    }
+
+    const char *DishDescriptor::getShortText(void)
+    {
+//        string tmp = "";
+////        if (shortText != NULL) tmp += *shortText;
+//        tmp += shortText;
+//        if(DishTheme > 0){
+//            if(tmp != "") tmp += " - ";
+//
+//            tmp += getTheme();
+//        }
+//        if(DishCategory > 0){
+//            if(tmp != "") tmp += " - ";
+//
+//            tmp += getCategory();
+//        }
+//        return tmp.c_str();
+      return shortText?shortText:"";
+    }
+
+    const char *DishDescriptor::getDescription(void) {
+//      string tmp = "";
+////      if (description != NULL) tmp += *description;
+//      tmp += description;
+//      const char* rating = getRating();
+//      if (rating && strcmp(rating,"") != 0) {
+//        if(tmp != "") tmp += " ~ ";
+//        tmp += rating;
+//      }
+//      if (starRating > 0) {
+//        if(tmp != "") tmp += " ~ ";
+//        tmp += getStarRating();
+//      }
+//      return tmp.c_str();
+      return description;
+    }
+
+    void DishDescriptor::setContent(ContentDescriptor::Nibble Nibble)
+    {
+      DishTheme = Nibble.getContentNibbleLevel2() & 0xF;
+      DishCategory = ((Nibble.getUserNibble1() & 0xF) << 4) | (Nibble.getUserNibble2() & 0xF);
+    }
+
+    void DishDescriptor::setRating(uint16_t rating)
+    {
+      uint16_t newRating = (rating >> 10) & 0x07;
+      if (newRating == 0) newRating = 5;
+      if (newRating == 6) newRating = 0;
+      mpaaRating = (newRating << 10) | (rating & 0x3FF);
+      starRating = (rating >> 13) & 0x07;
+    }
+
+    const char* DishDescriptor::getRating(){
+      static const char *const ratings[8] =  { "", "G", "PG", "PG-13", "R", "NR/AO", "", "NC-17" };
+
+      if (mpaaRating == 0) {
+        return ratings[mpaaRating];
+      }
+
+      char buffer[19];
+      buffer[0] = 0;
+      strcpy(buffer, ratings[(mpaaRating >> 10) & 0x07]);
+      if (mpaaRating & 0x3A7F) {
+         strcat(buffer, " [");
+         if (mpaaRating & 0x0230)
+            strcat(buffer, "V,");
+         if (mpaaRating & 0x000A)
+            strcat(buffer, "L,");
+         if (mpaaRating & 0x0044)
+            strcat(buffer, "N,");
+         if (mpaaRating & 0x0101)
+            strcat(buffer, "SC,");
+         if (char *s = strrchr(buffer, ','))
+            s[0] = ']';
+         }
+
+      return isempty(buffer) ? "" : buffer;
+    }
+
+    const char* DishDescriptor::getStarRating(){
+      static const char *const critiques[8] = { "", "*", "*+", "**", "**+", "***", "***+", "****" };
+      return critiques[starRating & 0x07];
+    }
+
+    const char *DishDescriptor::Decompress(unsigned char Tid, CharArray data)
     {
         const unsigned char *str = data.getData();
         const unsigned char *cmp = NULL;
@@ -270,17 +384,16 @@ namespace SI
             cmp = str + 3;
         }
         if(length <= 0 || !dLength)
-            return;
+            return NULL;
 
-        decompressed = new unsigned char[dLength + 1];
+        char *decompressed = new unsigned char[dLength + 1];
         HuffmanTable *table;
         unsigned int tableSize, numBits;
         if (Tid > 0x80) {
         table = Table255;
         tableSize = SIZE_TABLE_255;
         numBits = 13;
-     }
-     else {
+    } else {
         table = Table128;
         tableSize = SIZE_TABLE_128;
         numBits = 11;
@@ -303,15 +416,7 @@ namespace SI
         }
 
         decompressed[count] = 0;
-        char *split = strchr((char*)(decompressed), 0x0D); // Look for carriage return
-        //LogD(2, prep("dLength:%d, length:%d, count:%d, decompressed: %s"), dLength, length, count, decompressed);
-        if(split){
-            *split = 0;
-            shortText = (char*)(decompressed);
-            text = (split[1] == 0x20) ? split + 2 : split + 1;
-        }else{
-            text = (char*)(decompressed);
-        }
+        return decompressed;
     }
 
 
