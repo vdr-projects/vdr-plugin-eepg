@@ -11,6 +11,7 @@
 #define LIBSI_DISH_H
 
 #include <libsi/util.h>
+#include <libsi/descriptor.h>
 
 namespace SI
 {
@@ -265,7 +266,7 @@ public:
 
 protected:
     // Decompress the byte array and stores the result to a text string
-    const char *Decompress(unsigned char Tid, CharArray data);
+    unsigned char* Decompress(unsigned char Tid, CharArray data);
     const char* name; // name of the event
     const char* shortText; // usually the episode name
     const char* description; // description of the event

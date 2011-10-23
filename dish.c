@@ -368,7 +368,7 @@ namespace SI
       return critiques[starRating & 0x07];
     }
 
-    const char *DishDescriptor::Decompress(unsigned char Tid, CharArray data)
+    unsigned char* DishDescriptor::Decompress(unsigned char Tid, CharArray data)
     {
         const unsigned char *str = data.getData();
         const unsigned char *cmp = NULL;
@@ -386,7 +386,7 @@ namespace SI
         if(length <= 0 || !dLength)
             return NULL;
 
-        char *decompressed = new unsigned char[dLength + 1];
+        unsigned char* decompressed = new unsigned char[dLength + 1];
         HuffmanTable *table;
         unsigned int tableSize, numBits;
         if (Tid > 0x80) {
