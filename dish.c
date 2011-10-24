@@ -15,6 +15,7 @@
 #include <libsi/descriptor.h>
 #include <string.h>
 #include <stdlib.h>
+#include <vdr/tools.h>
 
 namespace SI
 {
@@ -265,7 +266,7 @@ namespace SI
     {
       decompressedShort = Decompress(Tid, data);
       if (decompressedShort) {
-        name = decompressedShort;
+        name = (char*)decompressedShort;
       }
     }
 
