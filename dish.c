@@ -318,7 +318,7 @@ namespace SI
 //        tmp += getStarRating();
 //      }
 //      return tmp.c_str();
-      return description;
+      return description?description:"";
     }
 
     void DishDescriptor::setContent(ContentDescriptor::Nibble Nibble)
