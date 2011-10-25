@@ -12,6 +12,7 @@
 
 #include <libsi/util.h>
 #include <libsi/descriptor.h>
+#include <time.h>
 
 namespace SI
 {
@@ -257,12 +258,16 @@ public:
     const char *getCategory();
     const char *getRating();
     const char *getStarRating();
+    const char *getSeriesId();
+    const char *getProgramId();
+    time_t getOriginalAirDate() { return originalAirDate; }
     bool hasTheme() {return DishTheme > 0;}
     bool hasCategory() {return DishCategory > 0;}
     void setShortData(unsigned char Tid, CharArray data);
     void setExtendedtData(unsigned char Tid, CharArray data);
     void setRating(uint16_t value);
     void setContent(ContentDescriptor::Nibble Nibble);
+    void setEpisodeInfo(CharArray data);
 
 protected:
     // Decompress the byte array and stores the result to a text string
@@ -275,7 +280,10 @@ protected:
     unsigned char DishTheme;
     unsigned char DishCategory;
     uint16_t mpaaRating;
-    uint16_t starRating;
+    uint8_t starRating;
+    time_t originalAirDate;
+    char* seriesId;
+    char* programId;
 
 
    struct HuffmanTable {

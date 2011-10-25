@@ -14,6 +14,7 @@
 #include <libsi/si.h>
 #include <libsi/descriptor.h>
 #include <string.h>
+#include <string>
 #include <stdlib.h>
 #include <vdr/tools.h>
 
@@ -51,6 +52,9 @@ namespace SI
         DishCategory = 0;
         mpaaRating = 0;
         starRating = 0;
+        originalAirDate = 0;
+        programId = NULL;
+        seriesId = NULL;
     }
 
     DishDescriptor::~DishDescriptor()
@@ -59,6 +63,10 @@ namespace SI
         decompressedShort = NULL;
         delete [] decompressedExtended;
         decompressedExtended = NULL;
+        delete [] programId;
+        programId = NULL;
+        delete [] seriesId;
+        seriesId = NULL;
     }
 
     const char *DishDescriptor::getTheme()
@@ -322,6 +330,41 @@ namespace SI
       return description?description:"";
     }
 
+    const char *DishDescriptor::getProgramId(void) {
+      return programId?programId:"";
+    }
+
+    const char *DishDescriptor::getSeriesId(void) {
+      return seriesId?seriesId:"";
+    }
+
+    void DishDescriptor::setEpisodeInfo(CharArray data)
+    {
+      int series = (data[1] << 0x12) | (data[2] << 0x0a) | (data[3] << 0x02) | ((data[4] & 0xc0) >> 0x06);
+      int episode = ((data[4] & 0x3f) << 0x08) | data[5];
+      const char* prefix;
+
+      if (data[0] == 0x7c)
+           prefix = "MV";
+      else if (data[0] == 0x7d)
+           prefix = "SP";
+      else if (data[0] == 0x7e)
+           prefix = "EP";
+
+      programId = new char[17];
+      seriesId = new char[11];
+      //programId =
+      sprintf(programId, "%s%08d%04d", (data[0] == 0x7e && episode == 0 ? "SH" : prefix), series, episode);
+
+      if (data[0] == 0x7e)
+        sprintf(seriesId, "%s08d", prefix, series);
+
+      if (data.TwoBytes(6) != 0 && data.TwoBytes(6) != 0x9e8b ) {
+
+          originalAirDate = (data[6] << 0x08 | data[7]) - 40587 * 86400;
+      }
+    }
+
     void DishDescriptor::setContent(ContentDescriptor::Nibble Nibble)
     {
       DishTheme = Nibble.getContentNibbleLevel2() & 0xF;
@@ -344,24 +387,36 @@ namespace SI
         return ratings[mpaaRating];
       }
 
-      char buffer[19];
-      buffer[0] = 0;
-      strcpy(buffer, ratings[(mpaaRating >> 10) & 0x07]);
+      std::string str = ratings[(mpaaRating >> 10) & 0x07];
+//      char buffer[19];
+//      buffer[0] = 0;
+//      strcpy(buffer, ratings[(mpaaRating >> 10) & 0x07]);
       if (mpaaRating & 0x3A7F) {
-         strcat(buffer, " [");
+          str += " [";
+//         strcat(buffer, " [");
          if (mpaaRating & 0x0230)
-            strcat(buffer, "V,");
+           str += "V,";
+//            strcat(buffer, "V,");
          if (mpaaRating & 0x000A)
-            strcat(buffer, "L,");
+           str += "L,";
+//            strcat(buffer, "L,");
          if (mpaaRating & 0x0044)
-            strcat(buffer, "N,");
+           str += "N,";
+//            strcat(buffer, "N,");
          if (mpaaRating & 0x0101)
-            strcat(buffer, "SC,");
-         if (char *s = strrchr(buffer, ','))
-            s[0] = ']';
+           str += "SC,";
+//            strcat(buffer, "SC,");
+//         if (char *s = strrchr(buffer, ','))
+//            s[0] = ']';
+         if (str.find(',') != std::string::npos) {
+           str.erase(str.find_last_of(','));
          }
+         str += "]";
+       }
 
-      return isempty(buffer) ? "" : buffer;
+      return str.c_str();
+
+//      return isempty(buffer) ? "" : buffer;
     }
 
     const char* DishDescriptor::getStarRating(){

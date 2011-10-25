@@ -2813,7 +2813,9 @@ namespace SI
   enum DescriptorTagExt {
     DishRatingDescriptorTag = 0x89,
     DishShortEventDescriptorTag = 0x91,
-    DishExtendedEventDescriptorTag = 0x92 };
+    DishExtendedEventDescriptorTag = 0x92,
+    DishSeriesDescriptorTag = 0x96,
+    };
 
   // typedef InheritEnum< DescriptorTagExt, SI::DescriptorTag > ExtendedDescriptorTag;
 
@@ -3192,7 +3194,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         if (!DishEventDescriptor) {
            DishEventDescriptor = new SI::DishDescriptor();
         }
-        DishEventDescriptor->setExtendedtData(Tid, deed->getData());
+        DishEventDescriptor->setExtendedtData(Tid+1, deed->getData());
         HasExternalData = true;
       }
       break;
@@ -3201,15 +3203,27 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         if (!DishEventDescriptor) {
            DishEventDescriptor = new SI::DishDescriptor();
         }
-        DishEventDescriptor->setShortData(Tid, dsed->getData());
+        DishEventDescriptor->setShortData(Tid+1, dsed->getData());
         HasExternalData = true;
       }
       break;
       case SI::DishRatingDescriptorTag: {
-        if (d->getLength() == 4 && DishEventDescriptor) {
-           uint16_t rating = d->getData().TwoBytes(2);
-           DishEventDescriptor->setRating(rating);
-           }
+        if (d->getLength() == 4) {
+          if (!DishEventDescriptor) {
+            DishEventDescriptor = new SI::DishDescriptor();
+          }
+          uint16_t rating = d->getData().TwoBytes(2);
+          DishEventDescriptor->setRating(rating);
+        }
+      }
+        break;
+      case SI::DishSeriesDescriptorTag: {
+        if (d->getLength() == 4) {
+          if (!DishEventDescriptor) {
+            DishEventDescriptor = new SI::DishDescriptor();
+          }
+          DishEventDescriptor->setEpisodeInfo(d->getData());
+        }
       }
         break;
       default:
@@ -3268,14 +3282,24 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
 
          fmt = "%s";
          if (0 != strcmp(DishEventDescriptor->getDescription(),"") && (0 != strcmp(DishEventDescriptor->getRating(),"") || 0 != strcmp(DishEventDescriptor->getStarRating(),""))) {
-           fmt += "|";
+           fmt += "\nRating: ";
          }
          fmt += "%s %s";
+         if (0 != strcmp(DishEventDescriptor->getProgramId(),"")) {
+           fmt += "\n Program ID: ";
+         }
+         fmt += "%s %s";
+         fmt += DishEventDescriptor->getOriginalAirDate() == 0 ? "%s" : " Original Air Date: ";
          Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getDescription()
              , DishEventDescriptor->getRating()
-             , DishEventDescriptor->getStarRating());
+             , DishEventDescriptor->getStarRating()
+             , DishEventDescriptor->getProgramId()
+             , DishEventDescriptor->getSeriesId()
+             , DishEventDescriptor->getOriginalAirDate() == 0 ? "" : ctime (&DishEventDescriptor->getOriginalAirDate()));
          pEvent->SetDescription(tmp);
          free(tmp);
+
+
          //LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
          //LogD(2, prep("DishShortText: %s"), DishExtendedEventDescriptor->getShortText());
       }
