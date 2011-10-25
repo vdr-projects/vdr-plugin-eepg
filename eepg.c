@@ -3289,13 +3289,14 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
            fmt += "\n Program ID: ";
          }
          fmt += "%s %s";
-         fmt += DishEventDescriptor->getOriginalAirDate() == 0 ? "%s" : " Original Air Date: ";
+         time_t orgAirDate = DishEventDescriptor->getOriginalAirDate();
+         fmt += orgAirDate == 0 ? "%s" : " Original Air Date: ";
          Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getDescription()
              , DishEventDescriptor->getRating()
              , DishEventDescriptor->getStarRating()
              , DishEventDescriptor->getProgramId()
              , DishEventDescriptor->getSeriesId()
-             , DishEventDescriptor->getOriginalAirDate() == 0 ? "" : ctime (&DishEventDescriptor->getOriginalAirDate()));
+             , DishEventDescriptor->getOriginalAirDate() == 0 ? "" : ctime (&orgAirDate));
          pEvent->SetDescription(tmp);
          free(tmp);
 

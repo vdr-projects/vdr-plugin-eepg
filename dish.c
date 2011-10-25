@@ -350,6 +350,8 @@ namespace SI
            prefix = "SP";
       else if (data[0] == 0x7e)
            prefix = "EP";
+      else
+           prefix ="";
 
       programId = new char[17];
       seriesId = new char[11];
@@ -357,11 +359,11 @@ namespace SI
       sprintf(programId, "%s%08d%04d", (data[0] == 0x7e && episode == 0 ? "SH" : prefix), series, episode);
 
       if (data[0] == 0x7e)
-        sprintf(seriesId, "%s08d", prefix, series);
+        sprintf(seriesId, "%s%08d", prefix, series);
 
       if (data.TwoBytes(6) != 0 && data.TwoBytes(6) != 0x9e8b ) {
 
-          originalAirDate = (data[6] << 0x08 | data[7]) - 40587 * 86400;
+          originalAirDate = ((data[6] << 0x08 | data[7]) - 40587) * 86400;
       }
     }
 
