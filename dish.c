@@ -340,6 +340,7 @@ namespace SI
 
     void DishDescriptor::setEpisodeInfo(CharArray data)
     {
+      data.addOffset(2);
       int series = (data[1] << 0x12) | (data[2] << 0x0a) | (data[3] << 0x02) | ((data[4] & 0xc0) >> 0x06);
       int episode = ((data[4] & 0x3f) << 0x08) | data[5];
       const char* prefix;
@@ -354,15 +355,15 @@ namespace SI
            prefix ="";
 
       programId = new char[17];
-      seriesId = new char[11];
-      //programId =
+
       sprintf(programId, "%s%08d%04d", (data[0] == 0x7e && episode == 0 ? "SH" : prefix), series, episode);
 
-      if (data[0] == 0x7e)
+      if (data[0] == 0x7e) {
+        seriesId = new char[11];
         sprintf(seriesId, "%s%08d", prefix, series);
+      }
 
       if (data.TwoBytes(6) != 0 && data.TwoBytes(6) != 0x9e8b ) {
-
           originalAirDate = ((data[6] << 0x08 | data[7]) - 40587) * 86400;
       }
     }

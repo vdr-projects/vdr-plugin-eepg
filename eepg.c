@@ -3218,12 +3218,16 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       }
         break;
       case SI::DishSeriesDescriptorTag: {
-        if (d->getLength() == 4) {
+        if (d->getLength() == 10) {
+          //LogD(2, prep("DishSeriesDescriptorTag: %s)"), (const char*) d->getData().getData());
           if (!DishEventDescriptor) {
             DishEventDescriptor = new SI::DishDescriptor();
           }
           DishEventDescriptor->setEpisodeInfo(d->getData());
         }
+//        else {
+//            LogD(2, prep("DishSeriesDescriptorTag length: %d)"), d->getLength());
+//        }
       }
         break;
       default:
@@ -3281,7 +3285,9 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
          free(tmp);
 
          fmt = "%s";
-         if (0 != strcmp(DishEventDescriptor->getDescription(),"") && (0 != strcmp(DishEventDescriptor->getRating(),"") || 0 != strcmp(DishEventDescriptor->getStarRating(),""))) {
+         if (0 != strcmp(DishEventDescriptor->getDescription(),"")
+             && (0 != strcmp(DishEventDescriptor->getRating(),"")
+                 || 0 != strcmp(DishEventDescriptor->getStarRating(),""))) {
            fmt += "\nRating: ";
          }
          fmt += "%s %s";
@@ -3290,13 +3296,17 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
          }
          fmt += "%s %s";
          time_t orgAirDate = DishEventDescriptor->getOriginalAirDate();
-         fmt += orgAirDate == 0 ? "%s" : " Original Air Date: ";
+         fmt += orgAirDate == 0 ? "%s" : " Original Air Date: %s";
+         LogD(3, prep("DishSeriesDescriptorTag2: %s %s %d %s)"),  DishEventDescriptor->getProgramId()
+             , DishEventDescriptor->getSeriesId()
+             , orgAirDate
+             , orgAirDate == 0 ? "" : asctime(localtime(&orgAirDate)));
          Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getDescription()
              , DishEventDescriptor->getRating()
              , DishEventDescriptor->getStarRating()
              , DishEventDescriptor->getProgramId()
              , DishEventDescriptor->getSeriesId()
-             , DishEventDescriptor->getOriginalAirDate() == 0 ? "" : ctime (&orgAirDate));
+             , orgAirDate == 0 ? "" : asctime(localtime(&orgAirDate)) (&orgAirDate));
          pEvent->SetDescription(tmp);
          free(tmp);
 
