@@ -3306,9 +3306,8 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
              , DishEventDescriptor->getStarRating()
              , DishEventDescriptor->getProgramId()
              , DishEventDescriptor->getSeriesId()
-<<<<<<< .mine             , orgAirDate == 0 ? "" : asctime(localtime(&orgAirDate)));
-=======             , orgAirDate == 0 ? "" : asctime(localtime(&orgAirDate)) (&orgAirDate));
->>>>>>> .theirs         pEvent->SetDescription(tmp);
+             , orgAirDate == 0 ? "" : asctime(localtime(&orgAirDate)));
+         pEvent->SetDescription(tmp);
          free(tmp);
 
 
