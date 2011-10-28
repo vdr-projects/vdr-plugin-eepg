@@ -3288,25 +3288,25 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
          if (0 != strcmp(DishEventDescriptor->getDescription(),"")
              && (0 != strcmp(DishEventDescriptor->getRating(),"")
                  || 0 != strcmp(DishEventDescriptor->getStarRating(),""))) {
-           fmt += "\nRating: ";
+           fmt += "\n\nRating: ";
          }
          fmt += "%s %s";
          if (0 != strcmp(DishEventDescriptor->getProgramId(),"")) {
-           fmt += "\n Program ID: ";
+           fmt += "\n\nProgram ID: ";
          }
-         fmt += "%s %s";
+         fmt += "%s %s%s";
          time_t orgAirDate = DishEventDescriptor->getOriginalAirDate();
-         fmt += orgAirDate == 0 ? "%s" : " Original Air Date: %s";
-         LogD(3, prep("DishSeriesDescriptorTag2: %s %s %d %s)"),  DishEventDescriptor->getProgramId()
-             , DishEventDescriptor->getSeriesId()
-             , orgAirDate
-             , orgAirDate == 0 ? "" : asctime(localtime(&orgAirDate)));
+         char datestr [80];
+         if (orgAirDate == 0 || strftime (datestr,80," Original Air Date: %a %b %d %Y",gmtime(&orgAirDate)) == 0) {
+             datestr = "";
+         }
+
          Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getDescription()
              , DishEventDescriptor->getRating()
              , DishEventDescriptor->getStarRating()
              , DishEventDescriptor->getProgramId()
              , DishEventDescriptor->getSeriesId()
-             , orgAirDate == 0 ? "" : asctime(localtime(&orgAirDate)));
+             , orgAirDate == 0 ? "" : datestr);
          pEvent->SetDescription(tmp);
          free(tmp);
 
