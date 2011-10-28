@@ -3297,8 +3297,9 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
          fmt += "%s %s%s";
          time_t orgAirDate = DishEventDescriptor->getOriginalAirDate();
          char datestr [80];
-         if (orgAirDate == 0 || strftime (datestr,80," Original Air Date: %a %b %d %Y",gmtime(&orgAirDate)) == 0) {
-             datestr = "";
+         bool dateok = false;
+         if (orgAirDate == 0) {
+           dateok = strftime (datestr,80," Original Air Date: %a %b %d %Y",gmtime(&orgAirDate)) > 0;
          }
 
          Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getDescription()
@@ -3306,7 +3307,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
              , DishEventDescriptor->getStarRating()
              , DishEventDescriptor->getProgramId()
              , DishEventDescriptor->getSeriesId()
-             , orgAirDate == 0 ? "" : datestr);
+             , orgAirDate == 0 || !dateok ? "" : datestr);
          pEvent->SetDescription(tmp);
          free(tmp);
 
