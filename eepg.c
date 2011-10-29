@@ -54,7 +54,7 @@
 #define trNOOP(s) (s)
 #endif
 
-#define DEBUG
+//#define DEBUG
 //#define DEBUG2
 
 /*#ifdef DEBUG
