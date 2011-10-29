@@ -263,6 +263,9 @@ static int AvailableSources[32];
 static int NumberOfAvailableSources = 0;
 static int LastVersionNagra = -1; //currently only used for Nagra, should be stored per transponder, per system
 
+static multimap<cString, cString> equiChanMap;
+
+
 #ifdef USE_NOEPG
 bool allowedEPG (tChannelID kanalID)
 {
@@ -1034,6 +1037,76 @@ void decodeText2 (const unsigned char *from, int len, char *buffer, int buffsize
   //LogE(5, prep("decodeText2 buffer %s - buffsize %d"), buffer, buffsize);
 }
 
+void loadEquivalentChannelMap (void)
+{
+  char Buffer[1024];
+  char *Line;
+  FILE *File;
+  string FileName = string(ConfDir) + "/" + EEPG_FILE_EQUIV;
+  multimap<cString,cString>::iterator it;
+  pair<multimap<cString,cString>::iterator,multimap<cString,cString>::iterator> ret;
+
+
+  File = fopen (FileName.c_str(), "r");
+  if (File) {
+    memset (Buffer, 0, sizeof (Buffer));
+    char origChanID[256];
+    char equiChanID[256];
+    char source[256];
+    int nid = 0;
+    int tid = 0;
+    int sid = 0;
+    int rid = 0;
+    while ((Line = fgets (Buffer, sizeof (Buffer), File)) != NULL) {
+      Line = compactspace (skipspace (stripspace (Line)));
+      if (!isempty (Line)) {
+        if (sscanf (Line, "%[^ ] %[^ ] %[^\n]\n", origChanID, equiChanID, source) == 3) {
+          if (origChanID[0] != '#' && origChanID[0] != ';') {
+            nid = 0;
+            tid = 0;
+            sid = 0;
+            rid = 0;
+            if (sscanf (origChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4)
+              if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
+                if (sscanf (origChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid) != 5) {
+                  rid = 0;
+                }
+                tChannelID OriginalChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
+                bool found = false;
+                int i = 0;
+                  cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
+                  if (!OriginalChannel) {
+                    LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalency is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID); //TODO: skip this ing?
+                    continue;
+                  }
+                  if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
+                    if (sscanf (equiChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid)
+                        != 5) {
+                      rid = 0;
+                    }
+                    tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
+                    cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false); //TODO use valid function?
+                    if (EquivChannel) {
+                        ret = equiChanMap.equal_range(OriginalChID.ToString());
+                        for (it=ret.first; it!=ret.second; ++it)
+                          if ((*it).second ==  OriginalChID.ToString()) {
+                            found = true;
+                            break;
+                          }
+
+                        if (!found)
+                          equiChanMap.insert(pair<cString,cString>(OriginalChID.ToString(),EquivChID.ToString()));
+                    } else
+                      LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
+                  }
+              }   //if scanf string1
+          }   //if string1
+        }     //if scanf
+      }    //if isempty
+    }      //while
+    fclose (File);
+  }  //if file
+}
 void cFilterEEPG::LoadEquivalentChannels (void)
 {
   char Buffer[1024];
@@ -1044,52 +1117,52 @@ void cFilterEEPG::LoadEquivalentChannels (void)
   File = fopen (FileName.c_str(), "r");
   if (File) {
     memset (Buffer, 0, sizeof (Buffer));
-    char string1[256];
-    char string2[256];
-    char string3[256];
-    int int1;
-    int int2;
-    int int3;
-    int int4;
+    char origChanID[256];
+    char equiChanID[256];
+    char source[256];
+    int nid;
+    int tid;
+    int sid;
+    int rid;
     while ((Line = fgets (Buffer, sizeof (Buffer), File)) != NULL) {
       Line = compactspace (skipspace (stripspace (Line)));
       if (!isempty (Line)) {
-        if (sscanf (Line, "%[^ ] %[^ ] %[^\n]\n", string1, string2, string3) == 3) {
-          if (string1[0] != '#' && string1[0] != ';') {
-            int1 = 0; //TODO: this could be made more readable
-            int2 = 0;
-            int3 = 0;
-            int4 = 0;
-            if (sscanf (string1, "%[^-]-%i -%i -%i ", string3, &int1, &int2, &int3) == 4)
-              if (sscanf (string2, "%[^-]-%i -%i -%i ", string3, &int1, &int2, &int3) == 4) {
-                if (sscanf (string1, "%[^-]-%i -%i -%i -%i ", string3, &int1, &int2, &int3, &int4) != 5) {
-                  int4 = 0;
+        if (sscanf (Line, "%[^ ] %[^ ] %[^\n]\n", origChanID, equiChanID, source) == 3) {
+          if (origChanID[0] != '#' && origChanID[0] != ';') {
+            nid = 0;
+            tid = 0;
+            sid = 0;
+            rid = 0;
+            if (sscanf (origChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4)
+              if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
+                if (sscanf (origChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid) != 5) {
+                  rid = 0;
                 }
-                tChannelID OriginalChID = tChannelID (cSource::FromString (string3), int1, int2, int3, int4);
+                tChannelID OriginalChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
                 bool found = false;
                 int i = 0;
                 sChannel *C = NULL;
                 while (i < nChannels && (!found)) {
                   C = &sChannels[i];
-                  if (C->Src[0] == (unsigned int)cSource::FromString (string3) && C->Nid[0] == int1
-                      && C->Tid[0] == int2 && C->Sid[0] == int3)
+                  if (C->Src[0] == (unsigned int)cSource::FromString (source) && C->Nid[0] == nid
+                      && C->Tid[0] == tid && C->Sid[0] == sid)
                     found = true;
                   else
                     i++;
                 }
                 if (!found) {
                   LogI(2, prep("Warning: in equivalence file, cannot find original channel %s. Perhaps you are tuned to another transponder right now."),
-                       string1);
+                       origChanID);
                 } else {
                   cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
                   if (!OriginalChannel)
-                    LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalency is assumed to be valid, but perhaps you should check the entry in the equivalents file"), string1); //TODO: skip this ing?
-                  if (sscanf (string2, "%[^-]-%i -%i -%i ", string3, &int1, &int2, &int3) == 4) {
-                    if (sscanf (string2, "%[^-]-%i -%i -%i -%i ", string3, &int1, &int2, &int3, &int4)
+                    LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalency is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID); //TODO: skip this ing?
+                  if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
+                    if (sscanf (equiChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid)
                         != 5) {
-                      int4 = 0;
+                      rid = 0;
                     }
-                    tChannelID EquivChID = tChannelID (cSource::FromString (string3), int1, int2, int3, int4);
+                    tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
                     cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false); //TODO use valid function?
                     if (EquivChannel) {
                       if (C->NumberOfEquivalences < MAX_EQUIVALENCES) {
@@ -1107,7 +1180,7 @@ void cFilterEEPG::LoadEquivalentChannels (void)
                         LogE(0, prep("Error, channel with id %i has more than %i equivalences. Increase MAX_EQUIVALENCES."),
                              i, MAX_EQUIVALENCES);
                     } else
-                      LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), string2);
+                      LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
                   }
                 } //else !found
               }   //if scanf string1
@@ -1118,6 +1191,9 @@ void cFilterEEPG::LoadEquivalentChannels (void)
     fclose (File);
   }  //if file
 }    //end of loadequiv
+
+//end of loadequiv
+
 
 /**
  * \brief Get MHW channels
@@ -2834,7 +2910,39 @@ class cEIT2:public SI::EIT
 {
 public:
   cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid = false, bool OnlyRunningStatus = false);
+protected:
+  void updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent);
 };
+
+void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent){
+  multimap<cString,cString>::iterator it;
+  pair<multimap<cString,cString>::iterator,multimap<cString,cString>::iterator> ret;
+
+  ret = equiChanMap.equal_range(channelID.ToString());
+  for (it=ret.first; it!=ret.second; ++it) {
+    tChannelID equChannelID (tChannelID::FromString((*it).second));
+    cChannel *equChannel = GetChannelByID (equChannelID, false);
+    if (equChannel) {
+      cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (equChannel, true);
+      cEvent *pEqvEvent = (cEvent *) pSchedule->GetEvent (pEvent->EventID(), pEvent->StartTime());
+      if (pEqvEvent) {
+        LogD(1, prep("equivalent event exists"));
+        if (pEqvEvent == pEvent) {
+          LogD(1, prep("equal event exists"));
+
+        } else {
+          LogD(1, prep("remove equivalent"));
+          pSchedule->DelEvent(pEqvEvent);
+          pSchedule->AddEvent(pEvent);
+        }
+
+      } else {
+        LogD(1, prep("equivalent event does not exist"));
+        pSchedule->AddEvent(pEvent);
+      }
+    }
+  }
+}
 
 cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid, bool OnlyRunningStatus)
     :  SI::EIT (Data, false)
@@ -2897,10 +3005,13 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       pEvent = newEvent = new cEvent (SiEitEvent.getEventId ());
       if (!pEvent)
         continue;
+      updateEquivalent(Schedules, channel->GetChannelID(), pEvent);
     } else {
       //LogD(3, prep("existing event channelID: %s Title: %s TableID 0x%02X new TID 0x%02X Version %i, new version %i"), *channel->GetChannelID().ToString(), pEvent->Title(), pEvent->TableID(), Tid, pEvent->Version(), versionNumber);
       // We have found an existing event, either through its event ID or its start time.
       pEvent->SetSeen ();
+
+      updateEquivalent(Schedules, channel->GetChannelID(), pEvent);
       // If the existing event has a zero table ID it was defined externally and shall
       // not be overwritten.
       if (pEvent->TableID () == 0x00) {
@@ -3258,10 +3369,12 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         pEvent->SetTitle (buffer);
         LogD(3, prep("channelID: %s Title: %s"), *channel->GetChannelID().ToString(), pEvent->Title());
         l = ShortEventDescriptor->text.getLength();
-        f = (unsigned char *) ShortEventDescriptor->text.getData().getData();
-        decodeText2 (f, l, buffer, sizeof (buffer));
-        //ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
-        pEvent->SetShortText (buffer);
+        if (l > 0) { //Set the Short Text only if ther is data so that we do not overwrite valid data
+          f = (unsigned char *) ShortEventDescriptor->text.getData().getData();
+          decodeText2 (f, l, buffer, sizeof (buffer));
+          //ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
+          pEvent->SetShortText (buffer);
+        }
         LogD(3, prep("ShortText: %s"), pEvent->ShortText());
       } else if (!HasExternalData) {
         pEvent->SetTitle (NULL);
@@ -3475,6 +3588,13 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
   ChannelSeq.clear ();
   FreeTitles ();
   FreeSummaries ();
+
+  // Enable EIT scan for all except DISH_BEV since it is already enabled
+  if (SetupPE.ProcessEIT && !UnprocessedFormat[EIT]
+       && !UnprocessedFormat[FREEVIEW] && !UnprocessedFormat[DISH_BEV]) {
+      UnprocessedFormat[EIT] = EIT_PID;
+      loadEquivalentChannelMap();
+  }
 
   //now start looking for next format to process
   int pid;
@@ -3712,10 +3832,6 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
               UnprocessedFormat[DISH_BEV] = stream.getPid ();
             }
 
-            // Enable EIT scan for all except DISH_BEV since it is already enabled
-            if (SetupPE.ProcessEIT && !UnprocessedFormat[DISH_BEV]) {
-                UnprocessedFormat[EIT] = EIT_PID;
-            }
           }   //if data[1] && data [3]
         }   //if streamtype
         /*if (Format != PREMIERE)       //any format found
