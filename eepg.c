@@ -10,6 +10,7 @@
  * -Freesat patch written by dom /at/ suborbital.org.uk
  *
  *
+ * This code is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
@@ -109,6 +110,7 @@ public:
   int RatingInfo;
   int FixEpg;
   int DisplayMessage;
+  int ProcessEIT;
 #ifdef DEBUG
   int LogLevel;
 #endif
@@ -126,6 +128,7 @@ cSetupEEPG::cSetupEEPG (void)
   RatingInfo = 1;
   FixEpg = 0;
   DisplayMessage = 1;
+  ProcessEIT = 0;
 #ifdef DEBUG
   LogLevel = 0;
 #endif
@@ -162,6 +165,7 @@ cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
   Add (new cMenuEditBoolItem (tr ("Display summary message"), &data.DisplayMessage));
 #ifdef DEBUG
   Add (new cMenuEditIntItem (tr ("Level of logging verbosity"), &data.LogLevel, 0, 5));
+  Add (new cMenuEditBoolItem (tr ("Process EIT info with EEPG"), &data.ProcessEIT));
 #endif
 }
 
@@ -175,6 +179,7 @@ void cMenuSetupPremiereEpg::Store (void)
   SetupStore ("DisplayMessage", SetupPE.DisplayMessage);
 #ifdef DEBUG
   SetupStore ("LogLevel", SetupPE.LogLevel);
+  SetupStore ("ProcessEIT", SetupPE.ProcessEIT);
 #endif
 }
 
@@ -344,6 +349,7 @@ public:
   cFilterEEPG (void);
   virtual void SetStatus (bool On);
   void Trigger (void);
+    static const int EIT_PID = 0x12;
 };
 
 cFilterEEPG::cFilterEEPG (void)
@@ -2149,6 +2155,7 @@ int cFilterEEPG::GetTitlesMHW2 (const u_char * Data, int Length)
         CleanString (T->Text);
         Pos += Len + 8; // Sub Theme starts here
         T->ThemeId = ((Data[7] & 0x3f) << 6) | (Data[Pos] & 0x3f);
+        T->TableId = DEFAULT_TABLE_ID; //TODO locate the actual table id
         T->EventId = (Data[Pos + 1] << 8) | Data[Pos + 2];
         T->SummaryAvailable = (T->EventId != 0xFFFF);
         LogI(3, prep("EventId %04x Titlenr %d:SummAv:%x,Name:%s."), T->EventId,
@@ -2474,6 +2481,7 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)
           T->StartTime = ((MjdTime - 40587) * 86400) + ((Data[p + 2] << 9) | (Data[p + 3] << 1));
           T->Duration = ((Data[p + 4] << 9) | (Data[p + 5] << 1));
           T->ThemeId = Data[p + 6];
+          T->TableId = DEFAULT_TABLE_ID; //TODO locate the actual table id
           //TODO Data[p + 7] is Quality value add it to description
           //int quality = Data[p + 7];
           switch (Data[p + 8] & 0x0F) {
@@ -2825,14 +2833,14 @@ extern bool SystemCharacterTableIsSingleByte;*/
 class cEIT2:public SI::EIT
 {
 public:
-  cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus = false);
+  cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid = false, bool OnlyRunningStatus = false);
 };
 
-cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool OnlyRunningStatus)
+cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid, bool OnlyRunningStatus)
     :  SI::EIT (Data, false)
 {
   //LogD(2, prep("cEIT2::cEIT2"));
-  if (Tid > 0 && Format == DISH_BEV) Tid--;
+  if (Tid > 0 && (Format == DISH_BEV || (SetupPE.ProcessEIT && isEITPid))) Tid--;
 
   if (!CheckCRCAndParse ()) {
     LogD(2, prep("!CheckCRCAndParse ()"));
@@ -2848,7 +2856,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     return; // only collect data for known channels
   }
 
-  LogD(4, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
+  //LogD(5, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
 
 #ifdef USE_NOEPG
   // only use epg from channels not blocked by noEPG-patch
@@ -2876,6 +2884,8 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     if (!SegmentStart)
       SegmentStart = SiEitEvent.getStartTime ();
     SegmentEnd = SiEitEvent.getStartTime () + SiEitEvent.getDuration ();
+    int versionNumber = getVersionNumber();
+
     cEvent *newEvent = NULL;
     cEvent *rEvent = NULL;
     cEvent *pEvent = (cEvent *) pSchedule->GetEvent (SiEitEvent.getEventId (), SiEitEvent.getStartTime ());
@@ -2888,6 +2898,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       if (!pEvent)
         continue;
     } else {
+      //LogD(3, prep("existing event channelID: %s Title: %s TableID 0x%02X new TID 0x%02X Version %i, new version %i"), *channel->GetChannelID().ToString(), pEvent->Title(), pEvent->TableID(), Tid, pEvent->Version(), versionNumber);
       // We have found an existing event, either through its event ID or its start time.
       pEvent->SetSeen ();
       // If the existing event has a zero table ID it was defined externally and shall
@@ -2964,14 +2975,14 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
           continue;
         }
 #else
-        if (pEvent->Version () == getVersionNumber ())
+        if (pEvent->Version () == versionNumber)
           continue;
 #endif /* DDEPGENTRY */
         HasExternalData = ExternalData = true;
       }
       // If the new event has a higher table ID, let's skip it.
       // The lower the table ID, the more "current" the information.
-      else if (Tid > pEvent->TableID ())
+      else if (Tid > pEvent->TableID())
         continue;
       // If the new event comes from the same table and has the same version number
       // as the existing one, let's skip it to avoid unnecessary work.
@@ -2979,7 +2990,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       // the actual Premiere transponder and the Sat.1/Pro7 transponder), but use different version numbers on
       // each of them :-( So if one DVB card is tuned to the Premiere transponder, while an other one is tuned
       // to the Sat.1/Pro7 transponder, events will keep toggling because of the bogus version numbers.
-      else if (Tid == pEvent->TableID() && pEvent->Version() == getVersionNumber())
+      else if (Tid == pEvent->TableID() && pEvent->Version() == versionNumber)
         continue;
     }
     if (!ExternalData) {
@@ -3000,7 +3011,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     }
     if (OnlyRunningStatus)
       continue;  // do this before setting the version, so that the full update can be done later
-    pEvent->SetVersion (getVersionNumber());
+    pEvent->SetVersion (versionNumber);
 
     int LanguagePreferenceShort = -1;
     int LanguagePreferenceExt = -1;
@@ -3065,8 +3076,8 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
           if (DishEventDescriptor && NumContents == 1) {
             DishEventDescriptor->setContent(Nibble);
           }
-          //LogD(2, prep("EEPGDEBUG:Nibble:%x-%x-%x-%x)"), Nibble.getContentNibbleLevel1(),Nibble.getContentNibbleLevel2()
-          //    , Nibble.getUserNibble1(), Nibble.getUserNibble2());
+//          LogD(2, prep("EEPGDEBUG:Nibble:%x-%x-%x-%x)"), Nibble.getContentNibbleLevel1(),Nibble.getContentNibbleLevel2()
+//              , Nibble.getUserNibble1(), Nibble.getUserNibble2());
 
         }
         pEvent->SetContents(Contents);
@@ -3245,19 +3256,23 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->name.getText(buffer, sizeof(buffer));
         pEvent->SetTitle (buffer);
+        LogD(3, prep("channelID: %s Title: %s"), *channel->GetChannelID().ToString(), pEvent->Title());
         l = ShortEventDescriptor->text.getLength();
         f = (unsigned char *) ShortEventDescriptor->text.getData().getData();
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
         pEvent->SetShortText (buffer);
+        LogD(3, prep("ShortText: %s"), pEvent->ShortText());
       } else if (!HasExternalData) {
         pEvent->SetTitle (NULL);
         pEvent->SetShortText (NULL);
+        LogD(3, prep("SetTitle (NULL)"));
       }
       if (ExtendedEventDescriptors) {
         char buffer[Utf8BufSize (ExtendedEventDescriptors->getMaximumTextLength (": ")) + 1];
         pEvent->SetDescription (ExtendedEventDescriptors->getText (buffer, sizeof (buffer), ": "));
-      } else if (!HasExternalData)
+        LogD(3, prep("Description: %s"), pEvent->Description());
+      } else if (!HasExternalData) {
         pEvent->SetDescription (NULL);
 
       if (DishEventDescriptor) {
@@ -3315,6 +3330,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
          //LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
          //LogD(2, prep("DishShortText: %s"), DishExtendedEventDescriptor->getShortText());
       }
+
     }
     delete ExtendedEventDescriptors;
     delete ShortEventDescriptor;
@@ -3516,11 +3532,16 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     AddFilter (pid, 0xb0); //perhaps TID is equal to first data byte?
     break;
   case DISH_BEV:
-    AddFilter (0x12, 0, 0); // event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (EIT_PID, 0, 0); // event info, actual(0x4e)/other(0x4f) TS, present/following
     AddFilter (0x0300, 0, 0); // Dish Network EEPG event info, actual(0x4e)/other(0x4f) TS, present/following
     AddFilter (0x0441, 0, 0); // Dish Network EEPG event info, actual(0x4e)/other(0x4f) TS, present/following
 //    AddFilter (0x0441, 0x50, 0xf0); // Bell ExpressVU EEPG
 //    AddFilter (0x0441, 0x60, 0xf0); // Bell ExpressVU EEPG
+    break;
+  case EIT:
+    AddFilter (pid, 0x4e, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (pid, 0x50, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
+    AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
     break;
   default:
     break;
@@ -3535,7 +3556,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
     cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
     //Look for other satelite positions only if Dish/Bell ExpressVU for the moment hardcoded pid check
     if(Schedules)
-        SI::cEIT2 EIT(Schedules, Source(), Tid, Data);
+        SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Pid == EIT_PID);
 
     else//cEIT EIT (Schedules, Source (), Tid, Data);
     {
@@ -3546,7 +3567,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
         cSchedulesLock SchedulesLock;
         cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
         if(Schedules)
-            SI::cEIT2 EIT(Schedules, Source(), Tid, Data, true);
+            SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Pid == EIT_PID, true);
 
         //cEIT EIT (Schedules, Source (), Tid, Data, true);
     }
@@ -3690,6 +3711,11 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                 && !UnprocessedFormat[DISH_BEV]) {
               UnprocessedFormat[DISH_BEV] = stream.getPid ();
             }
+
+            // Enable EIT scan for all except DISH_BEV since it is already enabled
+            if (SetupPE.ProcessEIT && !UnprocessedFormat[DISH_BEV]) {
+                UnprocessedFormat[EIT] = EIT_PID;
+            }
           }   //if data[1] && data [3]
         }   //if streamtype
         /*if (Format != PREMIERE)       //any format found
@@ -3710,7 +3736,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
   } //if pmtpid
   else if (Source ()) {
 
-    if ( Pid == 0x12 || Pid == 0x0300 || Pid == 0x0441 ) {
+    if ( Pid == EIT_PID || Pid == 0x0300 || Pid == 0x0441 ) {
       if (Tid >= 0x4E)
         ProccessContinuous(Pid, Tid, Length, Data);
       return;
@@ -4368,6 +4394,8 @@ bool cPluginEEPG::SetupParse (const char *Name, const char *Value)
 #ifdef DEBUG
   else if (!strcasecmp (Name, "LogLevel"))
     SetupPE.LogLevel = atoi (Value);
+  else if (!strcasecmp (Name, "ProcessEIT"))
+    SetupPE.ProcessEIT = atoi (Value);
 #endif
   else
     return false;
