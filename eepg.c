@@ -10,6 +10,7 @@
  * -Freesat patch written by dom /at/ suborbital.org.uk
  *
  *
+ * This code is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
@@ -42,7 +43,7 @@
 #include <string>
 #include <stdarg.h>
 
-#define VERBOSE 3
+#define VERBOSE 1
 /* 0 = only print errors, 1 = print channels and themes, 2 = print channels, themes, titles, summaries 3 = debug mode */
 /* all is logged into /var/log/syslog */
 
@@ -1628,8 +1629,8 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
         LogE(0, prep("ERROR, Title Text out of range: t:%p, DataEnd:%p, Data:%p, Length:%i."), t, DataEnd, Data,
              Length);
       else {
-        Asprintf (&Text, "%.*s", *t, t + 1); //FIXME second text string is not processed right now
-        //asprintf (&Text, "%.*s %.*s", *t, t + 1, *t2, t2 + 1);
+        Asprintf (&Text, "%.*s", *t, t + 1);
+        //asprintf (&Text, "%.*s %.*s", *t, t + 1, *t2, t2 + 1); //FIXME second text string is not processed right now
 
         //now get summary texts
         u_char *DataStartSummaries = buffer[TableIdExtension] + 4;
@@ -2020,7 +2021,7 @@ int cFilterEEPG::GetTitlesMHW1 (const u_char * Data, int Length)
     sTitleMHW1 *Title = (sTitleMHW1 *) Data;
     if (Title->ChannelId == 0xff) { //FF is separator packet
       if (memcmp (InitialTitle, Data, 46) == 0) { //data is the same as initial title //TODO use easier notation
-        LogD(1, prep("End procesing titles"));
+        LogD(2, prep("End procesing titles"));
         return 2;
       }
       if (nTitles == 0)
@@ -3402,7 +3403,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
   if (Tid == 0x4E)
     pSchedule->SetPresentSeen ();
   if (OnlyRunningStatus) {
-    LogD(2, prep("OnlyRunningStatus"));
+    LogD(4, prep("OnlyRunningStatus"));
     return;
   }
   if (Modified) {
@@ -3411,7 +3412,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       pSchedule->DropOutdated (SegmentStart, SegmentEnd, Tid, getVersionNumber ());
     Schedules->SetModified (pSchedule);
   }
-  LogD(2, prep("end of cEIT2"));
+  LogD(4, prep("end of cEIT2"));
 
 }
 //end of cEIT2
@@ -3600,7 +3601,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
     if (pmt.CheckCRCAndParse () && pmt.getServiceId () == pmtsid) {
       SI::PMT::Stream stream;
       for (SI::Loop::Iterator it; pmt.streamLoop.getNext (stream, it);) {
-        LogD(2, prep("StreamType: 0x%02x"), stream.getStreamType ());
+        LogD(4, prep("StreamType: 0x%02x"), stream.getStreamType ());
         if (stream.getStreamType () == 0x05 || stream.getStreamType () == 0xc1) { //0x05 = Premiere, SKY, Freeview, Nagra 0xc1 = MHW1,MHW2;
           SI::CharArray data = stream.getData ();
           if ((data[1] & 0xE0) == 0xE0 && (data[3] & 0xF0) == 0xF0) {
@@ -3610,12 +3611,12 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             if (data[2]==0x39) {//TODO Test This
               prvFRV = true;
               usrFRV = 1;
-              LogD(1, prep("if (data[2]==0x39) {//TODO Test This"));
+              LogD(4, prep("if (data[2]==0x39) {//TODO Test This"));
             }
             //Format = 0;               // 0 = premiere, 1 = MHW1, 2 = MHW2, 3 = Sky Italy (OpenTV), 4 = Sky UK (OpenTV), 5 = Freesat (Freeview), 6 = Nagraguide
             SI::Descriptor * d;
             for (SI::Loop::Iterator it; (d = stream.streamDescriptors.getNext (it));) {
-              LogD(2, prep("EEPGDEBUG:d->getDescriptorTAG():%x,SI::PrivateTag:%x\n"), d->getDescriptorTag (), SI::PrivateDataSpecifierDescriptorTag);
+              LogD(4, prep("EEPGDEBUG:d->getDescriptorTAG():%x,SI::PrivateTag:%x\n"), d->getDescriptorTag (), SI::PrivateDataSpecifierDescriptorTag);
               switch (d->getDescriptorTag ()) {
               case SI::PrivateDataSpecifierDescriptorTag:
                 //esyslog ("prv: %d %08x\n", d->getLength (), d->getData ().FourBytes (2));
@@ -3656,7 +3657,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                 }
                 break;
               case 0xd1: //Freeview
-                LogD(1, prep("case 0xd1: //Freeview"));
+                LogD(4, prep("case 0xd1: //Freeview"));
                 if (d->getLength () == 3 && ((d->getData ().TwoBytes (2) & 0xff00) == 0x0100))
                   usrFRV = 0x01;
                 //01 = EIT pid 3842
@@ -3683,7 +3684,8 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                 UnprocessedFormat[FREEVIEW] = stream.getPid ();
             if (prvData && usrData)
               UnprocessedFormat[PREMIERE] = stream.getPid ();
-            //TODO DPE this is not good since the DISH/BEV filters are always on, but have to test somehow.
+            //TODO DPE DISH/BEV filters are always ON on provided transponders,
+            // but there is no knowledge for the loop of the data at the moment.
             //EEPG:12472:H:S119.0W:20000:0:0:0:0:36862:4100:18:36862
             if (((Source() == cSource::FromString("S119.0W")
                 && Transponder() == cChannel::Transponder(12472,'H'))
@@ -3694,10 +3696,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             }
           }   //if data[1] && data [3]
         }   //if streamtype
-        /*if (Format != PREMIERE)       //any format found
-           break;               //break out for loop */
       } //for loop that walks through streams
-//      if (Format == PREMIERE) {       //FIXME for Premiere you should also stop scanning when found...
       NextPmt ();
       pmtnext = 0;
       /*      }
