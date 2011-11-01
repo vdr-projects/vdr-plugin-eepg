@@ -2152,6 +2152,7 @@ int cFilterEEPG::GetTitlesMHW2 (const u_char * Data, int Length)
         CleanString (T->Text);
         Pos += Len + 8; // Sub Theme starts here
         T->ThemeId = ((Data[7] & 0x3f) << 6) | (Data[Pos] & 0x3f);
+        T->TableId = DEFAULT_TABLE_ID; //TODO locate the actual table id
         T->EventId = (Data[Pos + 1] << 8) | Data[Pos + 2];
         T->SummaryAvailable = (T->EventId != 0xFFFF);
         LogI(3, prep("EventId %04x Titlenr %d:SummAv:%x,Name:%s."), T->EventId,
@@ -2477,6 +2478,7 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)
           T->StartTime = ((MjdTime - 40587) * 86400) + ((Data[p + 2] << 9) | (Data[p + 3] << 1));
           T->Duration = ((Data[p + 4] << 9) | (Data[p + 5] << 1));
           T->ThemeId = Data[p + 6];
+          T->TableId = DEFAULT_TABLE_ID; //TODO locate the actual table id
           //TODO Data[p + 7] is Quality value add it to description
           //int quality = Data[p + 7];
           switch (Data[p + 8] & 0x0F) {
