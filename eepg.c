@@ -540,7 +540,7 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
     char *uncompressed = (char *) calloc (1, uncompressed_len + 1);
     unsigned value = 0, byte = 2, bit = 0;
     int p = 0;
-    int lastch = START;
+    unsigned char lastch = START;
 
     tableid = src[1] - 1;
     while (byte < 6 && byte < size) {
@@ -550,11 +550,11 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
     //freesat_table_load ();    /**< Load the tables as necessary */
 
     do {
-      int found = 0;
+      bool found = false;
       unsigned bitShift = 0;
       if (lastch == ESCAPE) {
         char nextCh = (value >> 24) & 0xff;
-        found = 1;
+        found = true;
         // Encoded in the next 8 bits.
         // Terminated by the first ASCII character.
         bitShift = 8;
@@ -586,7 +586,7 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
               uncompressed[p++] = nextCh;
               uncompressed[p] = 0;
             }
-            found = 1;
+            found = true;
             lastch = nextCh;
             break;
           }
@@ -3249,15 +3249,18 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         f = (unsigned char *) ShortEventDescriptor->name.getData().getData();
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->name.getText(buffer, sizeof(buffer));
+        LogD(2, prep("Title: %s Decoded: %s"), f, buffer);
         pEvent->SetTitle (buffer);
         l = ShortEventDescriptor->text.getLength();
         f = (unsigned char *) ShortEventDescriptor->text.getData().getData();
         decodeText2 (f, l, buffer, sizeof (buffer));
         //ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
         pEvent->SetShortText (buffer);
+        LogD(2, prep("ShortText: %s Decoded: %s"), f, buffer);
       } else if (!HasExternalData) {
         pEvent->SetTitle (NULL);
         pEvent->SetShortText (NULL);
+        LogD(2, prep("!HasExternalData"));
       }
       if (ExtendedEventDescriptors) {
         char buffer[Utf8BufSize (ExtendedEventDescriptors->getMaximumTextLength (": ")) + 1];
