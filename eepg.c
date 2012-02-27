@@ -263,7 +263,7 @@ static int AvailableSources[32];
 static int NumberOfAvailableSources = 0;
 static int LastVersionNagra = -1; //currently only used for Nagra, should be stored per transponder, per system
 
-static multimap<cString, cString> equiChanMap;
+static multimap<const char*, const char*> equiChanMap;
 
 
 #ifdef USE_NOEPG
@@ -1045,8 +1045,8 @@ void loadEquivalentChannelMap (void)
   char *Line;
   FILE *File;
   string FileName = string(ConfDir) + "/" + EEPG_FILE_EQUIV;
-  multimap<cString,cString>::iterator it;
-  pair<multimap<cString,cString>::iterator,multimap<cString,cString>::iterator> ret;
+  multimap<const char*,const char*>::iterator it;
+  pair<multimap<const char*,const char*>::iterator,multimap<const char*,const char*>::iterator> ret;
 
 
   File = fopen (FileName.c_str(), "r");
@@ -1075,7 +1075,7 @@ void loadEquivalentChannelMap (void)
                 }
                 tChannelID OriginalChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
                 bool found = false;
-                int i = 0;
+                //int i = 0;
                   cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
                   if (!OriginalChannel) {
                     LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalency is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID); //TODO: skip this ing?
@@ -1089,9 +1089,9 @@ void loadEquivalentChannelMap (void)
                     tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
                     cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false); //TODO use valid function?
                     if (EquivChannel) {
-                        ret = equiChanMap.equal_range(OriginalChID.ToString());
+                        ret = equiChanMap.equal_range(*OriginalChID.ToString());
                         for (it=ret.first; it!=ret.second; ++it)
-                          if ((*it).second ==  OriginalChID.ToString()) {
+                          if ((*it).second ==  *OriginalChID.ToString()) {
                             found = true;
                             break;
                           }
@@ -2917,10 +2917,10 @@ protected:
 };
 
 void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent){
-  multimap<cString,cString>::iterator it;
-  pair<multimap<cString,cString>::iterator,multimap<cString,cString>::iterator> ret;
+  multimap<const char*,const char*>::iterator it;
+  pair<multimap<const char*,const char*>::iterator,multimap<const char*,const char*>::iterator> ret;
 
-  ret = equiChanMap.equal_range(channelID.ToString());
+  ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
     tChannelID equChannelID (tChannelID::FromString((*it).second));
     cChannel *equChannel = GetChannelByID (equChannelID, false);
