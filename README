@@ -62,6 +62,7 @@ Currently known transponders that send EEPG data:
 -Digital+         S19.2E:10847V (Mediahighway 2)
 -Premiere         Sport Portal, Premiere Direkt Portal
 -Freesat          all freesat channels
+-Dish and BEV	  S119.0W:12472H S91.0W12224R
 
 Please note that the NagraGuide broadcasts of Canal DigitaalNL are stil in betatest; 
 therefore its information is not always reliable. It seems that sometimes, when no summaries 
@@ -87,6 +88,9 @@ This code is based on:
  -mhwepg program  (C) 2002, 2003 Jean-Claude Repetto <mhwepg@repetto.org>
  -LoadEpg plugin written by Luca De Pieri <dpluca@libero.it>
  -Freesat patch written by dom /at/ suborbital.org.uk
+ -Dish/BEV patch written by 
+Thanks to mrgandalf, and the others who helped map NA eit.
+Thanks to VDR User for testing.
 
 We wish to thank all authors for the great work they have been doing, decoding
 this EEPG data; this plugin tries to combine the best of all worlds.
