@@ -1097,7 +1097,7 @@ void loadEquivalentChannelMap (void)
                           }
 
                         if (!found)
-                          equiChanMap.insert(pair<cString,cString>(OriginalChID.ToString(),EquivChID.ToString()));
+                          equiChanMap.insert(pair<const char*,const char*>(*OriginalChID.ToString(),*EquivChID.ToString()));
                     } else
                       LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
                   }
