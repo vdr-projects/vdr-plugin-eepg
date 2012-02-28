@@ -2921,13 +2921,14 @@ void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEven
   multimap<const char*,const char*>::iterator it;
   pair<multimap<const char*,const char*>::iterator,multimap<const char*,const char*>::iterator> ret;
 
-  LogD(3, prep("Start updateEquivalent"), equiChanMap.size());
+  LogD(3, prep("Start updateEquivalent %s"), *channelID.ToString());
 
   ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
     tChannelID equChannelID (tChannelID::FromString((*it).second));
     cChannel *equChannel = GetChannelByID (equChannelID, false);
     if (equChannel) {
+      LogD(3, prep("found Equivalent channel %s"), *equChannelID.ToString());
       cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (equChannel, true);
       cEvent *pEqvEvent = (cEvent *) pSchedule->GetEvent (pEvent->EventID(), pEvent->StartTime());
       if (pEqvEvent) {
