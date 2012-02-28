@@ -1107,6 +1107,7 @@ void loadEquivalentChannelMap (void)
       }    //if isempty
     }      //while
     fclose (File);
+    LogD(3, prep("Loaded %i equivalents."), equiChanMap.size());
   }  //if file
 }
 void cFilterEEPG::LoadEquivalentChannels (void)
@@ -2919,6 +2920,8 @@ protected:
 void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent){
   multimap<const char*,const char*>::iterator it;
   pair<multimap<const char*,const char*>::iterator,multimap<const char*,const char*>::iterator> ret;
+
+  LogD(3, prep("Start updateEquivalent"), equiChanMap.size());
 
   ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
