@@ -432,7 +432,7 @@ int freesat_decode_error = 0; /* If set an error has occurred during decoding */
 
 static struct hufftab *tables[2][256];
 static int table_size[2][256];
-sNodeH sky_tables[2];
+static sNodeH* sky_tables[2];
 
 /** \brief Convert a textual character description into a value
  *
@@ -549,16 +549,16 @@ static bool load_sky_file (const char *filename)
     char string2[256];
 
     tableId = Format == SKY_IT ? 0 : 1;
-    sky_tables[tableId].Value = NULL;
-    sky_tables[tableId].P0 = NULL;
-    sky_tables[tableId].P1 = NULL;
+//    sky_tables[tableId].Value = NULL;
+//    sky_tables[tableId].P0 = NULL;
+//    sky_tables[tableId].P1 = NULL;
     while ((Line = fgets (Buffer, sizeof (Buffer), FileDict)) != NULL) {
       if (!isempty (Line)) {
         memset (string1, 0, sizeof (string1));
         memset (string2, 0, sizeof (string2));
         if (sscanf (Line, "%c=%[^\n]\n", string1, string2) == 2
             || (sscanf (Line, "%[^=]=%[^\n]\n", string1, string2) == 2)) {
-          nH = & sky_tables[tableId];
+          nH = sky_tables[tableId];
           LenPrefix = strlen (string2);
           for (i = 0; i < LenPrefix; i++) {
             switch (string2[i]) {
@@ -621,7 +621,7 @@ static bool load_sky_file (const char *filename)
         memset (string2, 0, sizeof (string2));
         if (sscanf (Line, "%c=%[^\n]\n", string1, string2) == 2
             || (sscanf (Line, "%[^=]=%[^\n]\n", string1, string2) == 2)) {
-          nH = &sky_tables[tableId];
+          nH = sky_tables[tableId];
           LenPrefix = strlen (string2);
           for (i = 0; i < LenPrefix; i++) {
             switch (string2[i]) {
@@ -751,7 +751,7 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
 
 int sky_huffman_decode (const u_char * Data, int Length, unsigned char *DecodeText)
 {
-  sNodeH *nH, &H=(Format==SKY_IT)?sky_tables[0]:sky_tables[1];
+  sNodeH *nH, H=(Format==SKY_IT)?*sky_tables[0]:*sky_tables[1];
   int i;
   int p;
   int q;
@@ -1011,7 +1011,7 @@ bool cFilterEEPG::InitDictionary (void)
   char Buffer[256];
   switch (Format) {
   case SKY_IT:
-	if (sky_tables[0] == NULL) {
+	if (sky_tables[0]->Value == NULL) {
 	  FileName += "/sky_it.dict";
       LogD (1, prep("EEPGDebug: loading sky_it.dict"));
 	  return load_sky_file(FileName.c_str());
@@ -1019,7 +1019,7 @@ bool cFilterEEPG::InitDictionary (void)
         LogD (1, prep("EEPGDebug: sky_it.dict already loaded"));
     break;
   case SKY_UK:
-	if (sky_tables[1] == NULL) {
+	if (sky_tables[1]->Value == NULL) {
       FileName += "/sky_uk.dict";
       LogD (1, prep("EEPGDebug: loading sky_uk.dict"));
 	  return load_sky_file(FileName.c_str());
@@ -4360,6 +4360,8 @@ bool cPluginEEPG::Start (void)
   CheckCreateFile("freesat.t2", FreesatT2);
   CheckCreateFile("sky_uk.themes", SkyUkThemes);
 
+  sky_tables[0] = (sNodeH*) calloc(1,sizeof(sNodeH));
+  sky_tables[1] = (sNodeH*) calloc(1,sizeof(sNodeH));
   //store all available sources, so when a channel is not found on current satellite, we can look for alternate sat positions.
   //perhaps this can be done smarter through existing VDR function???
   for (cChannel * Channel = Channels.First (); Channel; Channel = Channels.Next (Channel)) {
@@ -4389,9 +4391,16 @@ void cPluginEEPG::Stop (void)
     epg[i].device = 0;
     epg[i].filter = 0;
   }
+
   // Clean up after yourself!
   if (ConfDir) {
     free (ConfDir);
+  }
+  if (sky_tables[0]) {
+	  free(sky_tables[0]);
+  }
+  if (sky_tables[1]) {
+	  free(sky_tables[1]);
   }
 }
 
