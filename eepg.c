@@ -322,7 +322,6 @@ protected:
   virtual void ProcessNextFormat (bool FirstTime);
   virtual int GetChannelsSKYBOX (const u_char * Data, int Length);
   virtual bool GetThemesSKYBOX (void);
-  virtual bool ReadFileDictionary (void); //Reads Huffman tables for SKY
   virtual int GetTitlesSKYBOX (const u_char * Data, int Length);
   virtual int GetSummariesSKYBOX (const u_char * Data, int Length);
   virtual int GetChannelsMHW (const u_char * Data, int Length, int MHW); //TODO replace MHW by Format?
@@ -354,7 +353,9 @@ public:
   cFilterEEPG (void);
   virtual void SetStatus (bool On);
   void Trigger (void);
-    static const int EIT_PID = 0x12;
+  bool InitDictionary (void); //Initialize the Huffman tables for SKY and Freesat
+
+  static const int EIT_PID = 0x12;
 };
 
 cFilterEEPG::cFilterEEPG (void)
@@ -440,6 +441,7 @@ int freesat_decode_error = 0; /* If set an error has occurred during decoding */
 
 static struct hufftab *tables[2][256];
 static int table_size[2][256];
+static sNodeH* sky_tables[2];
 
 /** \brief Convert a textual character description into a value
  *
@@ -492,8 +494,9 @@ static unsigned long decode_binary (char *binary)
  *
  *  \param tableid   - Table id that should be loaded
  *  \param filename  - Filename to load
+ *  \return Success of operation
  */
-static void load_file (int tableid, const char *filename)
+static bool load_freesat_file (int tableid, const char *filename)
 {
   char buf[1024];
   char *from, *to, *binary;
@@ -501,7 +504,7 @@ static void load_file (int tableid, const char *filename)
 
   tableid--;
   if ((fp = fopen (filename, "r")) != NULL) {
-    LogI(0, prep("Loading table %d Filename <%s>"), tableid + 1, filename);
+    LogI(2, prep("Loading table %d Filename <%s>"), tableid + 1, filename);
 
     while (fgets (buf, sizeof (buf), fp) != NULL) {
       from = binary = to = NULL;
@@ -526,9 +529,144 @@ static void load_file (int tableid, const char *filename)
     fclose (fp);
   } else {
     LogE(0, prep("Cannot load <%s> for table %d"), filename, tableid + 1);
+    return false;
   }
+  return true;
 }
 
+/** \brief Load an individual freesat data file
+ *
+ *  \param filename  - Filename to load
+ *  \return Success of operation
+ */
+static bool load_sky_file (const char *filename)
+{
+  FILE *FileDict;
+  char *Line;
+  char Buffer[256];
+  sNodeH *nH;
+  int tableId;
+
+  FileDict = fopen (filename, "r");
+  if (FileDict == NULL) {
+    LogE (0, prep("Error opening file '%s'. %s"), filename, strerror (errno));
+    return false;
+  } else {
+    int i;
+    int LenPrefix;
+    char string1[256];
+    char string2[256];
+
+    tableId = Format == SKY_IT ? 0 : 1;
+    if (!sky_tables[tableId]) {
+      sky_tables[tableId] = (sNodeH*) calloc(1,sizeof(sNodeH));
+      if (!sky_tables[tableId]) {
+        LogE (0, prep("Not enough memory to load file '%s'."), filename);
+        return false;
+      }
+    }
+
+    while ((Line = fgets (Buffer, sizeof (Buffer), FileDict)) != NULL) {
+      if (!isempty (Line)) {
+        memset (string1, 0, sizeof (string1));
+        memset (string2, 0, sizeof (string2));
+        if (sscanf (Line, "%c=%[^\n]\n", string1, string2) == 2
+            || (sscanf (Line, "%[^=]=%[^\n]\n", string1, string2) == 2)) {
+          nH = sky_tables[tableId];
+          LenPrefix = strlen (string2);
+          for (i = 0; i < LenPrefix; i++) {
+            switch (string2[i]) {
+            case '0':
+              if (nH->P0 == NULL) {
+                nH->P0 = new sNodeH ();
+                nH = nH->P0;
+                nH->Value = NULL;
+                nH->P0 = NULL;
+                nH->P1 = NULL;
+                if ((LenPrefix - 1) == i) {
+                  Asprintf (&nH->Value, "%s", string1);
+                }
+              } else {
+                nH = nH->P0;
+                if (nH->Value != NULL || (LenPrefix - 1) == i) {
+                  LogE (0 ,prep("Error, huffman prefix code already exists for \"%s\"=%s with '%s'"), string1,
+                        string2, nH->Value);
+                }
+              }
+              break;
+            case '1':
+              if (nH->P1 == NULL) {
+                nH->P1 = new sNodeH ();
+                nH = nH->P1;
+                nH->Value = NULL;
+                nH->P0 = NULL;
+                nH->P1 = NULL;
+                if ((LenPrefix - 1) == i) {
+                  Asprintf (&nH->Value, "%s", string1);
+                }
+              } else {
+                nH = nH->P1;
+                if (nH->Value != NULL || (LenPrefix - 1) == i) {
+                  LogE (0, prep("Error, huffman prefix code already exists for \"%s\"=%s with '%s'"), string1,
+                        string2, nH->Value);
+                }
+              }
+              break;
+            default:
+              break;
+            }
+          }
+        }
+      }
+    }
+    fclose (FileDict);
+  }
+
+  // check tree huffman nodes
+  FileDict = fopen (filename, "r");
+  if (FileDict) {
+    int i;
+    int LenPrefix;
+    char string1[256];
+    char string2[256];
+    while ((Line = fgets (Buffer, sizeof (Buffer), FileDict)) != NULL) {
+      if (!isempty (Line)) {
+        memset (string1, 0, sizeof (string1));
+        memset (string2, 0, sizeof (string2));
+        if (sscanf (Line, "%c=%[^\n]\n", string1, string2) == 2
+            || (sscanf (Line, "%[^=]=%[^\n]\n", string1, string2) == 2)) {
+          nH = sky_tables[tableId];
+          LenPrefix = strlen (string2);
+          for (i = 0; i < LenPrefix; i++) {
+            switch (string2[i]) {
+            case '0':
+              if (nH->P0 != NULL) {
+                nH = nH->P0;
+              }
+              break;
+            case '1':
+              if (nH->P1 != NULL) {
+                nH = nH->P1;
+              }
+              break;
+            default:
+              break;
+            }
+          }
+          if (nH->Value != NULL) {
+            if (memcmp (nH->Value, string1, strlen (nH->Value)) != 0) {
+              LogE (0, prep("Error, huffman prefix value '%s' not equal to '%s'"), nH->Value, string1);
+            }
+          } else {
+            LogE (0, prep("Error, huffman prefix value is not exists for \"%s\"=%s"), string1, string2);
+          }
+        }
+      }
+    }
+    fclose (FileDict);
+  }
+  return true;
+}
 
 /** \brief Decode an EPG string as necessary
  *
@@ -625,11 +763,102 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
   return NULL;
 }
 
+int sky_huffman_decode (const u_char * Data, int Length, unsigned char *DecodeText)
+{
+  sNodeH *nH, H=(Format==SKY_IT)?*sky_tables[0]:*sky_tables[1];
+  int i;
+  int p;
+  int q;
+  bool CodeError;
+  bool IsFound;
+  unsigned char Byte;
+  unsigned char lastByte;
+  unsigned char Mask;
+  unsigned char lastMask;
+  nH = &H;
+  p = 0;
+  q = 0;
+  DecodeText[0] = '\0';
+  //DecodeErrorText[0] = '\0';
+  CodeError = false;
+  IsFound = false;
+  lastByte = 0;
+  lastMask = 0;
+  for (i = 0; i < Length; i++) {
+    Byte = Data[i];
+    Mask = 0x80;
+    if (i == 0) {
+      Mask = 0x20;
+      lastByte = i;
+      lastMask = Mask;
+    }
+loop1:
+    if (IsFound) {
+      lastByte = i;
+      lastMask = Mask;
+      IsFound = false;
+    }
+    if ((Byte & Mask) == 0) {
+      if (CodeError) {
+        //DecodeErrorText[q] = 0x30;
+        q++;
+        goto nextloop1;
+      }
+      if (nH->P0 != NULL) {
+        nH = nH->P0;
+        if (nH->Value != NULL) {
+          memcpy (&DecodeText[p], nH->Value, strlen (nH->Value));
+          p += strlen (nH->Value);
+          nH = &H;
+          IsFound = true;
+        }
+      } else {
+        memcpy (&DecodeText[p], "<...?...>", 9);
+        p += 9;
+        i = lastByte;
+        Byte = Data[lastByte];
+        Mask = lastMask;
+        CodeError = true;
+        goto loop1;
+      }
+    } else {
+      if (CodeError) {
+        //DecodeErrorText[q] = 0x31;
+        q++;
+        goto nextloop1;
+      }
+      if (nH->P1 != NULL) {
+        nH = nH->P1;
+        if (nH->Value != NULL) {
+          memcpy (&DecodeText[p], nH->Value, strlen (nH->Value));
+          p += strlen (nH->Value);
+          nH = &H;
+          IsFound = true;
+        }
+      } else {
+        memcpy (&DecodeText[p], "<...?...>", 9);
+        p += 9;
+        i = lastByte;
+        Byte = Data[lastByte];
+        Mask = lastMask;
+        CodeError = true;
+        goto loop1;
+      }
+    }
+nextloop1:
+    Mask = Mask >> 1;
+    if (Mask > 0) {
+      goto loop1;
+    }
+  }
+  DecodeText[p] = '\0';
+  //DecodeErrorText[q] = '\0';
+  return p;
+}
+
 //here all declarations for global variables over all devices
 
 char *ConfDir;
-
-sNodeH *nH, H;
 
 //unsigned char DecodeErrorText[4096];  //TODO only used for debugging?
 
@@ -784,236 +1013,47 @@ bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB 
   return true;
 }
 
-bool cFilterEEPG::ReadFileDictionary (void)
+/**
+ * \brief Initialize the Huffman dictionaries if they are not already initialized.
+ *
+ */
+bool cFilterEEPG::InitDictionary (void)
 {
   string FileName = ConfDir;
-  FILE *FileDict;
-  char *Line;
-  char Buffer[256];
   switch (Format) {
   case SKY_IT:
-    FileName += "/sky_it.dict";
+    if (sky_tables[0] == NULL) {
+      FileName += "/sky_it.dict";
+      LogD (4, prep("EEPGDebug: loading sky_it.dict"));
+      return load_sky_file(FileName.c_str());
+    } else
+        LogD (4, prep("EEPGDebug: sky_it.dict already loaded"));
     break;
   case SKY_UK:
-    FileName += "/sky_uk.dict";
+    if (sky_tables[1] == NULL) {
+      FileName += "/sky_uk.dict";
+      LogD (4, prep("EEPGDebug: loading sky_uk.dict"));
+      return load_sky_file(FileName.c_str());
+    } else
+        LogD (4, prep("EEPGDebug: sky_uk.dict already loaded"));
     break;
   case FREEVIEW:
-    FileName += "/freesat.t1";
-    load_file (1, FileName.c_str());
-    FileName = ConfDir;
-    FileName += "/freesat.t2";
-    load_file (2, FileName.c_str());
+    if (tables[0][0] == NULL) {
+      LogD (4, prep("EEPGDebug: loading freesat.dict"));
+      FileName += "/freesat.t1";
+      if (!load_freesat_file (1, FileName.c_str()))
+	return false;
+      FileName = ConfDir;
+      FileName += "/freesat.t2";
+      return load_freesat_file (2, FileName.c_str());
+    } else
+        LogD (4, prep("EEPGDebug: freesat.dict already loaded"));
     break;
   default:
     LogE (0 ,prep("Error, wrong format detected in ReadFileDictionary. Format = %i."), Format);
     return false;
   }
-  if ((Format == SKY_IT) || (Format == SKY_UK)) { //SKY
-    FileDict = fopen (FileName.c_str(), "r");
-    if (FileDict == NULL) {
-      LogE (0, prep("Error opening file '%s'. %s"), FileName.c_str(), strerror (errno));
-      return false;
-    } else {
-      int i;
-      int LenPrefix;
-      char string1[256];
-      char string2[256];
-      H.Value = NULL;
-      H.P0 = NULL;
-      H.P1 = NULL;
-      while ((Line = fgets (Buffer, sizeof (Buffer), FileDict)) != NULL) {
-        if (!isempty (Line)) {
-          memset (string1, 0, sizeof (string1));
-          memset (string2, 0, sizeof (string2));
-          if (sscanf (Line, "%c=%[^\n]\n", string1, string2) == 2
-              || (sscanf (Line, "%[^=]=%[^\n]\n", string1, string2) == 2)) {
-            nH = &H;
-            LenPrefix = strlen (string2);
-            for (i = 0; i < LenPrefix; i++) {
-              switch (string2[i]) {
-              case '0':
-                if (nH->P0 == NULL) {
-                  nH->P0 = new sNodeH ();
-                  nH = nH->P0;
-                  nH->Value = NULL;
-                  nH->P0 = NULL;
-                  nH->P1 = NULL;
-                  if ((LenPrefix - 1) == i) {
-                    Asprintf (&nH->Value, "%s", string1);
-                  }
-                } else {
-                  nH = nH->P0;
-                  if (nH->Value != NULL || (LenPrefix - 1) == i) {
-                    LogE (0 ,prep("Error, huffman prefix code already exists for \"%s\"=%s with '%s'"), string1,
-                          string2, nH->Value);
-                  }
-                }
-                break;
-              case '1':
-                if (nH->P1 == NULL) {
-                  nH->P1 = new sNodeH ();
-                  nH = nH->P1;
-                  nH->Value = NULL;
-                  nH->P0 = NULL;
-                  nH->P1 = NULL;
-                  if ((LenPrefix - 1) == i) {
-                    Asprintf (&nH->Value, "%s", string1);
-                  }
-                } else {
-                  nH = nH->P1;
-                  if (nH->Value != NULL || (LenPrefix - 1) == i) {
-                    LogE (0, prep("Error, huffman prefix code already exists for \"%s\"=%s with '%s'"), string1,
-                          string2, nH->Value);
-                  }
-                }
-                break;
-              default:
-                break;
-              }
-            }
-          }
-        }
-      }
-      fclose (FileDict);
-    }
-
-    // check tree huffman nodes
-    FileDict = fopen (FileName.c_str(), "r");
-    if (FileDict) {
-      int i;
-      int LenPrefix;
-      char string1[256];
-      char string2[256];
-      while ((Line = fgets (Buffer, sizeof (Buffer), FileDict)) != NULL) {
-        if (!isempty (Line)) {
-          memset (string1, 0, sizeof (string1));
-          memset (string2, 0, sizeof (string2));
-          if (sscanf (Line, "%c=%[^\n]\n", string1, string2) == 2
-              || (sscanf (Line, "%[^=]=%[^\n]\n", string1, string2) == 2)) {
-            nH = &H;
-            LenPrefix = strlen (string2);
-            for (i = 0; i < LenPrefix; i++) {
-              switch (string2[i]) {
-              case '0':
-                if (nH->P0 != NULL) {
-                  nH = nH->P0;
-                }
-                break;
-              case '1':
-                if (nH->P1 != NULL) {
-                  nH = nH->P1;
-                }
-                break;
-              default:
-                break;
-              }
-            }
-            if (nH->Value != NULL) {
-              if (memcmp (nH->Value, string1, strlen (nH->Value)) != 0) {
-                LogE (0, prep("Error, huffman prefix value '%s' not equal to '%s'"), nH->Value, string1);
-              }
-            } else {
-              LogE (0, prep("Error, huffman prefix value is not exists for \"%s\"=%s"), string1, string2);
-            }
-          }
-        }
-      }
-      fclose (FileDict);
-    }
-  } //if Format == 3 || Format == 4
   return true;
-}
-
-int DecodeHuffmanCode (const u_char * Data, int Length, unsigned char *DecodeText)
-{
-  int i;
-  int p;
-  int q;
-  bool CodeError;
-  bool IsFound;
-  unsigned char Byte;
-  unsigned char lastByte;
-  unsigned char Mask;
-  unsigned char lastMask;
-  nH = &H;
-  p = 0;
-  q = 0;
-  DecodeText[0] = '\0';
-  //DecodeErrorText[0] = '\0';
-  CodeError = false;
-  IsFound = false;
-  lastByte = 0;
-  lastMask = 0;
-  for (i = 0; i < Length; i++) {
-    Byte = Data[i];
-    Mask = 0x80;
-    if (i == 0) {
-      Mask = 0x20;
-      lastByte = i;
-      lastMask = Mask;
-    }
-loop1:
-    if (IsFound) {
-      lastByte = i;
-      lastMask = Mask;
-      IsFound = false;
-    }
-    if ((Byte & Mask) == 0) {
-      if (CodeError) {
-        //DecodeErrorText[q] = 0x30;
-        q++;
-        goto nextloop1;
-      }
-      if (nH->P0 != NULL) {
-        nH = nH->P0;
-        if (nH->Value != NULL) {
-          memcpy (&DecodeText[p], nH->Value, strlen (nH->Value));
-          p += strlen (nH->Value);
-          nH = &H;
-          IsFound = true;
-        }
-      } else {
-        memcpy (&DecodeText[p], "<...?...>", 9);
-        p += 9;
-        i = lastByte;
-        Byte = Data[lastByte];
-        Mask = lastMask;
-        CodeError = true;
-        goto loop1;
-      }
-    } else {
-      if (CodeError) {
-        //DecodeErrorText[q] = 0x31;
-        q++;
-        goto nextloop1;
-      }
-      if (nH->P1 != NULL) {
-        nH = nH->P1;
-        if (nH->Value != NULL) {
-          memcpy (&DecodeText[p], nH->Value, strlen (nH->Value));
-          p += strlen (nH->Value);
-          nH = &H;
-          IsFound = true;
-        }
-      } else {
-        memcpy (&DecodeText[p], "<...?...>", 9);
-        p += 9;
-        i = lastByte;
-        Byte = Data[lastByte];
-        Mask = lastMask;
-        CodeError = true;
-        goto loop1;
-      }
-    }
-nextloop1:
-    Mask = Mask >> 1;
-    if (Mask > 0) {
-      goto loop1;
-    }
-  }
-  DecodeText[p] = '\0';
-  //DecodeErrorText[q] = '\0';
-  return p;
 }
 
 void decodeText2 (const unsigned char *from, int len, char *buffer, int buffsize)
@@ -2591,7 +2631,7 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)
           T->Unknown2 = Data[p + 4 - 12]; //FIXME
           T->Unknown3 = Data[p + 4 - 11]; //FIXME
           unsigned char tmp[4096]; //TODO smarter
-          Len2 = DecodeHuffmanCode (&Data[p + 9], Len2, tmp);
+          Len2 = sky_huffman_decode (&Data[p + 9], Len2, tmp);
           if (Len2 == 0) {
             LogE(0, prep("Warning, could not huffman-decode title-text, skipping title."));
             return 1; //non-fatal error
@@ -2669,7 +2709,7 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
           p += 4;
           Len2 = Data[p + 1];
           unsigned char tmp[4096]; //TODO can this be done better?
-          Len2 = DecodeHuffmanCode (&Data[p + 2], Len2, tmp);
+          Len2 = sky_huffman_decode (&Data[p + 2], Len2, tmp);
           if (Len2 == 0) {
             LogE(0, prep("Warning, could not huffman-decode text, skipping summary."));
             return 1; //non-fatal error
@@ -2730,10 +2770,9 @@ void cFilterEEPG::FreeTitles (void)
 
 void cFilterEEPG::LoadIntoSchedule (void)
 {
-  int i, j, k;
+  int i, j;
   i = 0;
   j = 0;
-  k = 0;
   bool foundtitle;
   foundtitle = false;
   Title_t *T;
@@ -3653,7 +3692,7 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     AddFilter (0x11, 0x4a); //Sky Channels
     break;
   case FREEVIEW: //Freeview, CONT mode //TODO streamline this for other modes
-    ReadFileDictionary ();
+    InitDictionary ();
     AddFilter (pid, 0x4e, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
     AddFilter (pid, 0x50, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
     AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
@@ -4014,7 +4053,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
           Del (Pid, Tid); //Read all channels, clean up filter
         if (Result == 2) {
           GetThemesSKYBOX (); //Sky Themes from file; must be called AFTER first channels to have lThemes initialized FIXME
-          if (ReadFileDictionary ())
+          if (InitDictionary ())
             AddFilter (0x30, 0xa0, 0xfc); //SKY Titles batch 0 of 7
           else {
             esyslog ("EEPG: Fatal error reading huffman table.");
@@ -4466,6 +4505,9 @@ bool cPluginEEPG::Start (void)
   CheckCreateFile("freesat.t2", FreesatT2);
   CheckCreateFile("sky_uk.themes", SkyUkThemes);
 
+  sky_tables[0] = NULL;
+  sky_tables[1] = NULL;
+  tables[0][0] = NULL;
   //store all available sources, so when a channel is not found on current satellite, we can look for alternate sat positions.
   //perhaps this can be done smarter through existing VDR function???
   for (cChannel * Channel = Channels.First (); Channel; Channel = Channels.Next (Channel)) {
@@ -4495,9 +4537,16 @@ void cPluginEEPG::Stop (void)
     epg[i].device = 0;
     epg[i].filter = 0;
   }
+
   // Clean up after yourself!
   if (ConfDir) {
     free (ConfDir);
+  }
+  if (sky_tables[0]) {
+	  free(sky_tables[0]);
+  }
+  if (sky_tables[1]) {
+	  free(sky_tables[1]);
   }
 }
 

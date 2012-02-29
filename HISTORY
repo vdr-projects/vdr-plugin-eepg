@@ -14,6 +14,7 @@ Release 0.0.6pre:
 - moved Premiere code in separate method
 - Added setup option to display message after finish of writing epg
 - Added Dish Network and Bell ExpressVU support, thanks to the VDR patch, Mrgandalf and VDR User
+- Applied patch to Load Huffman dictionaries only on first use, thanks to Torsten Lang
 
 
 Release 0.0.5:
