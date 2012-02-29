@@ -1048,6 +1048,10 @@ void loadEquivalentChannelMap (void)
   multimap<const char*,const char*>::iterator it;
   pair<multimap<const char*,const char*>::iterator,multimap<const char*,const char*>::iterator> ret;
 
+  //TODO DPE add code to reload if file is changed
+  if (equiChanMap.size() > 0)
+	  return;
+
 
   File = fopen (FileName.c_str(), "r");
   if (File) {
