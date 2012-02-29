@@ -1140,8 +1140,10 @@ void loadEquivalentChannelMap (void)
                             break;
                           }
 
-                        if (!found)
+                        if (!found) {
                           equiChanMap.insert(pair<const char*,const char*>(*OriginalChID.ToString(),*EquivChID.ToString()));
+                          LogD(4, prep("Found %s equivalent to %s."), *EquivChID.ToString(), *OriginalChID.ToString());
+                        }
                     } else
                       LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
                   }
@@ -2968,6 +2970,7 @@ void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEven
 
   ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
+    LogD(1, prep("equivalent channel exists"));
     tChannelID equChannelID (tChannelID::FromString((*it).second));
     cChannel *equChannel = GetChannelByID (equChannelID, false);
     if (equChannel) {
