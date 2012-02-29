@@ -549,9 +549,14 @@ static bool load_sky_file (const char *filename)
     char string2[256];
 
     tableId = Format == SKY_IT ? 0 : 1;
-//    sky_tables[tableId].Value = NULL;
-//    sky_tables[tableId].P0 = NULL;
-//    sky_tables[tableId].P1 = NULL;
+    if (!sky_tables[tableId]) {
+      sky_tables[tableId] = (sNodeH*) calloc(1,sizeof(sNodeH));
+      if (!sky_tables[tableId]) {
+        LogE (0, prep("Not enough memory to load file '%s'."), filename);
+        return false;
+      }
+    }
+
     while ((Line = fgets (Buffer, sizeof (Buffer), FileDict)) != NULL) {
       if (!isempty (Line)) {
         memset (string1, 0, sizeof (string1));
@@ -1006,36 +1011,33 @@ bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB 
 bool cFilterEEPG::InitDictionary (void)
 {
   string FileName = ConfDir;
-  FILE *FileDict;
-  char *Line;
-  char Buffer[256];
   switch (Format) {
   case SKY_IT:
-	if (sky_tables[0]->Value == NULL) {
-	  FileName += "/sky_it.dict";
+    if (sky_tables[0] == NULL) {
+      FileName += "/sky_it.dict";
       LogD (1, prep("EEPGDebug: loading sky_it.dict"));
-	  return load_sky_file(FileName.c_str());
-	} else
+      return load_sky_file(FileName.c_str());
+    } else
         LogD (1, prep("EEPGDebug: sky_it.dict already loaded"));
     break;
   case SKY_UK:
-	if (sky_tables[1]->Value == NULL) {
+    if (sky_tables[1] == NULL) {
       FileName += "/sky_uk.dict";
       LogD (1, prep("EEPGDebug: loading sky_uk.dict"));
-	  return load_sky_file(FileName.c_str());
-	} else
+      return load_sky_file(FileName.c_str());
+    } else
         LogD (1, prep("EEPGDebug: sky_uk.dict already loaded"));
     break;
   case FREEVIEW:
-	if (tables == NULL) {
+    if (tables[0][0] == NULL) {
       LogD (1, prep("EEPGDebug: loading freesat.dict"));
       FileName += "/freesat.t1";
       if (!load_freesat_file (1, FileName.c_str()))
-    	  return false;
+	return false;
       FileName = ConfDir;
       FileName += "/freesat.t2";
       return load_freesat_file (2, FileName.c_str());
-	} else
+    } else
         LogD (1, prep("EEPGDebug: freesat.dict already loaded"));
     break;
   default:
@@ -2684,10 +2686,9 @@ void cFilterEEPG::FreeTitles (void)
 
 void cFilterEEPG::LoadIntoSchedule (void)
 {
-  int i, j, k;
+  int i, j;
   i = 0;
   j = 0;
-  k = 0;
   bool foundtitle;
   foundtitle = false;
   Title_t *T;
@@ -4360,8 +4361,9 @@ bool cPluginEEPG::Start (void)
   CheckCreateFile("freesat.t2", FreesatT2);
   CheckCreateFile("sky_uk.themes", SkyUkThemes);
 
-  sky_tables[0] = (sNodeH*) calloc(1,sizeof(sNodeH));
-  sky_tables[1] = (sNodeH*) calloc(1,sizeof(sNodeH));
+  sky_tables[0] = NULL;
+  sky_tables[1] = NULL;
+  tables[0][0] = NULL;
   //store all available sources, so when a channel is not found on current satellite, we can look for alternate sat positions.
   //perhaps this can be done smarter through existing VDR function???
   for (cChannel * Channel = Channels.First (); Channel; Channel = Channels.Next (Channel)) {
