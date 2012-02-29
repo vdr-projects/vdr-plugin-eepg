@@ -1015,22 +1015,22 @@ bool cFilterEEPG::InitDictionary (void)
   case SKY_IT:
     if (sky_tables[0] == NULL) {
       FileName += "/sky_it.dict";
-      LogD (1, prep("EEPGDebug: loading sky_it.dict"));
+      LogD (4, prep("EEPGDebug: loading sky_it.dict"));
       return load_sky_file(FileName.c_str());
     } else
-        LogD (1, prep("EEPGDebug: sky_it.dict already loaded"));
+        LogD (4, prep("EEPGDebug: sky_it.dict already loaded"));
     break;
   case SKY_UK:
     if (sky_tables[1] == NULL) {
       FileName += "/sky_uk.dict";
-      LogD (1, prep("EEPGDebug: loading sky_uk.dict"));
+      LogD (4, prep("EEPGDebug: loading sky_uk.dict"));
       return load_sky_file(FileName.c_str());
     } else
-        LogD (1, prep("EEPGDebug: sky_uk.dict already loaded"));
+        LogD (4, prep("EEPGDebug: sky_uk.dict already loaded"));
     break;
   case FREEVIEW:
     if (tables[0][0] == NULL) {
-      LogD (1, prep("EEPGDebug: loading freesat.dict"));
+      LogD (4, prep("EEPGDebug: loading freesat.dict"));
       FileName += "/freesat.t1";
       if (!load_freesat_file (1, FileName.c_str()))
 	return false;
@@ -1038,15 +1038,12 @@ bool cFilterEEPG::InitDictionary (void)
       FileName += "/freesat.t2";
       return load_freesat_file (2, FileName.c_str());
     } else
-        LogD (1, prep("EEPGDebug: freesat.dict already loaded"));
+        LogD (4, prep("EEPGDebug: freesat.dict already loaded"));
     break;
   default:
     LogE (0 ,prep("Error, wrong format detected in ReadFileDictionary. Format = %i."), Format);
     return false;
   }
-//  if ((Format == SKY_IT) || (Format == SKY_UK)) { //SKY
-//	  return load_sky_file(FileName.c_str());
-//  } //if Format == 3 || Format == 4
   return true;
 }
 
