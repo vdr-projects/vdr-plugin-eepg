@@ -263,7 +263,7 @@ static int AvailableSources[32];
 static int NumberOfAvailableSources = 0;
 static int LastVersionNagra = -1; //currently only used for Nagra, should be stored per transponder, per system
 
-static multimap<const char*, const char*> equiChanMap;
+static multimap<string, string> equiChanMap;
 
 
 #ifdef USE_NOEPG
@@ -1085,8 +1085,8 @@ void loadEquivalentChannelMap (void)
   char *Line;
   FILE *File;
   string FileName = string(ConfDir) + "/" + EEPG_FILE_EQUIV;
-  multimap<const char*,const char*>::iterator it;
-  pair<multimap<const char*,const char*>::iterator,multimap<const char*,const char*>::iterator> ret;
+  multimap<string,string>::iterator it,it2;
+  pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
 
   //TODO DPE add code to reload if file is changed
   if (equiChanMap.size() > 0)
@@ -1141,8 +1141,12 @@ void loadEquivalentChannelMap (void)
                           }
 
                         if (!found) {
-                          equiChanMap.insert(pair<const char*,const char*>(*OriginalChID.ToString(),*EquivChID.ToString()));
-                          LogD(4, prep("Found %s equivalent to %s."), *EquivChID.ToString(), *OriginalChID.ToString());
+                          string origCh(*OriginalChID.ToString());
+                          string equiCh(*EquivChID.ToString());
+                          equiChanMap.insert(pair<string,string>(origCh.c_str(),equiCh.c_str()));
+                          LogD(4, prep("Found %s equivalent to %s. origCh %s"), *EquivChID.ToString(), *OriginalChID.ToString(), origCh.c_str());
+                          for ( it2=equiChanMap.begin() ; it2 != equiChanMap.end(); it2++ )
+                                LogD(3, prep("Original ID %s <-> Equivalent ID %s"), (*it2).first.c_str(), it2->second.c_str());
                         }
                     } else
                       LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
@@ -1154,6 +1158,8 @@ void loadEquivalentChannelMap (void)
     }      //while
     fclose (File);
     LogD(3, prep("Loaded %i equivalents."), equiChanMap.size());
+    for ( it2=equiChanMap.begin() ; it2 != equiChanMap.end(); it2++ )
+        LogD(3, prep("Original ID %s <-> Equivalent ID %s"), (*it2).first.c_str(), it2->second.c_str());
   }  //if file
 }
 void cFilterEEPG::LoadEquivalentChannels (void)
@@ -2963,15 +2969,15 @@ protected:
 };
 
 void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent){
-  multimap<const char*,const char*>::iterator it;
-  pair<multimap<const char*,const char*>::iterator,multimap<const char*,const char*>::iterator> ret;
+  multimap<string,string>::iterator it;
+  pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
 
   LogD(3, prep("Start updateEquivalent %s"), *channelID.ToString());
 
   ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
     LogD(1, prep("equivalent channel exists"));
-    tChannelID equChannelID (tChannelID::FromString((*it).second));
+    tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
     cChannel *equChannel = GetChannelByID (equChannelID, false);
     if (equChannel) {
       LogD(3, prep("found Equivalent channel %s"), *equChannelID.ToString());
@@ -3057,13 +3063,13 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       pEvent = newEvent = new cEvent (SiEitEvent.getEventId ());
       if (!pEvent)
         continue;
-      updateEquivalent(Schedules, channel->GetChannelID(), pEvent);
+      //updateEquivalent(Schedules, channel->GetChannelID(), pEvent);
     } else {
       //LogD(3, prep("existing event channelID: %s Title: %s TableID 0x%02X new TID 0x%02X Version %i, new version %i"), *channel->GetChannelID().ToString(), pEvent->Title(), pEvent->TableID(), Tid, pEvent->Version(), versionNumber);
       // We have found an existing event, either through its event ID or its start time.
       pEvent->SetSeen ();
 
-      updateEquivalent(Schedules, channel->GetChannelID(), pEvent);
+      //updateEquivalent(Schedules, channel->GetChannelID(), pEvent);
       // If the existing event has a zero table ID it was defined externally and shall
       // not be overwritten.
       if (pEvent->TableID () == 0x00) {
@@ -3576,6 +3582,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       }
     }
 #endif /* DDEPGENTRY */
+      updateEquivalent(Schedules, channel->GetChannelID(), pEvent);
   }
   if (Empty && Tid == 0x4E && getSectionNumber () == 0)
     // ETR 211: an empty entry in section 0 of table 0x4E means there is currently no event running
