@@ -2991,12 +2991,40 @@ void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEven
         } else {
           LogD(1, prep("remove equivalent"));
           pSchedule->DelEvent(pEqvEvent);
-          pSchedule->AddEvent(pEvent);
+          cEvent* newEvent = new cEvent (pEvent->EventID());
+          newEvent->SetTableID (pEvent->TableID());
+          newEvent->SetStartTime (pEvent->StartTime());
+          newEvent->SetDuration (pEvent->Duration());
+          newEvent->SetVersion (pEvent->Version());
+  //        newEvent->SetContents(pEvent->Contents());
+          newEvent->SetParentalRating(pEvent->ParentalRating());
+          newEvent->SetVps (pEvent->Vps());
+          newEvent->SetTitle (pEvent->Title ());
+          newEvent->SetShortText (pEvent->ShortText ());
+          newEvent->SetDescription (pEvent->Description ());
+  //        newEvent->SetComponents (pEvent->Components());
+          newEvent->FixEpgBugs ();
+
+          pSchedule->AddEvent(newEvent);
         }
 
       } else {
         LogD(1, prep("equivalent event does not exist"));
-        pSchedule->AddEvent(pEvent);
+        cEvent* newEvent = new cEvent (pEvent->EventID());
+        newEvent->SetTableID (pEvent->TableID());
+        newEvent->SetStartTime (pEvent->StartTime());
+        newEvent->SetDuration (pEvent->Duration());
+        newEvent->SetVersion (pEvent->Version());
+//        newEvent->SetContents(pEvent->Contents());
+        newEvent->SetParentalRating(pEvent->ParentalRating());
+        newEvent->SetVps (pEvent->Vps());
+        newEvent->SetTitle (pEvent->Title ());
+        newEvent->SetShortText (pEvent->ShortText ());
+        newEvent->SetDescription (pEvent->Description ());
+//        newEvent->SetComponents (pEvent->Components());
+        newEvent->FixEpgBugs ();
+
+        pSchedule->AddEvent(newEvent);
       }
     }
   }
