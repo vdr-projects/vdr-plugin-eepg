@@ -3212,7 +3212,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
 
     int LanguagePreferenceShort = -1;
     int LanguagePreferenceExt = -1;
-    int nDescriptorTag;
+    unsigned char nDescriptorTag;
     bool UseExtendedEventDescriptor = false;
     SI::Descriptor * d;
     SI::ExtendedEventDescriptors * ExtendedEventDescriptors = NULL;
@@ -3843,7 +3843,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             }
             //Format = 0;               // 0 = premiere, 1 = MHW1, 2 = MHW2, 3 = Sky Italy (OpenTV), 4 = Sky UK (OpenTV), 5 = Freesat (Freeview), 6 = Nagraguide
             SI::Descriptor * d;
-	    int nDescriptorTag;
+	    unsigned char nDescriptorTag;
             for (SI::Loop::Iterator it; (d = stream.streamDescriptors.getNext (it));) {
               LogD(4, prep("EEPGDEBUG:d->getDescriptorTAG():%x,SI::PrivateTag:%x\n"), d->getDescriptorTag (), SI::PrivateDataSpecifierDescriptorTag);
               nDescriptorTag = d->getDescriptorTag ();
@@ -4201,7 +4201,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
       {
         time_t firstTime = 0;
         SI::Descriptor * d;
-	int nDescriptorTag;
+	unsigned char nDescriptorTag;
         bool UseExtendedEventDescriptor = false;
         int LanguagePreferenceShort = -1;
         int LanguagePreferenceExt = -1;
