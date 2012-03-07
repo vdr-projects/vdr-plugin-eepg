@@ -3212,6 +3212,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
 
     int LanguagePreferenceShort = -1;
     int LanguagePreferenceExt = -1;
+    int nDescriptorTag;
     bool UseExtendedEventDescriptor = false;
     SI::Descriptor * d;
     SI::ExtendedEventDescriptors * ExtendedEventDescriptors = NULL;
@@ -3231,8 +3232,8 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       }
 
       //LogD(2, prep("EEPGDEBUG:d->getDescriptorTAG():%x)"), d->getDescriptorTag ());
-
-      switch (d->getDescriptorTag ()) {
+      nDescriptorTag = d->getDescriptorTag ();
+      switch (nDescriptorTag) {
       case SI::ExtendedEventDescriptorTag: {
         SI::ExtendedEventDescriptor * eed = (SI::ExtendedEventDescriptor *) d;
         if (I18nIsPreferredLanguage (Setup.EPGLanguages, eed->languageCode, LanguagePreferenceExt)
@@ -3842,9 +3843,11 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             }
             //Format = 0;               // 0 = premiere, 1 = MHW1, 2 = MHW2, 3 = Sky Italy (OpenTV), 4 = Sky UK (OpenTV), 5 = Freesat (Freeview), 6 = Nagraguide
             SI::Descriptor * d;
+	    int nDescriptorTag;
             for (SI::Loop::Iterator it; (d = stream.streamDescriptors.getNext (it));) {
               LogD(4, prep("EEPGDEBUG:d->getDescriptorTAG():%x,SI::PrivateTag:%x\n"), d->getDescriptorTag (), SI::PrivateDataSpecifierDescriptorTag);
-              switch (d->getDescriptorTag ()) {
+              nDescriptorTag = d->getDescriptorTag ();
+              switch (nDescriptorTag) {
               case SI::PrivateDataSpecifierDescriptorTag:
                 //esyslog ("prv: %d %08x\n", d->getLength (), d->getData ().FourBytes (2));
                 if (d->getLength () == 6 && d->getData ().FourBytes (2) == 0x000000be)
@@ -3952,6 +3955,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
         ProcessPremiere(Data);
         break;
       } //if citpid == 0xb11 Premiere
+      LogD(0, prep("!!!!!! case 0xA0: Without break test"));
     case 0xa1:
     case 0xa2:
     case 0xa3:
@@ -3970,6 +3974,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
     case 0xaa:
     case 0xab:
       Result = GetSummariesSKYBOX (Data, Length - 4);
+      LogD(0, prep("!!!!!! Tid: 0x%02x Result: %i"), Tid, Result);
       if (Result != 1) //when fatal error or finished
         Del (Pid, 0xa8, 0xfc); //kill filter
       if (Result == 0) {
@@ -4197,11 +4202,13 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
       {
         time_t firstTime = 0;
         SI::Descriptor * d;
+	int nDescriptorTag;
         bool UseExtendedEventDescriptor = false;
         int LanguagePreferenceShort = -1;
         int LanguagePreferenceExt = -1;
         for (SI::Loop::Iterator it; (d = cit.eventDescriptors.getNext (it));) {
-          switch (d->getDescriptorTag ()) {
+          nDescriptorTag = d->getDescriptorTag ();
+          switch (nDescriptorTag) {
           case 0xF0: // order information
             if (SetupPE.OrderInfo) {
               static const char *text[] = {
