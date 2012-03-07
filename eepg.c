@@ -3949,13 +3949,13 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
     }
     int Result;
     switch (Tid) {
-    case 0xA0: //TODO DPE test this missing break but it seems a bug
+    case 0xA0:
       if ((Pid < 0x30) || (Pid > 0x37)) {
 
         ProcessPremiere(Data);
         break;
       } //if citpid == 0xb11 Premiere
-      LogD(0, prep("!!!!!! case 0xA0: Without break test"));
+      /* no break - used for sky also*/
     case 0xa1:
     case 0xa2:
     case 0xa3:
@@ -3974,7 +3974,6 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
     case 0xaa:
     case 0xab:
       Result = GetSummariesSKYBOX (Data, Length - 4);
-      LogD(0, prep("!!!!!! Tid: 0x%02x Result: %i"), Tid, Result);
       if (Result != 1) //when fatal error or finished
         Del (Pid, 0xa8, 0xfc); //kill filter
       if (Result == 0) {
