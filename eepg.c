@@ -3006,6 +3006,8 @@ void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEven
           newEvent->FixEpgBugs ();
 
           pSchedule->AddEvent(newEvent);
+          pSchedule->Sort ();
+
         }
 
       } else {
@@ -3025,6 +3027,7 @@ void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEven
         newEvent->FixEpgBugs ();
 
         pSchedule->AddEvent(newEvent);
+        pSchedule->Sort ();
       }
     }
   }
