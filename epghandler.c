@@ -27,19 +27,19 @@ bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
 }
 
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
-	if (Event->Title() == "" || (Title != "" && Title != Event->Title()))
+	if (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),Title)))
 		Event->SetTitle(Title);
 	return true;
 }
 
 bool cEEpgHandler::SetShortText(cEvent* Event, const char* ShortText) {
-	if (Event->ShortText() == "" || (ShortText != "" && ShortText != Event->ShortText()))
+	if (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText)))
 		Event->SetShortText(ShortText);
 	return true;
 }
 
 bool cEEpgHandler::SetDescription(cEvent* Event, const char* Description) {
-	if (Event->Description() == "" || (Description != "" && Description != Event->Description()))
+	if (!strcmp(Event->Description(),"") || (strcmp(Description,"") && strcmp(Event->Description(),Description)))
 		Event->SetDescription(Description);
 	return true;
 }
