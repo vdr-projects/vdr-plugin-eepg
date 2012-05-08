@@ -22,40 +22,65 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
 }
 
 bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
+	Event->SetEventID(EventID);
+	return true;
 }
 
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
+	if (Event->Title() == "" || (Title != "" && Title != Event->Title()))
+		Event->SetTitle(Title);
+	return true;
 }
 
 bool cEEpgHandler::SetShortText(cEvent* Event, const char* ShortText) {
+	if (Event->ShortText() == "" || (ShortText != "" && ShortText != Event->ShortText()))
+		Event->SetShortText(ShortText);
+	return true;
 }
 
 bool cEEpgHandler::SetDescription(cEvent* Event, const char* Description) {
+	if (Event->Description() == "" || (Description != "" && Description != Event->Description()))
+		Event->SetDescription(Description);
+	return true;
 }
 
 bool cEEpgHandler::SetContents(cEvent* Event, uchar* Contents) {
+	Event->SetContents(Contents);
+	return true;
 }
 
 bool cEEpgHandler::SetParentalRating(cEvent* Event, int ParentalRating) {
+	Event->SetParentalRating(ParentalRating);
+	return true;
 }
 
 bool cEEpgHandler::SetStartTime(cEvent* Event, time_t StartTime) {
+	Event->SetStartTime(StartTime);
+	return true;
 }
 
 bool cEEpgHandler::SetDuration(cEvent* Event, int Duration) {
+	Event->SetDuration(Duration);
+	return true;
 }
 
 bool cEEpgHandler::SetVps(cEvent* Event, time_t Vps) {
+	Event->SetVps(Vps);
+	return true;
 }
 
 bool cEEpgHandler::HandleEvent(cEvent* Event) {
+	return true;
 }
 
 bool cEEpgHandler::SortSchedule(cSchedule* Schedule) {
+	Schedule->Sort();
+	return true;
 }
 
 bool cEEpgHandler::DropOutdated(cSchedule* Schedule, time_t SegmentStart,
 		time_t SegmentEnd, uchar TableID, uchar Version) {
+	return false;
 }
 
 

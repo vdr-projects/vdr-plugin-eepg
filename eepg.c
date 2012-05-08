@@ -4577,6 +4577,7 @@ bool cPluginEEPG::Start (void)
     for (int i = 0; i < NumberOfAvailableSources; i++)
       isyslog ("EEPG: Available sources:%s.", *cSource::ToString (AvailableSources[i]));
 
+  new cEEpgHandler();
 
   return true;
 }
