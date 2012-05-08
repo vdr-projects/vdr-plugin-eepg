@@ -38,6 +38,7 @@
 #include <libsi/si.h>
 #include "eepg.h"
 #include "dish.h"
+#include "epghandler.h"
 
 #include <map>
 #include <string>
