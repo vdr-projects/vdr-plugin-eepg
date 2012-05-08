@@ -6,6 +6,7 @@
  */
 
 #include "epghandler.h"
+#include "log.h"
 
 cEEpgHandler::cEEpgHandler() {
 	// TODO Auto-generated constructor stub
@@ -27,13 +28,17 @@ bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
 }
 
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
+    LogD(1, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
+
 	if (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),Title)))
 		Event->SetTitle(Title);
 	return true;
 }
 
 bool cEEpgHandler::SetShortText(cEvent* Event, const char* ShortText) {
-	if (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText)))
+    LogD(1, prep("Event id:%d ShortText:%s new ShortText:%s"), Event->EventID(), Event->ShortText(), ShortText);
+
+    if (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText)))
 		Event->SetShortText(ShortText);
 	return true;
 }

@@ -39,14 +39,12 @@
 #include "eepg.h"
 #include "dish.h"
 #include "epghandler.h"
+#include "log.h"
 
 #include <map>
 #include <string>
 #include <stdarg.h>
 
-#define VERBOSE 1
-/* 0 = only print errors, 1 = print channels and themes, 2 = print channels, themes, titles, summaries 3 = debug mode */
-/* all is logged into /var/log/syslog */
 
 #if APIVERSNUM < 10401
 #error You need at least VDR API version 1.4.1 for this plugin
@@ -183,62 +181,6 @@ void cMenuSetupPremiereEpg::Store (void)
   SetupStore ("ProcessEIT", SetupPE.ProcessEIT);
 #endif
 }
-
-bool CheckLevel(int level)
-{
-#ifdef DEBUG
-  if (SetupPE.LogLevel >= level)
-#else
-  if (VERBOSE >= level)
-#endif
-  {
-    return true;
-  }
-  return false;
-}
-
-const char* PrepareLog(string message)
-{
-  message = "EEPG: " + message;
-  return message.c_str();
-}
-
-#define MAXSYSLOGBUF 256
-
-//void LogVsyslog(int errLevel, const char * message, ...)
-void LogVsyslog(int errLevel, int const& lineNum, const char * function, const char * message, ...)
-{
-  va_list ap;
-  char fmt[MAXSYSLOGBUF];
-  if (errLevel == LOG_DEBUG) {
-    snprintf(fmt, sizeof(fmt), "[%d] %s:%d %s", cThread::ThreadId(), function, lineNum, message);
-  } else {
-    snprintf(fmt, sizeof(fmt), "[%d] %s", cThread::ThreadId(), message);
-  }
-  va_start(ap,message);
-  vsyslog ( errLevel, fmt, ap );
-  va_end(ap);
-}
-
-#define LogI(a, b...) void( CheckLevel(a) ? LogVsyslog ( LOG_INFO, __LINE__, __FUNCTION__, b ) : void() )
-#define LogE(a, b...) void( CheckLevel(a) ? LogVsyslog ( LOG_ERR, __LINE__, __FUNCTION__, b ) : void() )
-#define LogD(a, b...) void( CheckLevel(a) ? LogVsyslog ( LOG_DEBUG, __LINE__, __FUNCTION__, b ) : void() )
-//#define LogE(a, b...) void( CheckLevel(a) ? esyslog ( b ) : void() )
-//#define LogD(a, b...) void( CheckLevel(a) ? dsyslog ( b ) : void() )
-#define prep(s) PrepareLog(s)
-#define prep2(s) s
-
-//void LogF(int level, const char * message, ...)  __attribute__ ((format (printf,2,3)));
-
-//void LogF(int level, const char * message, ...)
-//{
-//  if (CheckLevel(level)) {
-//    va_list ap;
-//    va_start(ap,message);
-//    vsyslog (LOG_ERR, PrepareLog(message), ap );
-//    va_end(ap);
-//  }
-//}
 
 #define Asprintf(a, b, c...) void( asprintf(a, b, c) < 0 ? esyslog("memory allocation error - %s", b) : void() )
 
