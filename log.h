@@ -10,6 +10,7 @@
 
 #include <string>
 #include <stdarg.h>
+#include "setupeepg.h"
 
 #define VERBOSE 1
 /* 0 = only print errors, 1 = print channels and themes, 2 = print channels, themes, titles, summaries 3 = debug mode */
@@ -19,7 +20,7 @@
 bool CheckLevel(int level)
 {
 #ifdef DEBUG
-  if (SetupPE.LogLevel >= level)
+  if (cSetupEEPG::getInstance().LogLevel >= level)
 #else
   if (VERBOSE >= level)
 #endif

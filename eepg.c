@@ -40,6 +40,7 @@
 #include "dish.h"
 #include "epghandler.h"
 #include "log.h"
+#include "setupeepg.h"
 
 #include <map>
 #include <string>
@@ -75,8 +76,6 @@ static const char *DESCRIPTION = trNOOP ("Parses Extended EPG data");
 
 using namespace std;
 
-// --- cSetupEEPG -------------------------------------------------------
-
 const char *optPats[] = {
   "%s",
   "%s (Option %d)",
@@ -101,38 +100,8 @@ char *cs_hexdump (int m, const uchar * buf, int n)
   return (dump);
 }
 
-class cSetupEEPG
-{
-public:
-  int OptPat;
-  int OrderInfo;
-  int RatingInfo;
-  int FixEpg;
-  int DisplayMessage;
-  int ProcessEIT;
-#ifdef DEBUG
-  int LogLevel;
-#endif
+cSetupEEPG SetupPE = *cSetupEEPG::getInstance();
 
-public:
-  cSetupEEPG (void);
-};
-
-cSetupEEPG SetupPE;
-
-cSetupEEPG::cSetupEEPG (void)
-{
-  OptPat = 1;
-  OrderInfo = 1;
-  RatingInfo = 1;
-  FixEpg = 0;
-  DisplayMessage = 1;
-  ProcessEIT = 0;
-#ifdef DEBUG
-  LogLevel = 0;
-#endif
-
-}
 
 // --- cMenuSetupPremiereEpg ------------------------------------------------------------
 
