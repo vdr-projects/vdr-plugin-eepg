@@ -119,7 +119,7 @@ public:
 
 cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
 {
-  data = SetupPE;
+  data = *cSetupEEPG::getInstance();
   SetSection (tr ("PremiereEPG"));
   optDisp[0] = tr ("off");
   for (unsigned int i = 1; i < NUM_PATS; i++) {

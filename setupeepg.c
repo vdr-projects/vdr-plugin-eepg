@@ -5,9 +5,12 @@
  *      Author: d.petrovski
  */
 
+#include <stddef.h>
 #include "setupeepg.h"
 
 // --- cSetupEEPG -------------------------------------------------------
+
+cSetupEEPG* cSetupEEPG::_setupEEPG = NULL;
 
 cSetupEEPG::cSetupEEPG (void)
 {

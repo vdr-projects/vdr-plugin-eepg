@@ -20,7 +20,7 @@
 bool CheckLevel(int level)
 {
 #ifdef DEBUG
-  if (cSetupEEPG::getInstance().LogLevel >= level)
+  if (cSetupEEPG::getInstance()->LogLevel >= level)
 #else
   if (VERBOSE >= level)
 #endif
