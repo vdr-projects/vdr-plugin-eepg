@@ -20,8 +20,9 @@ cEEpgHandler::~cEEpgHandler() {
 
 bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
 		const SI::EIT::Event* EitEvent, uchar TableID, uchar Version) {
-    LogD(1, prep("HandleEitEvent"));
-	return true;
+    //LogD(1, prep("HandleEitEvent"));
+    return false;
+//	return true;
 }
 
 bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
@@ -32,23 +33,25 @@ bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
     LogD(1, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
 
-	if (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),Title)))
-		Event->SetTitle(Title);
-	return true;
+    if (!Event->Title() || Title && (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),Title))))
+	Event->SetTitle(Title);
+    return true;
 }
 
 bool cEEpgHandler::SetShortText(cEvent* Event, const char* ShortText) {
     LogD(1, prep("Event id:%d ShortText:%s new ShortText:%s"), Event->EventID(), Event->ShortText(), ShortText);
 
-    if (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText)))
-		Event->SetShortText(ShortText);
-	return true;
+    if (!Event->ShortText() || ShortText && (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText))))
+	Event->SetShortText(ShortText);
+    return true;
 }
 
 bool cEEpgHandler::SetDescription(cEvent* Event, const char* Description) {
-	if (!strcmp(Event->Description(),"") || (strcmp(Description,"") && strcmp(Event->Description(),Description)))
-		Event->SetDescription(Description);
-	return true;
+    LogD(1, prep("Event id:%d Description:%s new Description:%s"), Event->EventID(), Event->Description(), Description);
+    
+    if (!Event->Description() || Description && (!strcmp(Event->Description(),"") || (strcmp(Description,"") && strcmp(Event->Description(),Description))))
+	Event->SetDescription(Description);
+    return true;
 }
 
 bool cEEpgHandler::SetContents(cEvent* Event, uchar* Contents) {
@@ -77,7 +80,7 @@ bool cEEpgHandler::SetVps(cEvent* Event, time_t Vps) {
 }
 
 bool cEEpgHandler::HandleEvent(cEvent* Event) {
-    LogD(1, prep("HandleEvent"));
+    //LogD(1, prep("HandleEvent"));
 	return true;
 }
 
