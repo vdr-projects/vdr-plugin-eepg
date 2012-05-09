@@ -10,6 +10,7 @@
 
 cEEpgHandler::cEEpgHandler() {
 	// TODO Auto-generated constructor stub
+    LogD(1, prep("cEEpgHandler()"));
 
 }
 
@@ -19,6 +20,7 @@ cEEpgHandler::~cEEpgHandler() {
 
 bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
 		const SI::EIT::Event* EitEvent, uchar TableID, uchar Version) {
+    LogD(1, prep("HandleEitEvent"));
 	return true;
 }
 
@@ -75,6 +77,7 @@ bool cEEpgHandler::SetVps(cEvent* Event, time_t Vps) {
 }
 
 bool cEEpgHandler::HandleEvent(cEvent* Event) {
+    LogD(1, prep("HandleEvent"));
 	return true;
 }
 
