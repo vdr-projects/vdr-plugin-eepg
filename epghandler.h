@@ -9,7 +9,7 @@
 #define CEEPGHANDLER_H_
 #include <vdr/epg.h>
 
-class cEEpgHandler : public cEpgDataReader {
+class cEEpgHandler : public cEpgHandler {
 public:
 	cEEpgHandler();
 	virtual ~cEEpgHandler();
