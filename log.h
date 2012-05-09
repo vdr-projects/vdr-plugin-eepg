@@ -17,7 +17,7 @@
 /* all is logged into /var/log/syslog */
 
 
-bool CheckLevel(int level)
+inline bool CheckLevel(int level)
 {
 #ifdef DEBUG
   if (cSetupEEPG::getInstance()->LogLevel >= level)
@@ -30,7 +30,7 @@ bool CheckLevel(int level)
   return false;
 }
 
-const char* PrepareLog(std::string message)
+inline const char* PrepareLog(std::string message)
 {
   message = "EEPG: " + message;
   return message.c_str();
@@ -39,7 +39,7 @@ const char* PrepareLog(std::string message)
 #define MAXSYSLOGBUF 256
 
 //void LogVsyslog(int errLevel, const char * message, ...)
-void LogVsyslog(int errLevel, int const& lineNum, const char * function, const char * message, ...)
+inline void LogVsyslog(int errLevel, int const& lineNum, const char * function, const char * message, ...)
 {
   va_list ap;
   char fmt[MAXSYSLOGBUF];

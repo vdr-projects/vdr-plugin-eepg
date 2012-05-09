@@ -4548,9 +4548,9 @@ bool cPluginEEPG::SetupParse (const char *Name, const char *Value)
     SetupPE->DisplayMessage = atoi (Value);
 #ifdef DEBUG
   else if (!strcasecmp (Name, "LogLevel"))
-    SetupPE.LogLevel = atoi (Value);
+    SetupPE->LogLevel = atoi (Value);
   else if (!strcasecmp (Name, "ProcessEIT"))
-    SetupPE.ProcessEIT = atoi (Value);
+    SetupPE->ProcessEIT = atoi (Value);
 #endif
   else
     return false;

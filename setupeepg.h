@@ -26,8 +26,8 @@ public:
 
 private:
   cSetupEEPG (void);
-  cSetupEEPG(cSetupEEPG const&){};             // copy constructor is private
-  cSetupEEPG& operator=(cSetupEEPG const&){};  // assignment operator is private
+  cSetupEEPG(cSetupEEPG const&);             // copy constructor is private
+  cSetupEEPG& operator=(cSetupEEPG const&);  // assignment operator is private
   static cSetupEEPG* _setupEEPG;
 
 };

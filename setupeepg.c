@@ -26,7 +26,7 @@ cSetupEEPG::cSetupEEPG (void)
 
 }
 
-static cSetupEEPG* cSetupEEPG::getInstance()
+cSetupEEPG* cSetupEEPG::getInstance()
 {
 	if (!_setupEEPG)
 		_setupEEPG = new cSetupEEPG();
