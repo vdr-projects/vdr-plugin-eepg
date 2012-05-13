@@ -41,15 +41,25 @@ bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
 bool cEEpgHandler::SetShortText(cEvent* Event, const char* ShortText) {
     LogD(1, prep("Event id:%d ShortText:%s new ShortText:%s"), Event->EventID(), Event->ShortText(), ShortText);
 
-    if (!Event->ShortText() || ShortText && (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText))))
+    if (Event->ShortText() && !strcmp(Event->ShortText(),""))
+    	origShortText = Event->ShortText();
+    else
+    	origShortText.clear();
+
+    //if (!Event->ShortText() || ShortText && (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText))))
 	Event->SetShortText(ShortText);
     return true;
 }
 
 bool cEEpgHandler::SetDescription(cEvent* Event, const char* Description) {
     LogD(1, prep("Event id:%d Description:%s new Description:%s"), Event->EventID(), Event->Description(), Description);
+
+    if (Event->Description() && !strcmp(Event->Description(),""))
+    	origDescription = Event->Description();
+    else
+    	origDescription.clear();
     
-    if (!Event->Description() || Description && (!strcmp(Event->Description(),"") || (strcmp(Description,"") && strcmp(Event->Description(),Description))))
+    //if (!Event->Description() || Description && (!strcmp(Event->Description(),"") || (strcmp(Description,"") && strcmp(Event->Description(),Description))))
 	Event->SetDescription(Description);
     return true;
 }
@@ -81,6 +91,18 @@ bool cEEpgHandler::SetVps(cEvent* Event, time_t Vps) {
 
 bool cEEpgHandler::HandleEvent(cEvent* Event) {
     //LogD(1, prep("HandleEvent"));
+
+	//After FixEpgBugs of cEvent set the original Short Text if empty
+	if (!Event->ShortText() && !strcmp(Event->ShortText(),""))
+		Event->SetShortText(origShortText.c_str());
+
+	//TODO just to see the difference
+	if (!origDescription.empty() && !origDescription.compare(Event->Description())) {
+		origDescription.append(" | EIT: ");
+		origDescription.append(Event->Description());
+		Event->SetDescription(origDescription.c_str());
+	}
+
 	return true;
 }
 

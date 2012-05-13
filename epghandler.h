@@ -8,6 +8,7 @@
 #ifndef CEEPGHANDLER_H_
 #define CEEPGHANDLER_H_
 #include <vdr/epg.h>
+#include <string>
 
 class cEEpgHandler : public cEpgHandler {
 public:
@@ -28,6 +29,10 @@ public:
 	virtual bool HandleEvent(cEvent *Event);
 	virtual bool SortSchedule(cSchedule *Schedule);
 	virtual bool DropOutdated(cSchedule *Schedule, time_t SegmentStart, time_t SegmentEnd, uchar TableID, uchar Version);
+
+private:
+	std::string origShortText;
+	std::string origDescription;
 };
 
 #endif /* CEEPGHANDLER_H_ */
