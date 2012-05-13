@@ -74,6 +74,14 @@
 static const char *VERSION = "0.0.6pre";
 static const char *DESCRIPTION = trNOOP ("Parses Extended EPG data");
 
+template <class T> T REALLOC(T Var, size_t Size)
+{
+  T p = (T)realloc(Var, Size);
+  if (!p)
+    free(Var);
+  return p;
+}
+
 using namespace std;
 
 // --- cSetupEEPG -------------------------------------------------------
@@ -508,7 +516,7 @@ static bool load_freesat_file (int tableid, const char *filename)
         int i = table_size[tableid][from_char]++;
 
         tables[tableid][from_char] =
-          (struct hufftab *) realloc (tables[tableid][from_char], (i + 1) * sizeof (tables[tableid][from_char][0]));
+          (struct hufftab *) REALLOC (tables[tableid][from_char], (i + 1) * sizeof (tables[tableid][from_char][0]));
         tables[tableid][from_char][i].value = bin;
         tables[tableid][from_char][i].next = to_char;
         tables[tableid][from_char][i].bits = bin_len;
@@ -699,7 +707,7 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
           lastch = nextCh;
         if (p >= uncompressed_len) {
           uncompressed_len += 10;
-          uncompressed = (char *) realloc (uncompressed, uncompressed_len + 1);
+          uncompressed = (char *) REALLOC (uncompressed, uncompressed_len + 1);
         }
         uncompressed[p++] = nextCh;
         uncompressed[p] = 0;
@@ -718,7 +726,7 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
             if (nextCh != STOP && nextCh != ESCAPE) {
               if (p >= uncompressed_len) {
                 uncompressed_len += 10;
-                uncompressed = (char *) realloc (uncompressed, uncompressed_len + 1);
+                uncompressed = (char *) REALLOC (uncompressed, uncompressed_len + 1);
               }
               uncompressed[p++] = nextCh;
               uncompressed[p] = 0;
@@ -1431,7 +1439,7 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
         LogI(5, prep("DEBUG: Textnr %i, Lasttxt %i."), ST->TextNr, ST->LastTextNr);
         int SummaryLength = ST->Textlength;
 
-        Text = (unsigned char *) realloc (Text, SummaryLength + TotLength);
+        Text = (unsigned char *) REALLOC (Text, SummaryLength + TotLength);
         if (Text == NULL) {
           LogI(0, prep("Summaries memory allocation error."));
           return 0; //empty text
@@ -1442,7 +1450,7 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
 
         LastTextBlock = ((ST->LastTextNr == 0) || (ST->TextNr >= ST->LastTextNr));
       } while (!LastTextBlock);
-      Text = (unsigned char *) realloc (Text, 1 + TotLength); //allocate 1 extra byte
+      Text = (unsigned char *) REALLOC (Text, 1 + TotLength); //allocate 1 extra byte
       Text[TotLength] = '\0'; //terminate string by NULL char
       LogD(5, prep("DEBUG: Full Text:%s."), Text);
 
@@ -1998,7 +2006,7 @@ int cFilterEEPG::GetNagra (const u_char * Data, int Length)
   //since the data has to be stored anyway; summaries do not seem to have channelid included, so storing titles and separately storing summaries will not work...
   //GetEventId only works for a specific Schedule for a specific ChannelId....
   buffer[TableIdExtension] =
-    (unsigned char *) realloc (buffer[TableIdExtension], SectionLength - 9 + bufsize[TableIdExtension]);
+    (unsigned char *) REALLOC (buffer[TableIdExtension], SectionLength - 9 + bufsize[TableIdExtension]);
   memcpy (buffer[TableIdExtension] + bufsize[TableIdExtension], Data + 8, SectionLength - 9); //append new section
   bufsize[TableIdExtension] += SectionLength - 9;
   if (TBH->SectionNumber >= TBH->LastSectionNumber) {
@@ -4376,7 +4384,7 @@ bool cPluginEEPG::Start (void)
     for (int i = 0; i < NumberOfAvailableSources; i++)
       isyslog ("EEPG: Available sources:%s.", *cSource::ToString (AvailableSources[i]));
 
-
+  closedir(ConfigDir);
   return true;
 }
 
