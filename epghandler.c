@@ -5,6 +5,7 @@
  *      Author: d.petrovski
  */
 
+#if APIVERSNUM > 10725
 #include "epghandler.h"
 #include "log.h"
 
@@ -122,4 +123,4 @@ bool cEEpgHandler::DropOutdated(cSchedule* Schedule, time_t SegmentStart,
 	return false;
 }
 
-
+#endif

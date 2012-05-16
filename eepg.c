@@ -4497,9 +4497,11 @@ bool cPluginEEPG::Start (void)
     for (int i = 0; i < NumberOfAvailableSources; i++)
       isyslog ("EEPG: Available sources:%s.", *cSource::ToString (AvailableSources[i]));
 
-  closedir(ConfigDir);
+#if APIVERSNUM > 10725
   new cEEpgHandler();
+#endif
 
+  closedir(ConfigDir);
   return true;
 }
 
