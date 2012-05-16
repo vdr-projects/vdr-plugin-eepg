@@ -7,6 +7,7 @@
 
 #ifndef CEEPGHANDLER_H_
 #define CEEPGHANDLER_H_
+#if APIVERSNUM > 10725
 #include <vdr/epg.h>
 #include <string>
 
@@ -35,4 +36,5 @@ private:
 	std::string origDescription;
 };
 
+#endif /*APIVERSNUM > 10725*/
 #endif /* CEEPGHANDLER_H_ */
