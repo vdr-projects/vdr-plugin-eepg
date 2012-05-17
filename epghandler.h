@@ -7,6 +7,7 @@
 
 #ifndef CEEPGHANDLER_H_
 #define CEEPGHANDLER_H_
+#include <vdr/config.h>
 #if APIVERSNUM > 10725
 #include <vdr/epg.h>
 #include <string>

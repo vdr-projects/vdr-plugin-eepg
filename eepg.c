@@ -38,7 +38,9 @@
 #include <libsi/si.h>
 #include "eepg.h"
 #include "dish.h"
+#if APIVERSNUM > 10725
 #include "epghandler.h"
+#endif
 #include "log.h"
 #include "setupeepg.h"
 

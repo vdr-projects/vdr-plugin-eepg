@@ -5,8 +5,8 @@
  *      Author: d.petrovski
  */
 
-#if APIVERSNUM > 10725
 #include "epghandler.h"
+#if APIVERSNUM > 10725
 #include "log.h"
 
 cEEpgHandler::cEEpgHandler() {
