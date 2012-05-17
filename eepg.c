@@ -3672,7 +3672,9 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     AddFilter (pid, 0xb0); //perhaps TID is equal to first data byte?
     break;
   case DISH_BEV:
+#if APIVERSNUM < 10726
     AddFilter (EIT_PID, 0, 0); // event info, actual(0x4e)/other(0x4f) TS, present/following
+#endif
     AddFilter (0x0300, 0, 0); // Dish Network EEPG event info, actual(0x4e)/other(0x4f) TS, present/following
     AddFilter (0x0441, 0, 0); // Dish Network EEPG event info, actual(0x4e)/other(0x4f) TS, present/following
 //    AddFilter (0x0441, 0x50, 0xf0); // Bell ExpressVU EEPG
