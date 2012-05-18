@@ -38,6 +38,7 @@
 #include <libsi/si.h>
 #include "eepg.h"
 #include "dish.h"
+#include "epghandler.h"
 
 #include <map>
 #include <string>
@@ -1211,7 +1212,7 @@ void cFilterEEPG::LoadEquivalentChannels (void)
                 } else {
                   cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
                   if (!OriginalChannel)
-                    LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalency is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID); //TODO: skip this ing?
+                    LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalence is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID); //TODO: skip this ing?
                   if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
                     if (sscanf (equiChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid)
                         != 5) {
@@ -1331,7 +1332,7 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
     }   //else nChannels > MAX_CHANNELS
     LoadEquivalentChannels ();
     GetLocalTimeOffset (); //reread timing variables, only used for MHW
-    return 2; //obviously, when you get here, channels are read succesfully, but since all channels are sent at once, you can stop now
+    return 2; //obviously, when you get here, channels are read successfully, but since all channels are sent at once, you can stop now
   } //if nChannels == 0
   LogE (0, prep("Warning: Trying to read Channels more than once!"));
 //you will only get here when GetChannelsMHW is called, and nChannels !=0, e.g. when multiple citpids cause channels to be read multiple times. Second time, do nothing, give error so that the rest of the chain is not restarted also.
@@ -1578,15 +1579,25 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
 
   p += 29; //skip fixed part of block
   if (SD->NumberOfBlocks == 1)
-    p -= 4; //in this case there is NO summarytext AND no GBR??!!
+    p -= 4; //in this case there is NO summary text AND no GBR??!!
   for (int i = 1; i < (SD->NumberOfBlocks - 1); i++) {
-    LogD(3, prep("DEBUG: Extra Blockinfo: %02x %02x %02x %02x."), *p, *(p + 1), *(p + 2), *(p + 3));
-    p += 4; //skip this extra blockinfo
+    LogD(3, prep("DEBUG: Extra Block info: %02x %02x %02x %02x."), *p, *(p + 1), *(p + 2), *(p + 3));
+    p += 4; //skip this extra block info
   }
   return (char *) Text;
 }
 
-void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES]) //gets a channel and returns an array of schedules that WriteToSchedule can write to. Call this routine before a batch of titles with the same ChannelId will be WriteToScheduled; batchsize can be 1
+/**
+ * \brief Prepare to Write to Schedule
+ *
+ * gets a channel and returns an array of schedules that WriteToSchedule can write to.
+ * Call this routine before a batch of titles with the same ChannelId will be WriteToScheduled; batchsize can be 1
+ *
+ * \param C channel to prepare
+ * \param s VDR epg schedules
+ * \param ps pointer to the schedules that WriteToSchedule can write to
+ */
+void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES])
 {
   for (int eq = 0; eq < C->NumberOfEquivalences; eq++) {
     tChannelID channelID = tChannelID (C->Src[eq], C->Nid[eq], C->Tid[eq], C->Sid[eq]);
@@ -1598,7 +1609,7 @@ void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSched
       ps[eq] = s->AddSchedule (channelID); //open a a schedule for each equivalent channel
     else {
       ps[eq] = NULL;
-      LogE(5, prep("ERROR: Titleblock has invalid (equivalent) channel ID: Equivalence: %i, Source:%x, C->Nid:%x,C->Tid:%x,C->Sid:%x."),
+      LogE(5, prep("ERROR: Title block has invalid (equivalent) channel ID: Equivalence: %i, Source:%x, C->Nid:%x,C->Tid:%x,C->Sid:%x."),
            eq, C->Src[eq], C->Nid[eq], C->Tid[eq], C->Sid[eq]);
     }
   }
@@ -1722,13 +1733,13 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
 
     LogD(3, prep("DEBUG: ChannelId %04x, Blocklength %04x, NumberOfTitles %lu."), ChannelId, Blocklength,
          NumberOfTitles);
-    p += 4; //skip ChannelId and Blocklength
+    p += 4; //skip ChannelId and Block length
     next_p = p + Blocklength;
     if (next_p > DataEnd) { //only process if block is complete
       LogE(0, prep("ERROR, Block exceeds end of Data. p:%p, Blocklength:%x,DataEnd:%p."), p, Blocklength, DataEnd);
       return; //fatal error, this should never happen
     }
-    p += 4; //skip Titlenumber
+    p += 4; //skip Title number
 
     sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
     cSchedule *ps[MAX_EQUIVALENCES];
@@ -1747,7 +1758,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
       tmCurrent->tm_mon = CurrentMonth;
       tmCurrent->tm_mday = MonthdayTitles;
       tmCurrent->tm_hour = 0;
-      tmCurrent->tm_min = StartTime; //if starttime is bigger than 1 hour, mktime will correct this!
+      tmCurrent->tm_min = StartTime; //if start time is bigger than 1 hour, mktime will correct this!
       tmCurrent->tm_sec = 0;
       tmCurrent->tm_isdst = -1; //now correct with daylight savings
       if (MonthdayTitles < CurrentMonthday - 7) //the titles that are older than one week are not from the past, but from next month!
@@ -1775,7 +1786,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
         else
           SummText = GetSummaryTextNagra (DataStartSummaries, HILO32 (Title->SumDataOffset), EventId);
 
-        LogD(3, prep("DEBUG: Eventid: %08x ChannelId:%x, Starttime %02i:%02i, Duration %i, OffsetToText:%08x, OffsetToText2:%08x, SumDataOffset:%08x ThemeId:%x Title:%s \n SummaryText:%s"),
+        LogD(3, prep("DEBUG: Eventid: %08x ChannelId:%x, Start time %02i:%02i, Duration %i, OffsetToText:%08x, OffsetToText2:%08x, SumDataOffset:%08x ThemeId:%x Title:%s \n SummaryText:%s"),
              EventId, ChannelId, Hours, Minutes, Title->Duration,
              HILO32 (Title->OffsetToText), HILO32 (Title->OffsetToText2),
              HILO32 (Title->SumDataOffset), Title->ThemeId, Text, SummText);
@@ -1935,7 +1946,7 @@ int cFilterEEPG::GetChannelsNagra (const u_char * Data, int Length)
     sChannelsNagraGuide *Channel = (sChannelsNagraGuide *) p;
     sChannel *C = &sChannels[j];
     C->ChannelId = j + 1; //Nagra starts numbering at 1
-    ChannelSeq[C->ChannelId] = j; //fill lookup table to go from channel-id to sequence nr in table; lookuptable starts with 0
+    ChannelSeq[C->ChannelId] = j; //fill lookup table to go from channel-id to sequence nr in table; lookup table starts with 0
     C->SkyNumber = 0;
     C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
     C->Src[0] = Source(); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
@@ -2126,11 +2137,11 @@ void cFilterEEPG::ProcessNagra ()
     NumberOfTables--;
   }
 
-  for (int i = 0; i < NagraCounter; i++) { //first prcoess all themes, since they all use the same codes
+  for (int i = 0; i < NagraCounter; i++) { //first process all themes, since they all use the same codes
     unsigned short int TableIdExtension = NagraTIE[i];
     int TIE = TableIdExtension - 0x0200; //from 0x0400 to 0x0200 -> titles
     LogI(0, prep("Processing TableIdExtension:%04x"), TableIdExtension);
-    GetTitlesNagra (buffer[TIE] + 4, bufsize[TIE] - 4, TableIdExtension); //assume title-reading is completed  //TODO Language code terminatd by 0 is ignored
+    GetTitlesNagra (buffer[TIE] + 4, bufsize[TIE] - 4, TableIdExtension); //assume title-reading is completed  //TODO Language code terminated by 0 is ignored
     free (buffer[TIE]);
     buffer[TIE] = NULL;
     NumberOfTables--;
@@ -2155,7 +2166,7 @@ int cFilterEEPG::GetTitlesMHW1 (const u_char * Data, int Length)
     sTitleMHW1 *Title = (sTitleMHW1 *) Data;
     if (Title->ChannelId == 0xff) { //FF is separator packet
       if (memcmp (InitialTitle, Data, 46) == 0) { //data is the same as initial title //TODO use easier notation
-        LogD(2, prep("End procesing titles"));
+        LogD(2, prep("End processing titles"));
         return 2;
       }
       if (nTitles == 0)
@@ -2753,7 +2764,7 @@ void cFilterEEPG::FreeSummaries (void)
       S = Summaries[i];
       if (i < nSummaries - 1) {
         S2 = Summaries[i + 1]; //look at next summary
-        if (S->Text != S2->Text && S->Text != 0x00) //this is the last summary that points to this textblock; needed in case NumReplays > 1, multiple pointers to same textblock
+        if (S->Text != S2->Text && S->Text != 0x00) //this is the last summary that points to this text block; needed in case NumReplays > 1, multiple pointers to same textblock
           free (S->Text);
       } else if (S->Text != 0x00)
         free (S->Text);
@@ -3094,13 +3105,11 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       pEvent = newEvent = new cEvent (SiEitEvent.getEventId ());
       if (!pEvent)
         continue;
-      //updateEquivalent(Schedules, channel->GetChannelID(), pEvent);
     } else {
       //LogD(3, prep("existing event channelID: %s Title: %s TableID 0x%02X new TID 0x%02X Version %i, new version %i"), *channel->GetChannelID().ToString(), pEvent->Title(), pEvent->TableID(), Tid, pEvent->Version(), versionNumber);
       // We have found an existing event, either through its event ID or its start time.
       pEvent->SetSeen ();
 
-      //updateEquivalent(Schedules, channel->GetChannelID(), pEvent);
       // If the existing event has a zero table ID it was defined externally and shall
       // not be overwritten.
       if (pEvent->TableID () == 0x00) {
@@ -3460,7 +3469,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         pEvent->SetTitle (buffer);
         LogD(3, prep("channelID: %s Title: %s"), *channel->GetChannelID().ToString(), pEvent->Title());
         l = ShortEventDescriptor->text.getLength();
-        if (l > 0) { //Set the Short Text only if ther is data so that we do not overwrite valid data
+        if (l > 0) { //Set the Short Text only if there is data so that we do not overwrite valid data
           f = (unsigned char *) ShortEventDescriptor->text.getData().getData();
           decodeText2 (f, l, buffer, sizeof (buffer));
           //ShortEventDescriptor->text.getText(buffer, sizeof(buffer));
@@ -3720,8 +3729,7 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
   EndThemes = false;
   switch (Format) {
   case PREMIERE:
-    if (!Matches (pid, 0xA0))
-      Add (pid, 0xA0);
+    AddFilter (pid, 0xA0);
     break;
   case MHW1:
     AddFilter (0xd3, 0x92); //ThemesMHW1//TODO: all filters are serialized, strictly speaking Themes is non-fatal...
@@ -4570,6 +4578,7 @@ bool cPluginEEPG::Start (void)
     for (int i = 0; i < NumberOfAvailableSources; i++)
       isyslog ("EEPG: Available sources:%s.", *cSource::ToString (AvailableSources[i]));
 
+  new cEEpgHandler();
 
   return true;
 }

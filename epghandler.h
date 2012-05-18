@@ -1,0 +1,33 @@
+/*
+ * cEEpgHandler.h
+ *
+ *  Created on: 11.3.2012
+ *      Author: d.petrovski
+ */
+
+#ifndef CEEPGHANDLER_H_
+#define CEEPGHANDLER_H_
+#include <vdr/epg.h>
+
+class cEEpgHandler : public cEpgDataReader {
+public:
+	cEEpgHandler();
+	virtual ~cEEpgHandler();
+	virtual bool IgnoreChannel(const cChannel *Channel) { return false; }
+	virtual bool HandleEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
+	virtual bool SetEventID(cEvent *Event, tEventID EventID);
+	virtual bool SetTitle(cEvent *Event, const char *Title);
+	virtual bool SetShortText(cEvent *Event, const char *ShortText);
+	virtual bool SetDescription(cEvent *Event, const char *Description);
+	virtual bool SetContents(cEvent *Event, uchar *Contents);
+	virtual bool SetParentalRating(cEvent *Event, int ParentalRating);
+	virtual bool SetStartTime(cEvent *Event, time_t StartTime);
+	virtual bool SetDuration(cEvent *Event, int Duration);
+	virtual bool SetVps(cEvent *Event, time_t Vps);
+	virtual bool FixEpgBugs(cEvent *Event) { return false; }
+	virtual bool HandleEvent(cEvent *Event);
+	virtual bool SortSchedule(cSchedule *Schedule);
+	virtual bool DropOutdated(cSchedule *Schedule, time_t SegmentStart, time_t SegmentEnd, uchar TableID, uchar Version);
+};
+
+#endif /* CEEPGHANDLER_H_ */
