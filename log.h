@@ -10,16 +10,17 @@
 
 #include <string>
 #include <stdarg.h>
+#include "setupeepg.h"
 
 #define VERBOSE 1
 /* 0 = only print errors, 1 = print channels and themes, 2 = print channels, themes, titles, summaries 3 = debug mode */
 /* all is logged into /var/log/syslog */
 
 
-bool CheckLevel(int level)
+inline bool CheckLevel(int level)
 {
 #ifdef DEBUG
-  if (SetupPE.LogLevel >= level)
+  if (cSetupEEPG::getInstance()->LogLevel >= level)
 #else
   if (VERBOSE >= level)
 #endif
@@ -29,7 +30,7 @@ bool CheckLevel(int level)
   return false;
 }
 
-const char* PrepareLog(std::string message)
+inline const char* PrepareLog(std::string message)
 {
   message = "EEPG: " + message;
   return message.c_str();
@@ -38,7 +39,7 @@ const char* PrepareLog(std::string message)
 #define MAXSYSLOGBUF 256
 
 //void LogVsyslog(int errLevel, const char * message, ...)
-void LogVsyslog(int errLevel, int const& lineNum, const char * function, const char * message, ...)
+inline void LogVsyslog(int errLevel, int const& lineNum, const char * function, const char * message, ...)
 {
   va_list ap;
   char fmt[MAXSYSLOGBUF];

@@ -40,6 +40,7 @@
 #include "dish.h"
 #include "epghandler.h"
 #include "log.h"
+#include "setupeepg.h"
 
 #include <map>
 #include <string>
@@ -75,8 +76,6 @@ static const char *DESCRIPTION = trNOOP ("Parses Extended EPG data");
 
 using namespace std;
 
-// --- cSetupEEPG -------------------------------------------------------
-
 const char *optPats[] = {
   "%s",
   "%s (Option %d)",
@@ -101,45 +100,15 @@ char *cs_hexdump (int m, const uchar * buf, int n)
   return (dump);
 }
 
-class cSetupEEPG
-{
-public:
-  int OptPat;
-  int OrderInfo;
-  int RatingInfo;
-  int FixEpg;
-  int DisplayMessage;
-  int ProcessEIT;
-#ifdef DEBUG
-  int LogLevel;
-#endif
+cSetupEEPG* SetupPE = cSetupEEPG::getInstance();
 
-public:
-  cSetupEEPG (void);
-};
-
-cSetupEEPG SetupPE;
-
-cSetupEEPG::cSetupEEPG (void)
-{
-  OptPat = 1;
-  OrderInfo = 1;
-  RatingInfo = 1;
-  FixEpg = 0;
-  DisplayMessage = 1;
-  ProcessEIT = 0;
-#ifdef DEBUG
-  LogLevel = 0;
-#endif
-
-}
 
 // --- cMenuSetupPremiereEpg ------------------------------------------------------------
 
 class cMenuSetupPremiereEpg:public cMenuSetupPage
 {
 private:
-  cSetupEEPG data;
+  cSetupEEPG* data;
   const char *optDisp[NUM_PATS];
   char buff[NUM_PATS][32];
 protected:
@@ -150,35 +119,35 @@ public:
 
 cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
 {
-  data = SetupPE;
+  data = cSetupEEPG::getInstance();
   SetSection (tr ("PremiereEPG"));
   optDisp[0] = tr ("off");
   for (unsigned int i = 1; i < NUM_PATS; i++) {
     snprintf (buff[i], sizeof (buff[i]), optPats[i], "Event", 1);
     optDisp[i] = buff[i];
   }
-  Add (new cMenuEditStraItem (tr ("Tag option events"), &data.OptPat, NUM_PATS, optDisp));
-  Add (new cMenuEditBoolItem (tr ("Show order information"), &data.OrderInfo));
-  Add (new cMenuEditBoolItem (tr ("Show rating information"), &data.RatingInfo));
-  Add (new cMenuEditBoolItem (tr ("Fix EPG data"), &data.FixEpg));
-  Add (new cMenuEditBoolItem (tr ("Display summary message"), &data.DisplayMessage));
+  Add (new cMenuEditStraItem (tr ("Tag option events"), &data->OptPat, NUM_PATS, optDisp));
+  Add (new cMenuEditBoolItem (tr ("Show order information"), &data->OrderInfo));
+  Add (new cMenuEditBoolItem (tr ("Show rating information"), &data->RatingInfo));
+  Add (new cMenuEditBoolItem (tr ("Fix EPG data"), &data->FixEpg));
+  Add (new cMenuEditBoolItem (tr ("Display summary message"), &data->DisplayMessage));
 #ifdef DEBUG
-  Add (new cMenuEditIntItem (tr ("Level of logging verbosity"), &data.LogLevel, 0, 5));
-  Add (new cMenuEditBoolItem (tr ("Process EIT info with EEPG"), &data.ProcessEIT));
+  Add (new cMenuEditIntItem (tr ("Level of logging verbosity"), &data->LogLevel, 0, 5));
+  Add (new cMenuEditBoolItem (tr ("Process EIT info with EEPG"), &data->ProcessEIT));
 #endif
 }
 
 void cMenuSetupPremiereEpg::Store (void)
 {
-  SetupPE = data;
-  SetupStore ("OptionPattern", SetupPE.OptPat);
-  SetupStore ("OrderInfo", SetupPE.OrderInfo);
-  SetupStore ("RatingInfo", SetupPE.RatingInfo);
-  SetupStore ("FixEpg", SetupPE.FixEpg);
-  SetupStore ("DisplayMessage", SetupPE.DisplayMessage);
+  //SetupPE = data;
+  SetupStore ("OptionPattern", SetupPE->OptPat);
+  SetupStore ("OrderInfo", SetupPE->OrderInfo);
+  SetupStore ("RatingInfo", SetupPE->RatingInfo);
+  SetupStore ("FixEpg", SetupPE->FixEpg);
+  SetupStore ("DisplayMessage", SetupPE->DisplayMessage);
 #ifdef DEBUG
-  SetupStore ("LogLevel", SetupPE.LogLevel);
-  SetupStore ("ProcessEIT", SetupPE.ProcessEIT);
+  SetupStore ("LogLevel", SetupPE->LogLevel);
+  SetupStore ("ProcessEIT", SetupPE->ProcessEIT);
 #endif
 }
 
@@ -2990,7 +2959,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     :  SI::EIT (Data, false)
 {
   //LogD(2, prep("cEIT2::cEIT2"));
-  if (Tid > 0 && (Format == DISH_BEV || (SetupPE.ProcessEIT && isEITPid))) Tid--;
+  if (Tid > 0 && (Format == DISH_BEV || (SetupPE->ProcessEIT && isEITPid))) Tid--;
 
   if (!CheckCRCAndParse ()) {
     LogD(2, prep("!CheckCRCAndParse ()"));
@@ -3604,7 +3573,7 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     isyslog ("EEPG: written %i summaries", SummaryCounter);
     isyslog ("EEPG: rejected %i titles/summaries because of higher TableId", RejectTableId);
     //Send message when finished
-    if (SetupPE.DisplayMessage) {
+    if (SetupPE->DisplayMessage) {
       char *mesg;
       Asprintf(&mesg, "EEPG: written %i summaries", SummaryCounter);
       Skins.QueueMessage(mtInfo, mesg, 2);
@@ -3634,7 +3603,7 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
   FreeSummaries ();
 
   // Enable EIT scan for all except DISH_BEV since it is already enabled
-  if (SetupPE.ProcessEIT && !UnprocessedFormat[EIT]
+  if (SetupPE->ProcessEIT && !UnprocessedFormat[EIT]
        && !UnprocessedFormat[FREEVIEW] && !UnprocessedFormat[DISH_BEV]) {
       UnprocessedFormat[EIT] = EIT_PID;
       loadEquivalentChannelMap();
@@ -4162,7 +4131,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
           nDescriptorTag = d->getDescriptorTag ();
           switch (nDescriptorTag) {
           case 0xF0: // order information
-            if (SetupPE.OrderInfo) {
+            if (SetupPE->OrderInfo) {
               static const char *text[] = {
                 trNOOP ("Ordernumber"),
                 trNOOP ("Price"),
@@ -4184,7 +4153,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
             }
             break;
           case 0xF1: // parental rating
-            if (SetupPE.RatingInfo) {
+            if (SetupPE->RatingInfo) {
               char buff[512];
               int p = 0;
               const unsigned char *data = d->getData ().getData () + 2;
@@ -4264,7 +4233,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
           int nid = pct->getOriginalNetworkId ();
           int tid = pct->getTransportStreamId ();
           int sid = pct->getServiceId ();
-          if (SetupPE.FixEpg) {
+          if (SetupPE->FixEpg) {
             if (nid == 133) {
               if (tid == 0x03 && sid == 0xf0) {
                 tid = 0x02;
@@ -4358,7 +4327,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
                 ShortEventDescriptor->name.getText (buffer, sizeof (buffer));
                 if (isOpt) {
                   char buffer2[sizeof (buffer) + 32];
-                  snprintf (buffer2, sizeof (buffer2), optPats[SetupPE.OptPat], buffer, optCount);
+                  snprintf (buffer2, sizeof (buffer2), optPats[SetupPE->OptPat], buffer, optCount);
                   pEvent->SetTitle (buffer2);
                 } else
                   pEvent->SetTitle (buffer);
@@ -4568,20 +4537,20 @@ bool cPluginEEPG::SetupParse (const char *Name, const char *Value)
 
 
   if (!strcasecmp (Name, "OptionPattern"))
-    SetupPE.OptPat = atoi (Value);
+    SetupPE->OptPat = atoi (Value);
   else if (!strcasecmp (Name, "OrderInfo"))
-    SetupPE.OrderInfo = atoi (Value);
+    SetupPE->OrderInfo = atoi (Value);
   else if (!strcasecmp (Name, "RatingInfo"))
-    SetupPE.RatingInfo = atoi (Value);
+    SetupPE->RatingInfo = atoi (Value);
   else if (!strcasecmp (Name, "FixEpg"))
-    SetupPE.FixEpg = atoi (Value);
+    SetupPE->FixEpg = atoi (Value);
   else if (!strcasecmp (Name, "DisplayMessage"))
-    SetupPE.DisplayMessage = atoi (Value);
+    SetupPE->DisplayMessage = atoi (Value);
 #ifdef DEBUG
   else if (!strcasecmp (Name, "LogLevel"))
-    SetupPE.LogLevel = atoi (Value);
+    SetupPE->LogLevel = atoi (Value);
   else if (!strcasecmp (Name, "ProcessEIT"))
-    SetupPE.ProcessEIT = atoi (Value);
+    SetupPE->ProcessEIT = atoi (Value);
 #endif
   else
     return false;
