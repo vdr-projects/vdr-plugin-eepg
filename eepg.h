@@ -1,4 +1,4 @@
-#define DEBUG false
+//#define DEBUG false
 //#define DEBUG_STARTTIME false
 
 #define EEPG_FILE_EQUIV "eepg.equiv"
@@ -10,21 +10,34 @@
 #define MAX_EQUIVALENCES 8 //the number of equivalences one channel can have
 
 //Formats (need to be consecutively numbered):
-//First all CONTinuous protocols, so they will be processed LAST:
-#define PREMIERE	0
-#define FREEVIEW 	1
-//Then all batchmode, load ONCE protocols:
-#define MHW1 		2
-#define MHW2 		3
-#define SKY_IT 		4
-#define SKY_UK 		5
-#define NAGRA 		6
-#define HIGHEST_FORMAT 	6 //the highest number of EPG-formats that is supported by this plugin
+//#define PREMIERE	0
+//#define FREEVIEW 	1
+//#define MHW1 		2
+//#define MHW2 		3
+//#define SKY_IT 		4
+//#define SKY_UK 		5
+//#define NAGRA 		6
+//#define HIGHEST_FORMAT 	6
+
+enum EFormat {
+//First all batchmode, load ONCE protocols:
+  MHW1  = 0,
+  MHW2     ,
+  SKY_IT   ,
+  SKY_UK   ,
+  NAGRA    ,
+//Than all CONTinuous protocols, so they will be processed LAST:
+  PREMIERE ,
+  FREEVIEW ,
+  DISH_BEV ,
+//the highest number of EPG-formats that is supported by this plugin
+  HIGHEST_FORMAT = DISH_BEV
+} Format;
 
 #define NAGRA_TABLE_ID  	0x55 //the lower the table Id, the more "current" it is; table_id 0x00 never gets overwritten, now/next are at 0x4e or 0x4f!
-#define DEFAULT_TABLE_ID 	0x60
+#define DEFAULT_TABLE_ID 	0x30
 
-const char *FormatName[]= {"Premiere","FreeView","MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide"};
+const char *FormatName[]= {"MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide","Premiere","FreeView","Dish/Bev"};
 
 struct sNode
 {
@@ -60,6 +73,7 @@ typedef struct {
   unsigned char Unknown2;//FIXME
   unsigned char Unknown3;//FIXME
   unsigned char Rating;
+  unsigned short int TableId;
 } Title_t;
 
 typedef struct {
@@ -73,6 +87,37 @@ typedef struct {
   unsigned short int NumReplays;
   unsigned char * Text;
 } Summary_t;
+
+
+// -- InheritEnum.h
+template <typename EnumT, typename BaseEnumT>
+class InheritEnum
+{
+public:
+  InheritEnum() {}
+  InheritEnum(EnumT e)
+    : enum_(e)
+  {}
+
+  InheritEnum(BaseEnumT e)
+    : baseEnum_(e)
+  {}
+
+  explicit InheritEnum( int val )
+    : enum_(static_cast<EnumT>(val))
+  {}
+
+  operator EnumT() const { return enum_; }
+private:
+  // Note - the value is declared as a union mainly for as a debugging aid. If
+  // the union is undesired and you have other methods of debugging, change it
+  // to either of EnumT and do a cast for the constructor that accepts BaseEnumT.
+  union
+  {
+    EnumT enum_;
+    BaseEnumT baseEnum_;
+  };
+};
 
 static const char *FileEquivalences[] = {
   "#",

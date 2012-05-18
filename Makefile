@@ -42,6 +42,7 @@ TMPDIR = /tmp
 ### Allow user defined options to overwrite defaults:
 
 -include $(VDRDIR)/Make.config
+-include Make.config
 
 ### The version number of VDR (taken from VDR's "config.h"):
 
@@ -64,7 +65,7 @@ DEFINES += -D_GNU_SOURCE -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
 
 ### The object files (add further files here):
 
-OBJS = $(PLUGIN).o
+OBJS = $(PLUGIN).o dish.o
 
 ifdef DBG
 CXXFLAGS += -g
@@ -77,7 +78,10 @@ I18Npot   = $(PODIR)/$(PLUGIN).pot
 I18Nmsgs  = $(addprefix $(LOCALEDIR)/,$(addsuffix /LC_MESSAGES/vdr-$(PLUGIN).mo,$(notdir $(foreach file, $(wildcard $(PODIR)/*.po), $(basename $(file))))))
 LOCALEDIR = $(VDRDIR)/locale
 
-# Dependencies:
+### Default Target
+default: $(OBJS)
+
+### Dependencies:
 
 MAKEDEP = $(CXX) -MM -MG
 DEPFILE = .dependencies
