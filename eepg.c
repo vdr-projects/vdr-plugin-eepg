@@ -261,14 +261,13 @@ protected:
   virtual int GetSummariesMHW2 (const u_char * Data, int Length);
   virtual void FreeSummaries (void);
   virtual void FreeTitles (void);
-  virtual void PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES]); //gets a channel and returns an array of schedules that WriteToSchedule can write to. Call this routine before a batch of titles with the same ChannelId will be WriteToScheduled; batchsize can be 1
-  virtual void FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES]);
-  virtual void WriteToSchedule (cSchedule * ps[MAX_EQUIVALENCES], unsigned short int NumberOfEquivalences,
-                                unsigned int EventId, unsigned int StartTime, unsigned int Duration, char *Text,
-                                char *SummText, unsigned short int ThemeId, unsigned short int TableId,
-                                unsigned short int Version, char Rating = 0x00);
+  virtual void PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps/*[MAX_EQUIVALENCES]*/); //gets a channel and returns an array of schedules that WriteToSchedule can write to. Call this routine before a batch of titles with the same ChannelId will be WriteToScheduled; batchsize can be 1
+  //virtual void FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES]);
+  virtual void WriteToSchedule (cSchedule * ps, cSchedules* s, unsigned int EventId, unsigned int StartTime,
+                                unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId,
+                                unsigned short int TableId, unsigned short int Version, char Rating = 0x00);
   virtual void LoadIntoSchedule (void);
-  virtual void LoadEquivalentChannels (void);
+  //virtual void LoadEquivalentChannels (void);
 
   void ProcessPremiere(const u_char *& Data);
 public:
@@ -1084,90 +1083,182 @@ void loadEquivalentChannelMap (void)
       LogD(3, prep("Original ID %s <-> Equivalent ID %s"), (*it2).first.c_str(), it2->second.c_str());
   }  //if file
 }
-void cFilterEEPG::LoadEquivalentChannels (void)
-{
-  char Buffer[1024];
-  char *Line;
-  FILE *File;
-  string FileName = string(ConfDir) + "/" + EEPG_FILE_EQUIV;
 
-  File = fopen (FileName.c_str(), "r");
-  if (File) {
-    memset (Buffer, 0, sizeof (Buffer));
-    char origChanID[256];
-    char equiChanID[256];
-    char source[256];
-    int nid;
-    int tid;
-    int sid;
-    int rid;
-    while ((Line = fgets (Buffer, sizeof (Buffer), File)) != NULL) {
-      Line = compactspace (skipspace (stripspace (Line)));
-      if (!isempty (Line)) {
-        if (sscanf (Line, "%[^ ] %[^ ] %[^\n]\n", origChanID, equiChanID, source) == 3) {
-          if (origChanID[0] != '#' && origChanID[0] != ';') {
-            nid = 0;
-            tid = 0;
-            sid = 0;
-            rid = 0;
-            if (sscanf (origChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4)
-              if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
-                if (sscanf (origChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid) != 5) {
-                  rid = 0;
-                }
-                tChannelID OriginalChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
-                bool found = false;
-                int i = 0;
-                sChannel *C = NULL;
-                while (i < nChannels && (!found)) {
-                  C = &sChannels[i];
-                  if (C->Src[0] == (unsigned int)cSource::FromString (source) && C->Nid[0] == nid
-                    && C->Tid[0] == tid && C->Sid[0] == sid)
-                    found = true;
-                  else
-                    i++;
-                }
-                if (!found) {
-                  LogI(2, prep("Warning: in equivalence file, cannot find original channel %s. Perhaps you are tuned to another transponder right now."),
-                    origChanID);
-                } else {
-                  cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
-                  if (!OriginalChannel)
-                    LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalence is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID); //TODO: skip this ing?
-                  if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
-                    if (sscanf (equiChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid)
-                      != 5) {
-                      rid = 0;
-                    }
-                    tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
-                    cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false); //TODO use valid function?
-                    if (EquivChannel) {
-                      if (C->NumberOfEquivalences < MAX_EQUIVALENCES) {
-                        C->Src[C->NumberOfEquivalences] = EquivChannel->Source ();
-                        C->Nid[C->NumberOfEquivalences] = EquivChannel->Nid ();
-                        C->Tid[C->NumberOfEquivalences] = EquivChannel->Tid ();
-                        C->Sid[C->NumberOfEquivalences] = EquivChannel->Sid ();
-                        C->NumberOfEquivalences++;
-                        nEquivChannels++;
-                        LogI(3, prep("Added equivalent nr %i with Channel Id %s-%i-%i-%i to channel with id %i."),
-                             C->NumberOfEquivalences, *cSource::ToString (C->Src[C->NumberOfEquivalences - 1]),
-                             C->Nid[C->NumberOfEquivalences - 1], C->Tid[C->NumberOfEquivalences - 1],
-                             C->Sid[C->NumberOfEquivalences - 1], i);
-                      } else
-                        LogE(0, prep("Error, channel with id %i has more than %i equivalences. Increase MAX_EQUIVALENCES."),
-                          i, MAX_EQUIVALENCES);
-                    } else
-                      LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
-                  }
-                } //else !found
-              }   //if scanf string1
-          }   //if string1
-        }     //if scanf
-      }    //if isempty
-    }      //while
-    fclose (File);
-  }  //if file
-}    //end of loadequiv
+void updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent){
+  multimap<string,string>::iterator it;
+  pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
+
+  LogD(3, prep("Start updateEquivalent %s"), *channelID.ToString());
+
+  ret = equiChanMap.equal_range(*channelID.ToString());
+  for (it=ret.first; it!=ret.second; ++it) {
+    LogD(1, prep("equivalent channel exists"));
+    tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
+    cChannel *equChannel = GetChannelByID (equChannelID, false);
+    if (equChannel) {
+      LogD(3, prep("found Equivalent channel %s"), *equChannelID.ToString());
+      cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (equChannel, true);
+      cEvent *pEqvEvent = (cEvent *) pSchedule->GetEvent (pEvent->EventID(), pEvent->StartTime());
+      if (pEqvEvent) {
+        LogD(1, prep("equivalent event exists"));
+        if (pEqvEvent == pEvent) {
+          LogD(1, prep("equal event exists"));
+
+        } else {
+          LogD(1, prep("remove equivalent"));
+          pSchedule->DelEvent(pEqvEvent);
+          cEvent* newEvent = new cEvent (pEvent->EventID());
+          newEvent->SetTableID (pEvent->TableID());
+          newEvent->SetStartTime (pEvent->StartTime());
+          newEvent->SetDuration (pEvent->Duration());
+          newEvent->SetVersion (pEvent->Version());
+//        newEvent->SetContents(pEvent->Contents());
+          newEvent->SetParentalRating(pEvent->ParentalRating());
+          newEvent->SetVps (pEvent->Vps());
+          newEvent->SetTitle (pEvent->Title ());
+          newEvent->SetShortText (pEvent->ShortText ());
+          newEvent->SetDescription (pEvent->Description ());
+//        newEvent->SetComponents (pEvent->Components());
+          newEvent->FixEpgBugs ();
+
+          pSchedule->AddEvent(newEvent);
+
+        }
+
+      } else {
+        LogD(1, prep("equivalent event does not exist"));
+        cEvent* newEvent = new cEvent (pEvent->EventID());
+        newEvent->SetTableID (pEvent->TableID());
+        newEvent->SetStartTime (pEvent->StartTime());
+        newEvent->SetDuration (pEvent->Duration());
+        newEvent->SetVersion (pEvent->Version());
+//      newEvent->SetContents(pEvent->Contents());
+        newEvent->SetParentalRating(pEvent->ParentalRating());
+        newEvent->SetVps (pEvent->Vps());
+        newEvent->SetTitle (pEvent->Title ());
+        newEvent->SetShortText (pEvent->ShortText ());
+        newEvent->SetDescription (pEvent->Description ());
+//      newEvent->SetComponents (pEvent->Components());
+        newEvent->FixEpgBugs ();
+
+        pSchedule->AddEvent(newEvent);
+
+      }
+    }
+  }
+}
+
+void sortSchedules(cSchedules * Schedules, tChannelID channelID){
+  multimap<string,string>::iterator it;
+  pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
+
+  LogD(3, prep("Start sortEquivalent %s"), *channelID.ToString());
+
+  cChannel *pChannel = GetChannelByID (channelID, false);
+  cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (pChannel, true);
+  pSchedule->Sort ();
+  Schedules->SetModified (pSchedule);
+
+  ret = equiChanMap.equal_range(*channelID.ToString());
+  for (it=ret.first; it!=ret.second; ++it) {
+    LogD(3, prep("equivalent channel exists"));
+    tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
+    pChannel = GetChannelByID (equChannelID, false);
+    if (pChannel) {
+      LogD(3, prep("found Equivalent channel %s"), *equChannelID.ToString());
+      pSchedule = (cSchedule *) Schedules->GetSchedule (pChannel, true);
+
+      pSchedule->Sort ();
+      Schedules->SetModified (pSchedule);
+    }
+  }
+}
+
+
+//void cFilterEEPG::LoadEquivalentChannels (void)
+//{
+//  char Buffer[1024];
+//  char *Line;
+//  FILE *File;
+//  string FileName = string(ConfDir) + "/" + EEPG_FILE_EQUIV;
+//
+//  File = fopen (FileName.c_str(), "r");
+//  if (File) {
+//    memset (Buffer, 0, sizeof (Buffer));
+//    char origChanID[256];
+//    char equiChanID[256];
+//    char source[256];
+//    int nid;
+//    int tid;
+//    int sid;
+//    int rid;
+//    while ((Line = fgets (Buffer, sizeof (Buffer), File)) != NULL) {
+//      Line = compactspace (skipspace (stripspace (Line)));
+//      if (!isempty (Line)) {
+//        if (sscanf (Line, "%[^ ] %[^ ] %[^\n]\n", origChanID, equiChanID, source) == 3) {
+//          if (origChanID[0] != '#' && origChanID[0] != ';') {
+//            nid = 0;
+//            tid = 0;
+//            sid = 0;
+//            rid = 0;
+//            if (sscanf (origChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4)
+//              if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
+//                if (sscanf (origChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid) != 5) {
+//                  rid = 0;
+//                }
+//                tChannelID OriginalChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
+//                bool found = false;
+//                int i = 0;
+//                sChannel *C = NULL;
+//                while (i < nChannels && (!found)) {
+//                  C = &sChannels[i];
+//                  if (C->Src[0] == (unsigned int)cSource::FromString (source) && C->Nid[0] == nid
+//                    && C->Tid[0] == tid && C->Sid[0] == sid)
+//                    found = true;
+//                  else
+//                    i++;
+//                }
+//                if (!found) {
+//                  LogI(2, prep("Warning: in equivalence file, cannot find original channel %s. Perhaps you are tuned to another transponder right now."),
+//                    origChanID);
+//                } else {
+//                  cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
+//                  if (!OriginalChannel)
+//                    LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalence is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID); //TODO: skip this ing?
+//                  if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
+//                    if (sscanf (equiChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid)
+//                      != 5) {
+//                      rid = 0;
+//                    }
+//                    tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
+//                    cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false); //TODO use valid function?
+//                    if (EquivChannel) {
+//                      if (C->NumberOfEquivalences < MAX_EQUIVALENCES) {
+//                        C->Src[C->NumberOfEquivalences] = EquivChannel->Source ();
+//                        C->Nid[C->NumberOfEquivalences] = EquivChannel->Nid ();
+//                        C->Tid[C->NumberOfEquivalences] = EquivChannel->Tid ();
+//                        C->Sid[C->NumberOfEquivalences] = EquivChannel->Sid ();
+//                        C->NumberOfEquivalences++;
+//                        nEquivChannels++;
+//                        LogI(3, prep("Added equivalent nr %i with Channel Id %s-%i-%i-%i to channel with id %i."),
+//                             C->NumberOfEquivalences, *cSource::ToString (C->Src[C->NumberOfEquivalences - 1]),
+//                             C->Nid[C->NumberOfEquivalences - 1], C->Tid[C->NumberOfEquivalences - 1],
+//                             C->Sid[C->NumberOfEquivalences - 1], i);
+//                      } else
+//                        LogE(0, prep("Error, channel with id %i has more than %i equivalences. Increase MAX_EQUIVALENCES."),
+//                          i, MAX_EQUIVALENCES);
+//                    } else
+//                      LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
+//                  }
+//                } //else !found
+//              }   //if scanf string1
+//          }   //if string1
+//        }     //if scanf
+//      }    //if isempty
+//    }      //while
+//    fclose (File);
+//  }  //if file
+//}    //end of loadequiv
 
 //end of loadequiv
 
@@ -1231,27 +1322,28 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
           //memcpy (C->Name, &Data[pName + 1], 256);
           pName += (lenName + 1);
         }
-        C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
-        C->Src[0] = Source (); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
-        C->Nid[0] = HILO16 (Channel->NetworkId);
-        C->Tid[0] = HILO16 (Channel->TransportId);
-        C->Sid[0] = HILO16 (Channel->ServiceId);
-        tChannelID channelID = tChannelID (C->Src[0], C->Nid[0], C->Tid[0], C->Sid[0]);
+        //C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
+        C->Src = Source (); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
+        C->Nid = HILO16 (Channel->NetworkId);
+        C->Tid = HILO16 (Channel->TransportId);
+        C->Sid = HILO16 (Channel->ServiceId);
+        tChannelID channelID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
         cChannel *VC = GetChannelByID(channelID, true);
         bool IsFound = (VC);
         if(IsFound) {
-          C->Src[0] = VC->Source();
+          C->Src = VC->Source();
         }
         CleanString (C->Name);
 
         LogI(1, "|% 5d | %-26.26s | %-22.22s | %-3.3s |  % 6d  |\n", C->ChannelId
-             , *tChannelID (C->Src[0], C->Nid[0], C->Tid[0], C->Sid[0]).ToString()
+             , *tChannelID (C->Src, C->Nid, C->Tid, C->Sid).ToString()
              , C->Name, IsFound ? "YES" : "NO", C->SkyNumber);
 
         Off += Size;
       } //for loop
     }   //else nChannels > MAX_CHANNELS
-    LoadEquivalentChannels ();
+    //LoadEquivalentChannels ();
+    loadEquivalentChannelMap();
     GetLocalTimeOffset (); //reread timing variables, only used for MHW
     return 2; //obviously, when you get here, channels are read successfully, but since all channels are sent at once, you can stop now
   } //if nChannels == 0
@@ -1518,32 +1610,32 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
  * \param s VDR epg schedules
  * \param ps pointer to the schedules that WriteToSchedule can write to
  */
-void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES])
+void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps/*[MAX_EQUIVALENCES]*/)
 {
-  for (int eq = 0; eq < C->NumberOfEquivalences; eq++) {
-    tChannelID channelID = tChannelID (C->Src[eq], C->Nid[eq], C->Tid[eq], C->Sid[eq]);
+  //for (int eq = 0; eq < C->NumberOfEquivalences; eq++) {
+    tChannelID channelID = tChannelID (C->Src/*[eq]*/, C->Nid/*[eq]*/, C->Tid/*[eq]*/, C->Sid/*[eq]*/);
 #ifdef USE_NOEPG
     if (allowedEPG (channelID) && (channelID.Valid ()))
 #else
     if (channelID.Valid ()) //only add channels that are known to vdr
 #endif /* NOEPG */
-      ps[eq] = s->AddSchedule (channelID); //open a a schedule for each equivalent channel
+      ps/*[eq]*/ = s->AddSchedule (channelID); //open a a schedule for each equivalent channel
     else {
-      ps[eq] = NULL;
-      LogE(5, prep("ERROR: Title block has invalid (equivalent) channel ID: Equivalence: %i, Source:%x, C->Nid:%x,C->Tid:%x,C->Sid:%x."),
-           eq, C->Src[eq], C->Nid[eq], C->Tid[eq], C->Sid[eq]);
+      ps/*[eq]*/ = NULL;
+//      LogE(5, prep("ERROR: Title block has invalid (equivalent) channel ID: Equivalence: %i, Source:%x, C->Nid:%x,C->Tid:%x,C->Sid:%x."),
+//           eq, C->Src[eq], C->Nid[eq], C->Tid[eq], C->Sid[eq]);
     }
-  }
+  //}
 }
 
-void cFilterEEPG::FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES])
-{
-  for (int eq = 0; eq < C->NumberOfEquivalences; eq++)
-    if (ps[eq]) {
-      ps[eq]->Sort ();
-      s->SetModified (ps[eq]);
-    }
-}
+//void cFilterEEPG::FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES])
+//{
+//  for (int eq = 0; eq < C->NumberOfEquivalences; eq++)
+//    if (ps[eq]) {
+//      ps[eq]->Sort ();
+//      s->SetModified (ps[eq]);
+//    }
+//}
 
 /**
  * \brief write event to schedule
@@ -1551,20 +1643,20 @@ void cFilterEEPG::FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule
  * \param Duration the Duration of the event in minutes
  * \param ps points to array of schedules ps[eq], where eq is equivalence number of the channel. If channelId is invalid then ps[eq]=NULL
  */
-void cFilterEEPG::WriteToSchedule (cSchedule * ps[MAX_EQUIVALENCES], unsigned short int NumberOfEquivalences, unsigned int EventId, unsigned int StartTime, unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId, unsigned short int TableId, unsigned short int Version, char Rating)
+void cFilterEEPG::WriteToSchedule (cSchedule * ps, cSchedules* pSchedules, unsigned int EventId, unsigned int StartTime, unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId, unsigned short int TableId, unsigned short int Version, char Rating)
 {
   bool WrittenTitle = false;
   bool WrittenSummary = false;
-  for (int eq = 0; eq < NumberOfEquivalences; eq++) {
-    if (ps[eq]) {
+//  for (int eq = 0; eq < NumberOfEquivalences; eq++) {
+//    if (ps[eq]) {
       cEvent *Event = NULL;
 
-      Event = (cEvent *) ps[eq]->GetEvent (EventId); //since Nagra uses consistent EventIds, try this first
+      Event = (cEvent *) ps->GetEvent (EventId); //since Nagra uses consistent EventIds, try this first
       bool TableIdMatches = false;
       if (Event)
         TableIdMatches = (Event->TableID() == TableId);
       if (!Event || !TableIdMatches || abs(Event->StartTime() - (time_t) StartTime) > Duration * 60) //if EventId does not match, or it matched with wrong TableId, then try with StartTime
-        Event = (cEvent *) ps[eq]->GetEvent (EventId, StartTime);
+        Event = (cEvent *) ps->GetEvent (EventId, StartTime);
 
       cEvent *newEvent = NULL;
       if (!Event) {  //event is new
@@ -1602,7 +1694,10 @@ void cFilterEEPG::WriteToSchedule (cSchedule * ps[MAX_EQUIVALENCES], unsigned sh
         }
         free (tmp);
         if (newEvent)
-          ps[eq]->AddEvent (newEvent);
+          ps->AddEvent (newEvent);
+
+        updateEquivalent(pSchedules,ps->channelID, Event);
+
         //newEvent->FixEpgBugs (); causes segfault
       }
       /*      else
@@ -1616,8 +1711,8 @@ void cFilterEEPG::WriteToSchedule (cSchedule * ps[MAX_EQUIVALENCES], unsigned sh
         isyslog ("D %s\n", SummText);
         isyslog ("e\nc\n.\n");
       }
-    } //if ps[eq]
-  } //for eq
+//    } //if ps[eq]
+//  } //for eq
   if (WrittenTitle)
     TitleCounter++;
   if (WrittenSummary)
@@ -1663,7 +1758,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
     p += 4; //skip Title number
 
     sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
-    cSchedule *ps[MAX_EQUIVALENCES];
+    cSchedule *ps;//[MAX_EQUIVALENCES];
     PrepareToWriteToSchedule (C, s, ps);
 
     for (int i = 0; i < NumberOfTitles; i++) { //process each title within block
@@ -1714,7 +1809,8 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
 
         if (Themes[Title->ThemeId][0] == 0x00) //if detailed themeid is not known, get global themeid
           Title->ThemeId &= 0xf0;
-        WriteToSchedule (ps, C->NumberOfEquivalences, EventId, StartTime, Title->Duration, Text, SummText,
+
+        WriteToSchedule (ps, s, EventId, StartTime, Title->Duration, Text, SummText,
                          Title->ThemeId, NAGRA_TABLE_ID, Version);
 
         if (Text != NULL)
@@ -1752,7 +1848,8 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
       p += 30; //next title
     } //end for titles
 
-    FinishWriteToSchedule (C, s, ps);
+    //FinishWriteToSchedule (C, s, ps);
+    sortSchedules(s, tChannelID (C->Src, C->Nid, C->Tid, C->Sid));
     p = next_p;
   } while (p < DataEnd); //end of TitleBlock
 }
@@ -1869,17 +1966,17 @@ int cFilterEEPG::GetChannelsNagra (const u_char * Data, int Length)
     C->ChannelId = j + 1; //Nagra starts numbering at 1
     ChannelSeq[C->ChannelId] = j; //fill lookup table to go from channel-id to sequence nr in table; lookup table starts with 0
     C->SkyNumber = 0;
-    C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
-    C->Src[0] = Source(); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
-    C->Nid[0] = HILO16 (Channel->NetworkId);
-    C->Tid[0] = HILO16 (Channel->TransportId);
-    C->Sid[0] = HILO16 (Channel->ServiceId);
-    tChannelID channelID = tChannelID(C->Src[0], C->Nid[0], C->Tid[0], C->Sid[0]);
+    //C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
+    C->Src = Source(); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
+    C->Nid = HILO16 (Channel->NetworkId);
+    C->Tid = HILO16 (Channel->TransportId);
+    C->Sid = HILO16 (Channel->ServiceId);
+    tChannelID channelID = tChannelID(C->Src, C->Nid, C->Tid, C->Sid);
     cChannel *VC = GetChannelByID(channelID, true);
     bool IsFound = (VC);
     if(IsFound) {
       strncpy((char*)(C->Name), VC->Name (), 64);
-      C->Src[0] = VC->Source();
+      C->Src = VC->Source();
       CleanString (C->Name);
     }
     else
@@ -1937,7 +2034,8 @@ int cFilterEEPG::GetChannelsNagra (const u_char * Data, int Length)
   }
   if (p != DataEnd)
     LogE(0, prep("Warning, possible problem at end of channel table; p = %p, DataEnd = %p"), p, DataEnd);
-  LoadEquivalentChannels ();
+  //LoadEquivalentChannels ();
+  loadEquivalentChannelMap();
   return 2; //obviously, when you get here, channels are read succesfully, but since all channels are sent at once, you can stop now
 }
 
@@ -2412,7 +2510,8 @@ int cFilterEEPG::GetChannelsSKYBOX (const u_char * Data, int Length)
 {
 
   if (memcmp (InitialChannel, Data, 8) == 0) { //data is the same as initial title
-    LoadEquivalentChannels ();
+    //LoadEquivalentChannels ();
+    loadEquivalentChannelMap();
     return 2;
   } else {
     if (nChannels == 0)
@@ -2459,13 +2558,13 @@ int cFilterEEPG::GetChannelsSKYBOX (const u_char * Data, int Length)
                 if (ChannelSeq.count (ChannelId) == 0) { //not found
                   C = &sChannels[nChannels];
                   C->ChannelId = ChannelId;
-                  C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
-                  C->Src[0] = Source (); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
-                  C->Nid[0] = Nid;
-                  C->Tid[0] = Tid;
-                  C->Sid[0] = Sid;
+                  //C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
+                  C->Src = Source (); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
+                  C->Nid = Nid;
+                  C->Tid = Tid;
+                  C->Sid = Sid;
                   C->SkyNumber = SkyNumber;
-                  tChannelID channelID = tChannelID (C->Src[0], C->Nid[0], C->Tid[0], C->Sid[0]);
+                  tChannelID channelID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
                   cChannel *VC = Channels.GetByChannelID (channelID, true);
                   bool IsFound = (VC);
                   if (IsFound)
@@ -2769,7 +2868,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
 
           //channelids are sequentially numbered and sent in MHW1 and MHW2, but not in SKY, so we need to lookup the table index
           sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
-          cSchedule *p[MAX_EQUIVALENCES];
+          cSchedule *p;//[MAX_EQUIVALENCES];
           PrepareToWriteToSchedule (C, s, p);
 
           char rating = 0x00;
@@ -2781,10 +2880,11 @@ void cFilterEEPG::LoadIntoSchedule (void)
             TableId = T->TableId;
           }
 
-          WriteToSchedule (p, C->NumberOfEquivalences, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
+          WriteToSchedule (p, s, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
                            (char *) S->Text, T->ThemeId, TableId, 0, rating);
+          sortSchedules(s, p->channelID);
 
-          FinishWriteToSchedule (C, s, p);
+          //FinishWriteToSchedule (C, s, p);
           //Replays--;
           //if ((S->NumReplays != 0) && (Replays > 0)) { //when replays are used, all summaries of the replays are stored consecutively; currently only CSAT
           //j++;  //move to next summary
@@ -2817,15 +2917,16 @@ void cFilterEEPG::LoadIntoSchedule (void)
 
           /* write Title info to schedule */
           sChannel *C = &sChannels[ChannelSeq[T->ChannelId]]; //find channel
-          cSchedule *p[MAX_EQUIVALENCES];
+          cSchedule *p;//[MAX_EQUIVALENCES];
           PrepareToWriteToSchedule (C, s, p);
           char rating = 0x00;
           if ((Format == SKY_IT || Format == SKY_UK) &&  T->Rating) { //TODO only works on OTV for now
             rating = T->Rating;
           }
-          WriteToSchedule (p, C->NumberOfEquivalences, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
+          WriteToSchedule (p, s, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
                            NULL, T->ThemeId, DEFAULT_TABLE_ID, 0, rating);
-          FinishWriteToSchedule (C, s, p);
+          //FinishWriteToSchedule (C, s, p);
+          sortSchedules(s, p->channelID);
 
           SummariesNotFound++;
           i++; //move to next title, for this one no summary can be found
@@ -2896,74 +2997,10 @@ class cEIT2:public SI::EIT
 {
 public:
   cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid = false, bool OnlyRunningStatus = false);
-protected:
-  void updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent);
+//protected:
+//  void updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent);
 };
 
-void cEIT2::updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent){
-  multimap<string,string>::iterator it;
-  pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
-
-  LogD(3, prep("Start updateEquivalent %s"), *channelID.ToString());
-
-  ret = equiChanMap.equal_range(*channelID.ToString());
-  for (it=ret.first; it!=ret.second; ++it) {
-    LogD(1, prep("equivalent channel exists"));
-    tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
-    cChannel *equChannel = GetChannelByID (equChannelID, false);
-    if (equChannel) {
-      LogD(3, prep("found Equivalent channel %s"), *equChannelID.ToString());
-      cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (equChannel, true);
-      cEvent *pEqvEvent = (cEvent *) pSchedule->GetEvent (pEvent->EventID(), pEvent->StartTime());
-      if (pEqvEvent) {
-        LogD(1, prep("equivalent event exists"));
-        if (pEqvEvent == pEvent) {
-          LogD(1, prep("equal event exists"));
-
-        } else {
-          LogD(1, prep("remove equivalent"));
-          pSchedule->DelEvent(pEqvEvent);
-          cEvent* newEvent = new cEvent (pEvent->EventID());
-          newEvent->SetTableID (pEvent->TableID());
-          newEvent->SetStartTime (pEvent->StartTime());
-          newEvent->SetDuration (pEvent->Duration());
-          newEvent->SetVersion (pEvent->Version());
-//        newEvent->SetContents(pEvent->Contents());
-          newEvent->SetParentalRating(pEvent->ParentalRating());
-          newEvent->SetVps (pEvent->Vps());
-          newEvent->SetTitle (pEvent->Title ());
-          newEvent->SetShortText (pEvent->ShortText ());
-          newEvent->SetDescription (pEvent->Description ());
-//        newEvent->SetComponents (pEvent->Components());
-          newEvent->FixEpgBugs ();
-
-          pSchedule->AddEvent(newEvent);
-          pSchedule->Sort ();
-
-        }
-
-      } else {
-        LogD(1, prep("equivalent event does not exist"));
-        cEvent* newEvent = new cEvent (pEvent->EventID());
-        newEvent->SetTableID (pEvent->TableID());
-        newEvent->SetStartTime (pEvent->StartTime());
-        newEvent->SetDuration (pEvent->Duration());
-        newEvent->SetVersion (pEvent->Version());
-//      newEvent->SetContents(pEvent->Contents());
-        newEvent->SetParentalRating(pEvent->ParentalRating());
-        newEvent->SetVps (pEvent->Vps());
-        newEvent->SetTitle (pEvent->Title ());
-        newEvent->SetShortText (pEvent->ShortText ());
-        newEvent->SetDescription (pEvent->Description ());
-//      newEvent->SetComponents (pEvent->Components());
-        newEvent->FixEpgBugs ();
-
-        pSchedule->AddEvent(newEvent);
-        pSchedule->Sort ();
-      }
-    }
-  }
-}
 
 cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid, bool OnlyRunningStatus)
 :  SI::EIT (Data, false)
@@ -3556,10 +3593,9 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
     return;
   }
   if (Modified) {
-    pSchedule->Sort ();
     if (!HasExternalData)
       pSchedule->DropOutdated (SegmentStart, SegmentEnd, Tid, getVersionNumber ());
-    Schedules->SetModified (pSchedule);
+    sortSchedules(Schedules, channel->GetChannelID());
   }
   LogD(4, prep("end of cEIT2"));
 

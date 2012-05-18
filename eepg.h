@@ -7,7 +7,7 @@
 #define MAX_CHANNELS 2048
 #define MAX_TITLES 262144
 
-#define MAX_EQUIVALENCES 8 //the number of equivalences one channel can have
+//#define MAX_EQUIVALENCES 8 //the number of equivalences one channel can have
 
 //Formats (need to be consecutively numbered):
 //#define PREMIERE	0
@@ -53,11 +53,11 @@ typedef struct
 {
   unsigned short int ChannelId;
   unsigned short int SkyNumber;
-  unsigned short int NumberOfEquivalences;//original channel sets this value to 1, every equivalent channel adds 1
-  unsigned int Src[MAX_EQUIVALENCES];
-  unsigned short int Nid[MAX_EQUIVALENCES];
-  unsigned short int Tid[MAX_EQUIVALENCES];
-  unsigned short int Sid[MAX_EQUIVALENCES];
+  //unsigned short int NumberOfEquivalences;//original channel sets this value to 1, every equivalent channel adds 1
+  unsigned int Src;//[MAX_EQUIVALENCES];
+  unsigned short int Nid;//[MAX_EQUIVALENCES];
+  unsigned short int Tid;//[MAX_EQUIVALENCES];
+  unsigned short int Sid;//[MAX_EQUIVALENCES];
   unsigned char Name[64];
 } sChannel;
 
