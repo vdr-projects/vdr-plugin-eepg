@@ -1696,7 +1696,7 @@ void cFilterEEPG::WriteToSchedule (cSchedule * ps, cSchedules* pSchedules, unsig
         if (newEvent)
           ps->AddEvent (newEvent);
 
-        updateEquivalent(pSchedules,ps->channelID, Event);
+        updateEquivalent(pSchedules,ps->ChannelID(), Event);
 
         //newEvent->FixEpgBugs (); causes segfault
       }
@@ -1758,7 +1758,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
     p += 4; //skip Title number
 
     sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
-    cSchedule *ps;//[MAX_EQUIVALENCES];
+    cSchedule *ps = NULL;//[MAX_EQUIVALENCES];
     PrepareToWriteToSchedule (C, s, ps);
 
     for (int i = 0; i < NumberOfTitles; i++) { //process each title within block
@@ -2882,7 +2882,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
 
           WriteToSchedule (p, s, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
                            (char *) S->Text, T->ThemeId, TableId, 0, rating);
-          sortSchedules(s, p->channelID);
+          sortSchedules(s, p->ChannelID());
 
           //FinishWriteToSchedule (C, s, p);
           //Replays--;
@@ -2926,7 +2926,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
           WriteToSchedule (p, s, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
                            NULL, T->ThemeId, DEFAULT_TABLE_ID, 0, rating);
           //FinishWriteToSchedule (C, s, p);
-          sortSchedules(s, p->channelID);
+          sortSchedules(s, p->ChannelID());
 
           SummariesNotFound++;
           i++; //move to next title, for this one no summary can be found
