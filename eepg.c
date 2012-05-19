@@ -261,9 +261,9 @@ protected:
   virtual int GetSummariesMHW2 (const u_char * Data, int Length);
   virtual void FreeSummaries (void);
   virtual void FreeTitles (void);
-  virtual void PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps/*[MAX_EQUIVALENCES]*/); //gets a channel and returns an array of schedules that WriteToSchedule can write to. Call this routine before a batch of titles with the same ChannelId will be WriteToScheduled; batchsize can be 1
+  //virtual void PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps/*[MAX_EQUIVALENCES]*/); //gets a channel and returns an array of schedules that WriteToSchedule can write to. Call this routine before a batch of titles with the same ChannelId will be WriteToScheduled; batchsize can be 1
   //virtual void FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES]);
-  virtual void WriteToSchedule (cSchedule * ps, cSchedules* s, unsigned int EventId, unsigned int StartTime,
+  virtual void WriteToSchedule (tChannelID channelID, cSchedules* s, unsigned int EventId, unsigned int StartTime,
                                 unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId,
                                 unsigned short int TableId, unsigned short int Version, char Rating = 0x00);
   virtual void LoadIntoSchedule (void);
@@ -1610,23 +1610,23 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
  * \param s VDR epg schedules
  * \param ps pointer to the schedules that WriteToSchedule can write to
  */
-void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps/*[MAX_EQUIVALENCES]*/)
-{
-  //for (int eq = 0; eq < C->NumberOfEquivalences; eq++) {
-    tChannelID channelID = tChannelID (C->Src/*[eq]*/, C->Nid/*[eq]*/, C->Tid/*[eq]*/, C->Sid/*[eq]*/);
-#ifdef USE_NOEPG
-    if (allowedEPG (channelID) && (channelID.Valid ()))
-#else
-    if (channelID.Valid ()) //only add channels that are known to vdr
-#endif /* NOEPG */
-      ps/*[eq]*/ = s->AddSchedule (channelID); //open a a schedule for each equivalent channel
-    else {
-      ps/*[eq]*/ = NULL;
-//      LogE(5, prep("ERROR: Title block has invalid (equivalent) channel ID: Equivalence: %i, Source:%x, C->Nid:%x,C->Tid:%x,C->Sid:%x."),
-//           eq, C->Src[eq], C->Nid[eq], C->Tid[eq], C->Sid[eq]);
-    }
-  //}
-}
+//void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps/*[MAX_EQUIVALENCES]*/)
+//{
+//  //for (int eq = 0; eq < C->NumberOfEquivalences; eq++) {
+//    tChannelID channelID = tChannelID (C->Src/*[eq]*/, C->Nid/*[eq]*/, C->Tid/*[eq]*/, C->Sid/*[eq]*/);
+//#ifdef USE_NOEPG
+//    if (allowedEPG (channelID) && (channelID.Valid ()))
+//#else
+//    if (channelID.Valid ()) //only add channels that are known to vdr
+//#endif /* NOEPG */
+//      ps/*[eq]*/ = s->AddSchedule (channelID); //open a a schedule for each equivalent channel
+//    else {
+//      ps/*[eq]*/ = NULL;
+////      LogE(5, prep("ERROR: Title block has invalid (equivalent) channel ID: Equivalence: %i, Source:%x, C->Nid:%x,C->Tid:%x,C->Sid:%x."),
+////           eq, C->Src[eq], C->Nid[eq], C->Tid[eq], C->Sid[eq]);
+//    }
+//  //}
+//}
 
 //void cFilterEEPG::FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES])
 //{
@@ -1643,13 +1643,20 @@ void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSched
  * \param Duration the Duration of the event in minutes
  * \param ps points to array of schedules ps[eq], where eq is equivalence number of the channel. If channelId is invalid then ps[eq]=NULL
  */
-void cFilterEEPG::WriteToSchedule (cSchedule * ps, cSchedules* pSchedules, unsigned int EventId, unsigned int StartTime, unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId, unsigned short int TableId, unsigned short int Version, char Rating)
+void cFilterEEPG::WriteToSchedule (tChannelID channelID, cSchedules* pSchedules, unsigned int EventId, unsigned int StartTime, unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId, unsigned short int TableId, unsigned short int Version, char Rating)
 {
   bool WrittenTitle = false;
   bool WrittenSummary = false;
 //  for (int eq = 0; eq < NumberOfEquivalences; eq++) {
-//    if (ps[eq]) {
-      cEvent *Event = NULL;
+  cSchedule* ps;
+  if (channelID.Valid ()) //only add channels that are known to VDR
+    ps = pSchedules->AddSchedule (channelID); //open or create new schedule
+  else {
+    ps = NULL;
+  }
+
+  cEvent *Event = NULL;
+  if (ps/*[eq]*/) {
 
       Event = (cEvent *) ps->GetEvent (EventId); //since Nagra uses consistent EventIds, try this first
       bool TableIdMatches = false;
@@ -1657,60 +1664,65 @@ void cFilterEEPG::WriteToSchedule (cSchedule * ps, cSchedules* pSchedules, unsig
         TableIdMatches = (Event->TableID() == TableId);
       if (!Event || !TableIdMatches || abs(Event->StartTime() - (time_t) StartTime) > Duration * 60) //if EventId does not match, or it matched with wrong TableId, then try with StartTime
         Event = (cEvent *) ps->GetEvent (EventId, StartTime);
+  }
+  cEvent *newEvent = NULL;
+  if (!Event) {  //event is new
+    Event = newEvent = new cEvent (EventId);
+    Event->SetSeen ();
+  } else if (Event->TableID() < TableId) { //existing table may not be overwritten
+    RejectTableId++;
+    //esyslog ("EEPGDEBUG: Rejecting Event, existing TableID:%x, new TableID:%x.", Event->TableID (),
+    //           TableId);
+    Event = NULL;
+  }
 
-      cEvent *newEvent = NULL;
-      if (!Event) {  //event is new
-        Event = newEvent = new cEvent (EventId);
-        Event->SetSeen ();
-      } else if (Event->TableID() < TableId) { //existing table may not be overwritten
-        RejectTableId++;
-        //esyslog ("EEPGDEBUG: Rejecting Event, existing TableID:%x, new TableID:%x.", Event->TableID (),
-        //           TableId);
+  if (Event) {
+    Event->SetEventID (EventId); //otherwise the summary cannot be added later
+    Event->SetTableID (TableId); //TableID 0 is reserved for external epg, will not be overwritten; the lower the TableID, the more actual it is
+    Event->SetVersion (Version); //TODO use version and tableID to decide whether to update; TODO add language code
+    Event->SetStartTime (StartTime);
+    Event->SetDuration (Duration * 60);
+    if (Rating) {
+      Event->SetParentalRating(Rating);
+    }
+    char *tmp;
+    if (Text != 0x00) {
+      WrittenTitle = true;
+      CleanString ((uchar *) Text);
+      Event->SetTitle (Text);
+    }
+    Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
+    Event->SetShortText (tmp);
+    //strreplace(t, '|', '\n');
+    if (SummText != 0x00) {
+      WrittenSummary = true;
+      CleanString ((uchar *) SummText);
+      Event->SetDescription (SummText);
+    }
+    free (tmp);
+    if (ps && newEvent)
+      ps->AddEvent (newEvent);
+
+    updateEquivalent(pSchedules, channelID, Event);
+
+    if (!ps) {
+        //the event is not send to VDR so it has to be deleted.
+        delete Event;
         Event = NULL;
-      }
-
-      if (Event) {
-        Event->SetEventID (EventId); //otherwise the summary cannot be added later
-        Event->SetTableID (TableId); //TableID 0 is reserved for external epg, will not be overwritten; the lower the TableID, the more actual it is
-        Event->SetVersion (Version); //TODO use version and tableID to decide whether to update; TODO add language code
-        Event->SetStartTime (StartTime);
-        Event->SetDuration (Duration * 60);
-        if (Rating) {
-          Event->SetParentalRating(Rating);
-        }
-        char *tmp;
-        if (Text != 0x00) {
-          WrittenTitle = true;
-          CleanString ((uchar *) Text);
-          Event->SetTitle (Text);
-        }
-        Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
-        Event->SetShortText (tmp);
-        //strreplace(t, '|', '\n');
-        if (SummText != 0x00) {
-          WrittenSummary = true;
-          CleanString ((uchar *) SummText);
-          Event->SetDescription (SummText);
-        }
-        free (tmp);
-        if (newEvent)
-          ps->AddEvent (newEvent);
-
-        updateEquivalent(pSchedules,ps->ChannelID(), Event);
-
+    }
         //newEvent->FixEpgBugs (); causes segfault
-      }
+  }
       /*      else
             esyslog ("EEPG: ERROR, somehow not able to add/update event.");*///at this moment only reports RejectTableId events
-      if (CheckLevel(4)) {
-        isyslog ("EEPG: Title:%i, Summary:%i I would put into schedule:", TitleCounter, SummaryCounter);
-        //isyslog ("C %s-%i-%i-%i\n", *cSource::ToString (C->Src[eq]), C->Nid[eq], C->Tid[eq], C->Sid[eq]);
-        isyslog ("E %u %u %u 01 FF\n", EventId, StartTime, Duration * 60);
-        isyslog ("T %s\n", Text);
-        isyslog ("S %s - %d\'\n", Themes[ThemeId], Duration);
-        isyslog ("D %s\n", SummText);
-        isyslog ("e\nc\n.\n");
-      }
+  if (CheckLevel(4)) {
+    isyslog ("EEPG: Title:%i, Summary:%i I would put into schedule:", TitleCounter, SummaryCounter);
+    //isyslog ("C %s-%i-%i-%i\n", *cSource::ToString (C->Src[eq]), C->Nid[eq], C->Tid[eq], C->Sid[eq]);
+    isyslog ("E %u %u %u 01 FF\n", EventId, StartTime, Duration * 60);
+    isyslog ("T %s\n", Text);
+    isyslog ("S %s - %d\'\n", Themes[ThemeId], Duration);
+    isyslog ("D %s\n", SummText);
+    isyslog ("e\nc\n.\n");
+  }
 //    } //if ps[eq]
 //  } //for eq
   if (WrittenTitle)
@@ -1758,8 +1770,8 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
     p += 4; //skip Title number
 
     sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
-    cSchedule *ps = NULL;//[MAX_EQUIVALENCES];
-    PrepareToWriteToSchedule (C, s, ps);
+    //cSchedule *ps = NULL;//[MAX_EQUIVALENCES];
+    //PrepareToWriteToSchedule (C, s, ps);
 
     for (int i = 0; i < NumberOfTitles; i++) { //process each title within block
       sTitleNagraGuide *Title = (sTitleNagraGuide *) p;
@@ -1810,7 +1822,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
         if (Themes[Title->ThemeId][0] == 0x00) //if detailed themeid is not known, get global themeid
           Title->ThemeId &= 0xf0;
 
-        WriteToSchedule (ps, s, EventId, StartTime, Title->Duration, Text, SummText,
+        WriteToSchedule (tChannelID (C->Src, C->Nid, C->Tid, C->Sid), s, EventId, StartTime, Title->Duration, Text, SummText,
                          Title->ThemeId, NAGRA_TABLE_ID, Version);
 
         if (Text != NULL)
@@ -2868,8 +2880,9 @@ void cFilterEEPG::LoadIntoSchedule (void)
 
           //channelids are sequentially numbered and sent in MHW1 and MHW2, but not in SKY, so we need to lookup the table index
           sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
-          cSchedule *p;//[MAX_EQUIVALENCES];
-          PrepareToWriteToSchedule (C, s, p);
+          //cSchedule *p;//[MAX_EQUIVALENCES];
+          //PrepareToWriteToSchedule (C, s, p);
+          tChannelID chanID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
 
           char rating = 0x00;
           if ((Format == SKY_IT || Format == SKY_UK) &&  T->Rating) { //TODO only works on OTV for now
@@ -2880,9 +2893,9 @@ void cFilterEEPG::LoadIntoSchedule (void)
             TableId = T->TableId;
           }
 
-          WriteToSchedule (p, s, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
+          WriteToSchedule (chanID, s, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
                            (char *) S->Text, T->ThemeId, TableId, 0, rating);
-          sortSchedules(s, p->ChannelID());
+          sortSchedules(s, chanID);
 
           //FinishWriteToSchedule (C, s, p);
           //Replays--;
@@ -2917,16 +2930,17 @@ void cFilterEEPG::LoadIntoSchedule (void)
 
           /* write Title info to schedule */
           sChannel *C = &sChannels[ChannelSeq[T->ChannelId]]; //find channel
-          cSchedule *p;//[MAX_EQUIVALENCES];
-          PrepareToWriteToSchedule (C, s, p);
+          //cSchedule *p;//[MAX_EQUIVALENCES];
+          tChannelID chanID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
+          //PrepareToWriteToSchedule (C, s, p);
           char rating = 0x00;
           if ((Format == SKY_IT || Format == SKY_UK) &&  T->Rating) { //TODO only works on OTV for now
             rating = T->Rating;
           }
-          WriteToSchedule (p, s, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
+          WriteToSchedule (chanID, s, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
                            NULL, T->ThemeId, DEFAULT_TABLE_ID, 0, rating);
           //FinishWriteToSchedule (C, s, p);
-          sortSchedules(s, p->ChannelID());
+          sortSchedules(s, chanID);
 
           SummariesNotFound++;
           i++; //move to next title, for this one no summary can be found
