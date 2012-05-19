@@ -56,20 +56,6 @@
 #define trNOOP(s) (s)
 #endif
 
-//#define DEBUG
-//#define DEBUG2
-
-/*#ifdef DEBUG
-#define d(x) { (x); }
-#else
-#define d(x) ;
-#endif
-#ifdef DEBUG2
-#define d2(x) { (x); }
-#else
-#define d2(x) ;
-#endif*/
-
 #define PMT_SCAN_TIMEOUT  10 // seconds
 #define PMT_SCAN_IDLE     3600 // seconds
 
@@ -186,6 +172,7 @@ static int NumberOfAvailableSources = 0;
 static int LastVersionNagra = -1; //currently only used for Nagra, should be stored per transponder, per system
 
 static multimap<string, string> equiChanMap;
+static long equiChanFileTime = 0;
 
 
 #ifdef USE_NOEPG
@@ -1009,9 +996,17 @@ void loadEquivalentChannelMap (void)
   multimap<string,string>::iterator it,it2;
   pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
 
-  //TODO DPE add code to reload if file is changed
-  if (equiChanMap.size() > 0)
+  //Test if file is changed and reload
+  struct stat st;
+  if (stat(FileName.c_str(), &st)) {
+      LogE(0, prep("Error obtaining stats for '%s' "), FileName.c_str());
+      return;
+  }
+
+  if (equiChanMap.size() > 0 &&  equiChanFileTime == st.st_mtim.tv_nsec)
     return;
+  else
+    equiChanMap.clear();
 
 
   File = fopen (FileName.c_str(), "r");
@@ -1078,6 +1073,7 @@ void loadEquivalentChannelMap (void)
       }    //if isempty
     }      //while
     fclose (File);
+    equiChanFileTime = st.st_mtim.tv_nsec;
     LogD(3, prep("Loaded %i equivalents."), equiChanMap.size());
     for ( it2=equiChanMap.begin() ; it2 != equiChanMap.end(); it2++ )
       LogD(3, prep("Original ID %s <-> Equivalent ID %s"), (*it2).first.c_str(), it2->second.c_str());
@@ -1176,94 +1172,6 @@ void sortSchedules(cSchedules * Schedules, tChannelID channelID){
     }
   }
 }
-
-
-//void cFilterEEPG::LoadEquivalentChannels (void)
-//{
-//  char Buffer[1024];
-//  char *Line;
-//  FILE *File;
-//  string FileName = string(ConfDir) + "/" + EEPG_FILE_EQUIV;
-//
-//  File = fopen (FileName.c_str(), "r");
-//  if (File) {
-//    memset (Buffer, 0, sizeof (Buffer));
-//    char origChanID[256];
-//    char equiChanID[256];
-//    char source[256];
-//    int nid;
-//    int tid;
-//    int sid;
-//    int rid;
-//    while ((Line = fgets (Buffer, sizeof (Buffer), File)) != NULL) {
-//      Line = compactspace (skipspace (stripspace (Line)));
-//      if (!isempty (Line)) {
-//        if (sscanf (Line, "%[^ ] %[^ ] %[^\n]\n", origChanID, equiChanID, source) == 3) {
-//          if (origChanID[0] != '#' && origChanID[0] != ';') {
-//            nid = 0;
-//            tid = 0;
-//            sid = 0;
-//            rid = 0;
-//            if (sscanf (origChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4)
-//              if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
-//                if (sscanf (origChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid) != 5) {
-//                  rid = 0;
-//                }
-//                tChannelID OriginalChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
-//                bool found = false;
-//                int i = 0;
-//                sChannel *C = NULL;
-//                while (i < nChannels && (!found)) {
-//                  C = &sChannels[i];
-//                  if (C->Src[0] == (unsigned int)cSource::FromString (source) && C->Nid[0] == nid
-//                    && C->Tid[0] == tid && C->Sid[0] == sid)
-//                    found = true;
-//                  else
-//                    i++;
-//                }
-//                if (!found) {
-//                  LogI(2, prep("Warning: in equivalence file, cannot find original channel %s. Perhaps you are tuned to another transponder right now."),
-//                    origChanID);
-//                } else {
-//                  cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
-//                  if (!OriginalChannel)
-//                    LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalence is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID); //TODO: skip this ing?
-//                  if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
-//                    if (sscanf (equiChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid)
-//                      != 5) {
-//                      rid = 0;
-//                    }
-//                    tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
-//                    cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false); //TODO use valid function?
-//                    if (EquivChannel) {
-//                      if (C->NumberOfEquivalences < MAX_EQUIVALENCES) {
-//                        C->Src[C->NumberOfEquivalences] = EquivChannel->Source ();
-//                        C->Nid[C->NumberOfEquivalences] = EquivChannel->Nid ();
-//                        C->Tid[C->NumberOfEquivalences] = EquivChannel->Tid ();
-//                        C->Sid[C->NumberOfEquivalences] = EquivChannel->Sid ();
-//                        C->NumberOfEquivalences++;
-//                        nEquivChannels++;
-//                        LogI(3, prep("Added equivalent nr %i with Channel Id %s-%i-%i-%i to channel with id %i."),
-//                             C->NumberOfEquivalences, *cSource::ToString (C->Src[C->NumberOfEquivalences - 1]),
-//                             C->Nid[C->NumberOfEquivalences - 1], C->Tid[C->NumberOfEquivalences - 1],
-//                             C->Sid[C->NumberOfEquivalences - 1], i);
-//                      } else
-//                        LogE(0, prep("Error, channel with id %i has more than %i equivalences. Increase MAX_EQUIVALENCES."),
-//                          i, MAX_EQUIVALENCES);
-//                    } else
-//                      LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
-//                  }
-//                } //else !found
-//              }   //if scanf string1
-//          }   //if string1
-//        }     //if scanf
-//      }    //if isempty
-//    }      //while
-//    fclose (File);
-//  }  //if file
-//}    //end of loadequiv
-
-//end of loadequiv
 
 
 /**
@@ -4166,8 +4074,6 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
   } //closes SOURCE()
 } //end of closing
 
-// --- cPluginEEPG ------------------------------------------------------
-
 void cFilterEEPG::ProcessPremiere(const u_char *& Data)
 
 {
@@ -4443,6 +4349,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
 
 }
 
+// --- cPluginEEPG ------------------------------------------------------
 
 class cPluginEEPG:public cPlugin
 {
