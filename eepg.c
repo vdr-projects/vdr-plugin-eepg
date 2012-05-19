@@ -1155,9 +1155,12 @@ void sortSchedules(cSchedules * Schedules, tChannelID channelID){
   LogD(3, prep("Start sortEquivalent %s"), *channelID.ToString());
 
   cChannel *pChannel = GetChannelByID (channelID, false);
-  cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (pChannel, true);
-  pSchedule->Sort ();
-  Schedules->SetModified (pSchedule);
+  cSchedule *pSchedule;
+  if (pChannel) {
+    pSchedule = (cSchedule *) Schedules->GetSchedule (pChannel, true);
+    pSchedule->Sort ();
+    Schedules->SetModified (pSchedule);
+  }
 
   ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
