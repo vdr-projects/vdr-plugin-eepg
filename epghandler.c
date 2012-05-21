@@ -8,20 +8,24 @@
 #include "epghandler.h"
 #if APIVERSNUM > 10725
 #include "log.h"
+#include <vdr/sources.h>
 
 cEEpgHandler::cEEpgHandler() {
-  // TODO Auto-generated constructor stub
   LogD(4, prep("cEEpgHandler()"));
 
 }
 
 cEEpgHandler::~cEEpgHandler() {
-  // TODO Auto-generated destructor stub
 }
 
 bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
                                   const SI::EIT::Event* EitEvent, uchar TableID, uchar Version) {
   //LogD(1, prep("HandleEitEvent"));
+  //DISH NID 0x1001 to 0x100B BEV 0x100 and 0x101
+  //TODO move the eit handling code at least for NA providers here instead of discarding.
+  int nid = Schedule->ChannelID().Nid();
+  if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100)
+    return true;
   return false;
   //	return true;
 }
