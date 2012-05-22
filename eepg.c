@@ -3854,7 +3854,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             if (((Source() == cSource::FromString("S119.0W")
                 && Transponder() == cChannel::Transponder(12472,'H'))
                 || (Source() == cSource::FromString("S91.0W")
-                && Transponder() == cChannel::Transponder(12224,'R')))
+                && Transponder() == cChannel::Transponder(12224,'V')))
                 && !UnprocessedFormat[DISH_BEV]) {
               UnprocessedFormat[DISH_BEV] = stream.getPid ();
             }
