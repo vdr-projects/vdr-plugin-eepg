@@ -11,6 +11,7 @@
 #include <vdr/epg.h>
 #include <vdr/channels.h>
 #include <map>
+#include <string>
 
 #define EEPG_FILE_EQUIV "eepg.equiv"
 

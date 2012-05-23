@@ -12,8 +12,8 @@
 #include <string>
 
 
-static multimap<string, string> cEquivHandler::equiChanMap;
-static long cEquivHandler::equiChanFileTime = 0;
+multimap<string, string> cEquivHandler::equiChanMap;
+long cEquivHandler::equiChanFileTime = 0;
 
 cEquivHandler::cEquivHandler()
 {
