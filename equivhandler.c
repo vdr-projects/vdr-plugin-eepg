@@ -8,6 +8,7 @@
 #include "equivhandler.h"
 #include "setupeepg.h"
 #include "log.h"
+#include "util.h"
 
 #include <string>
 
