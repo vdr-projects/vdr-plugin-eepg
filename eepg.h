@@ -1,8 +1,6 @@
 //#define DEBUG false
 //#define DEBUG_STARTTIME false
 
-#define EEPG_FILE_EQUIV "eepg.equiv"
-
 #define MAX_THEMES 2046 //this should always be >=256, or Nagra will go wrong!!
 #define MAX_CHANNELS 2048
 #define MAX_TITLES 262144

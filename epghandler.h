@@ -12,6 +12,8 @@
 #include <vdr/epg.h>
 #include <string>
 
+class cEquivHandler;
+
 class cEEpgHandler : public cEpgHandler {
 public:
     cEEpgHandler();
@@ -35,6 +37,7 @@ public:
 private:
     std::string origShortText;
     std::string origDescription;
+    cEquivHandler* equivHandler;
 };
 
 #endif /*APIVERSNUM > 10725*/

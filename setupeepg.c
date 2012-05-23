@@ -23,14 +23,13 @@ cSetupEEPG::cSetupEEPG (void)
 #ifdef DEBUG
   LogLevel = 0;
 #endif
-
 }
 
 cSetupEEPG* cSetupEEPG::getInstance()
 {
-	if (!_setupEEPG)
-		_setupEEPG = new cSetupEEPG();
+  if (!_setupEEPG)
+    _setupEEPG = new cSetupEEPG();
 
-	return _setupEEPG;
+  return _setupEEPG;
 }
 
