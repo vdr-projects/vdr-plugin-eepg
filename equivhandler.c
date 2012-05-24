@@ -12,6 +12,7 @@
 
 #include <string>
 
+using namespace util;
 
 multimap<string, string> cEquivHandler::equiChanMap;
 long cEquivHandler::equiChanFileTime = 0;

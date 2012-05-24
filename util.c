@@ -4,8 +4,11 @@
  *  Created on: 23.5.2012
  *      Author: d.petrovski
  */
+#include "util.h"
+#include <vdr/channels.h>
 
-int NumberOfAvailableSources = 0;
+namespace util
+{
 
 cChannel *GetChannelByID(tChannelID & channelID, bool searchOtherPos)
 {
@@ -110,4 +113,4 @@ void CleanString (unsigned char *String)
 //  LogD (1, prep("Clean: %s"), String);
 }
 
-
+}

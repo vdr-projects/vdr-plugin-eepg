@@ -73,6 +73,7 @@ template <class T> T REALLOC(T Var, size_t Size)
 }
 
 using namespace std;
+using namespace util;
 
 const char *optPats[] = {
   "%s",
