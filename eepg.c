@@ -1343,7 +1343,7 @@ int cFilterEEPG::GetThemesMHW2 (const u_char * Data, int Length)
                   if (Length >= (pSubThemeName + lenSubThemeName))
                     if (lenSubThemeName > 0)
                       if ((lenThemeName + lenSubThemeName + 2) < 256) {
-                        Themes[pThemeId][lenThemeName] = ' ';
+                        Themes[pThemeId][lenThemeName] = '-';
                         decodeText2(&Data[pSubThemeName],lenSubThemeName,(char*)&Themes[pThemeId][lenThemeName + 1],256);
                         //memcpy (&Themes[pThemeId][lenThemeName + 1], &Data[pSubThemeName], lenSubThemeName);
                       }
@@ -1594,13 +1594,44 @@ void cFilterEEPG::WriteToSchedule (cSchedule * ps[MAX_EQUIVALENCES], unsigned sh
         }
         Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
         Event->SetShortText (tmp);
+        free(tmp);
         //strreplace(t, '|', '\n');
         if (SummText != 0x00) {
           WrittenSummary = true;
           CleanString ((uchar *) SummText);
+
+          //Add themes and categories epgsearch style
+          char *theme;
+          Asprintf (&theme, "%s", Themes[ThemeId]);
+          if (theme && 0 != strcmp(theme,"")) {
+            char *category, *genre;
+            category = NULL;
+            genre = NULL;
+            char *split = strchr(theme, '-'); // Look for '-' delim to separate category from genre
+            if (split){
+              *split = 0;
+              category = theme;
+              genre = (split[1] == 0x20) ? split + 2 : split + 1;
+            }else{
+              category = theme;
+            }
+            string fmt;
+            fmt = "%s";
+            if (stripspace(category)) {
+              fmt += "\nCategory: %s";
+            }
+            if (genre) {
+              fmt += "\nGenre: %s";
+            }
+            Asprintf (&tmp, fmt.c_str(), SummText, category, stripspace (genre));
+
+            Event->SetDescription (tmp);
+            free(tmp);
+            free(theme);
+        }
+        else
           Event->SetDescription (SummText);
         }
-        free (tmp);
         if (newEvent)
           ps[eq]->AddEvent (newEvent);
         //newEvent->FixEpgBugs (); causes segfault
@@ -3415,26 +3446,20 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
           pEvent->SetTitle(DishEventDescriptor->getName());
         //LogD(2, prep("channelID: %s DishTitle: %s"), *channel->GetChannelID().ToString(), DishShortEventDescriptor->getText());
         //         pEvent->SetDescription(DishExtendedEventDescriptor->getText());
+        pEvent->SetShortText(DishEventDescriptor->getShortText());
         char *tmp;
         string fmt;
+
         fmt = "%s";
-        if (0 != strcmp(DishEventDescriptor->getShortText(),"") && DishEventDescriptor->hasTheme()) {
-          fmt += " - ";
+        if (DishEventDescriptor->hasTheme()) {
+          fmt += "\nTheme: ";
         }
         fmt += "%s";
-        if (DishEventDescriptor->hasTheme() && DishEventDescriptor->hasCategory()) {
-          fmt += " ~ ";
+        if (DishEventDescriptor->hasCategory()) {
+          fmt += "\nCategory: ";
         }
         fmt += "%s";
 
-        Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getShortText()
-                  , DishEventDescriptor->getTheme()
-                  , DishEventDescriptor->getCategory());
-        pEvent->SetShortText(tmp);
-        //LogD(2, prep("EEPGDEBUG:DishTheme:%x-DishCategory:%x)"), DishTheme, DishCategory);
-        free(tmp);
-
-        fmt = "%s";
         if (0 != strcmp(DishEventDescriptor->getDescription(),"")
           && (0 != strcmp(DishEventDescriptor->getRating(),"")
             || 0 != strcmp(DishEventDescriptor->getStarRating(),""))) {
@@ -3453,11 +3478,10 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         }
 
         Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getDescription()
-                  , DishEventDescriptor->getRating()
-                  , DishEventDescriptor->getStarRating()
-                  , DishEventDescriptor->getProgramId()
-                  , DishEventDescriptor->getSeriesId()
-                  , orgAirDate == 0 || !dateok ? "" : datestr);
+            , DishEventDescriptor->getTheme(), DishEventDescriptor->getCategory()
+            , DishEventDescriptor->getRating(), DishEventDescriptor->getStarRating()
+            , DishEventDescriptor->getProgramId(), DishEventDescriptor->getSeriesId()
+            , orgAirDate == 0 || !dateok ? "" : datestr);
         pEvent->SetDescription(tmp);
         free(tmp);
 
