@@ -112,12 +112,15 @@ bool cEEpgHandler::HandleEvent(cEvent* Event) {
     Event->SetDescription(origDescription.c_str());
   }
 
-  cSchedulesLock SchedulesLock (true);
+  if (equivHandler->getEquiChanMap().count(*Event->ChannelID().ToString()) <= 0)
+      return true;
+      
+  cSchedulesLock SchedulesLock (false);
   cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
   if (s) {
     equivHandler->updateEquivalent(s, Event->ChannelID(), Event);
   } else
-    LogE (0, prep("Error: could not lock schedules."));
+    LogD (0, prep("Error: could not lock schedules."));
 
   //TODO just to see the difference
   //else if (!origDescription.empty() && !origDescription.compare(Event->Description())) {
@@ -133,12 +136,15 @@ bool cEEpgHandler::SortSchedule(cSchedule* Schedule) {
 
   Schedule->Sort();
 
-  cSchedulesLock SchedulesLock (true);
+  if (equivHandler->getEquiChanMap().count(*Schedule->ChannelID().ToString()) <= 0)
+      return true;
+      
+  cSchedulesLock SchedulesLock (false);
   cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
   if (s) {
     equivHandler->sortEquivalents(Schedule->ChannelID(), s);
   } else
-    LogE (0, prep("Error: could not lock schedules."));
+    LogD (0, prep("Error: could not lock schedules."));
 
   return true;
 }
