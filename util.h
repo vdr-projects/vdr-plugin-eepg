@@ -13,12 +13,12 @@ struct tChannelID;
 
 namespace util
 {
-int AvailableSources[32];
-int NumberOfAvailableSources = 0;
+extern int AvailableSources[32];
+extern int NumberOfAvailableSources;
 
-int Yesterday;
-int YesterdayEpoch;
-int YesterdayEpochUTC;
+extern int Yesterday;
+extern int YesterdayEpoch;
+extern int YesterdayEpochUTC;
 
 void AddEvent(cEvent *event, tChannelID ChannelID);
 

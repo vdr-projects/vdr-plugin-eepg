@@ -11,6 +11,13 @@
 namespace util
 {
 
+int AvailableSources[32];
+int NumberOfAvailableSources = 0;
+
+int Yesterday;
+int YesterdayEpoch;
+int YesterdayEpochUTC;
+
 cChannel *GetChannelByID(tChannelID & channelID, bool searchOtherPos)
 {
   cChannel *VC = Channels.GetByChannelID(channelID, true);
