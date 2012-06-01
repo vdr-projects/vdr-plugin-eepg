@@ -3444,11 +3444,16 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       if (DishEventDescriptor) {
         if (DishEventDescriptor->getName())
           pEvent->SetTitle(DishEventDescriptor->getName());
-        //LogD(2, prep("channelID: %s DishTitle: %s"), *channel->GetChannelID().ToString(), DishShortEventDescriptor->getText());
-        //         pEvent->SetDescription(DishExtendedEventDescriptor->getText());
+        //LogD(2, prep("channelID: %s DishTitle: %s"), *channel->GetChannelID().ToString(), DishEventDescriptor->getName());
         pEvent->SetShortText(DishEventDescriptor->getShortText());
         char *tmp;
         string fmt;
+
+        const char * description = DishEventDescriptor->getDescription();
+        //BEV sets the description previously with ExtendedEventDescriptor
+        if (0 == strcmp(DishEventDescriptor->getDescription(),"") && pEvent->Description())
+          description = pEvent->Description();
+
 
         fmt = "%s";
         if (DishEventDescriptor->hasTheme()) {
@@ -3460,8 +3465,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         }
         fmt += "%s";
 
-        if (0 != strcmp(DishEventDescriptor->getDescription(),"")
-          && (0 != strcmp(DishEventDescriptor->getRating(),"")
+        if ((0 != strcmp(DishEventDescriptor->getRating(),"")
             || 0 != strcmp(DishEventDescriptor->getStarRating(),""))) {
           fmt += "\n\nRating: ";
         }
@@ -3477,7 +3481,7 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
           dateok = strftime (datestr,80," Original Air Date: %a %b %d %Y",gmtime(&orgAirDate)) > 0;
         }
 
-        Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getDescription()
+        Asprintf (&tmp, fmt.c_str(), description
             , DishEventDescriptor->getTheme(), DishEventDescriptor->getCategory()
             , DishEventDescriptor->getRating(), DishEventDescriptor->getStarRating()
             , DishEventDescriptor->getProgramId(), DishEventDescriptor->getSeriesId()
@@ -3486,8 +3490,8 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
         free(tmp);
 
 
-        //LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
-        //LogD(2, prep("DishShortText: %s"), DishExtendedEventDescriptor->getShortText());
+        //LogD(2, prep("DishDescription: %s"), DishEventDescriptor->getDescription());
+        //LogD(2, prep("DishShortText: %s"), DishEventDescriptor->getShortText());
       }
 
     }
