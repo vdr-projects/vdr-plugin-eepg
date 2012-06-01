@@ -184,6 +184,62 @@ void cEquivHandler::updateEquivalent(cSchedules * Schedules, tChannelID channelI
   }
 }
 
+void cEquivHandler::updateEquivalent(tChannelID channelID, cEvent *pEvent){
+  multimap<string,string>::iterator it;
+  pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
+
+  LogD(3, prep("Start updateEquivalent %s"), *channelID.ToString());
+
+  ret = equiChanMap.equal_range(*channelID.ToString());
+  for (it=ret.first; it!=ret.second; ++it) {
+    LogD(1, prep("equivalent channel exists"));
+    tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
+    cEvent* newEvent = new cEvent (pEvent->EventID());
+    newEvent->SetTableID (pEvent->TableID());
+    newEvent->SetStartTime (pEvent->StartTime());
+    newEvent->SetDuration (pEvent->Duration());
+    newEvent->SetVersion (pEvent->Version());
+//        newEvent->SetContents(pEvent->Contents());
+    newEvent->SetParentalRating(pEvent->ParentalRating());
+    newEvent->SetVps (pEvent->Vps());
+    newEvent->SetTitle (pEvent->Title ());
+    newEvent->SetShortText (pEvent->ShortText ());
+    newEvent->SetDescription (pEvent->Description ());
+//        newEvent->SetComponents (pEvent->Components());
+    AddEvent(newEvent, equChannelID);
+  }
+}
+
+
+//cSchedule * findFisrtSchedule (cSchedule * Schedule) {
+//  if (Schedule->Prev())
+//    return findFisrtSchedule((cSchedule *)Schedule->Prev());
+//  else
+//    return Schedule;
+//}
+//
+//cSchedule * findSchedule (cSchedule * Schedule, tChannelID channelID) {
+//  if (Schedule->ChannelID() == channelID)
+//    return Schedule;
+//
+//  if (Schedule->Next())
+//    return findSchedule((cSchedule *)Schedule->Next(), channelID);
+//  else
+//    return NULL;
+//}
+//
+//cSchedule * findEqvSchedule (cSchedule * Schedule, tChannelID channelID) {
+//  cSchedule* foundSchedule = findSchedule(findFisrtSchedule(Schedule),channelID);
+//
+//  if (foundSchedule)
+//    return foundSchedule;
+//
+//  cSchedule* sch = new cSchedule(channelID);
+//  Schedule->Insert(sch);
+//  return sch;
+//}
+
+
 void cEquivHandler::sortEquivalents(tChannelID channelID, cSchedules* Schedules)
 {
   multimap<string, string>::iterator it;

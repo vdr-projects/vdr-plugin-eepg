@@ -25,6 +25,7 @@ public:
 
   void loadEquivalentChannelMap (void);
   void updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent);
+  void updateEquivalent(tChannelID channelID, cEvent *pEvent);
   void sortEquivalents(tChannelID channelID, cSchedules* Schedules);
 
   static multimap<string, string> getEquiChanMap() { return cEquivHandler::equiChanMap; };

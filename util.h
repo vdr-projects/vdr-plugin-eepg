@@ -20,6 +20,8 @@ int Yesterday;
 int YesterdayEpoch;
 int YesterdayEpochUTC;
 
+void AddEvent(cEvent *event, tChannelID ChannelID);
+
 cChannel *GetChannelByID(tChannelID & channelID, bool searchOtherPos);
 time_t LocalTime2UTC (time_t t);
 time_t UTC2LocalTime (time_t t);

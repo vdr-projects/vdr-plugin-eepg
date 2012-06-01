@@ -6,6 +6,7 @@
  */
 #include "util.h"
 #include <vdr/channels.h>
+#include <vdr/thread.h>
 
 namespace util
 {
@@ -113,4 +114,88 @@ void CleanString (unsigned char *String)
 //  LogD (1, prep("Clean: %s"), String);
 }
 
+// --- cAddEventThread ----------------------------------------
+// Taken from VDR EPGFixer Plug-in
+// http://projects.vdr-developer.org/projects/plg-epgfixer
+// by  Matti Lehtimaki
+
+class cAddEventListItem : public cListObject
+{
+protected:
+  cEvent *event;
+  tChannelID channelID;
+public:
+  cAddEventListItem(cEvent *Event, tChannelID ChannelID) { event = Event; channelID = ChannelID; }
+  tChannelID GetChannelID() { return channelID; }
+  cEvent *GetEvent() { return event; }
+  ~cAddEventListItem() { }
+};
+
+class cAddEventThread : public cThread
+{
+private:
+  cTimeMs LastHandleEvent;
+  cList<cAddEventListItem> *list;
+  enum { INSERT_TIMEOUT_IN_MS = 10000 };
+protected:
+  virtual void Action(void);
+public:
+  cAddEventThread(void);
+  ~cAddEventThread(void);
+  void AddEvent(cEvent *Event, tChannelID ChannelID);
+};
+
+cAddEventThread::cAddEventThread(void)
+:cThread("cAddEventThread"), LastHandleEvent()
+{
+  list = new cList<cAddEventListItem>;
 }
+
+cAddEventThread::~cAddEventThread(void)
+{
+  LOCK_THREAD;
+  list->cList::Clear();
+  Cancel(3);
+}
+
+void cAddEventThread::Action(void)
+{
+  SetPriority(19);
+  while (Running() && !LastHandleEvent.TimedOut()) {
+     cAddEventListItem *e = NULL;
+     cSchedulesLock SchedulesLock(true, 10);
+     cSchedules *schedules = (cSchedules *)cSchedules::Schedules(SchedulesLock);
+     Lock();
+     while (schedules && (e = list->First()) != NULL) {
+           cSchedule *schedule = (cSchedule *)schedules->GetSchedule(Channels.GetByChannelID(e->GetChannelID()), true);
+           schedule->AddEvent(e->GetEvent());
+           EpgHandlers.SortSchedule(schedule);
+           EpgHandlers.DropOutdated(schedule, e->GetEvent()->StartTime(), e->GetEvent()->EndTime(), e->GetEvent()->TableID(), e->GetEvent()->Version());
+           list->Del(e);
+           }
+     Unlock();
+     cCondWait::SleepMs(10);
+     }
+}
+
+void cAddEventThread::AddEvent(cEvent *Event, tChannelID ChannelID)
+{
+  LOCK_THREAD;
+  list->Add(new cAddEventListItem(Event, ChannelID));
+  LastHandleEvent.Set(INSERT_TIMEOUT_IN_MS);
+}
+
+static cAddEventThread AddEventThread;
+
+// ---
+
+void AddEvent(cEvent *Event, tChannelID ChannelID)
+{
+  AddEventThread.AddEvent(Event, ChannelID);
+  if (!AddEventThread.Active())
+     AddEventThread.Start();
+}
+
+
+}
+
