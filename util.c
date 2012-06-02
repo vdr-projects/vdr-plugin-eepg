@@ -143,9 +143,9 @@ void CleanString (unsigned char *String)
 
 struct tChannelIDCompare
 {
-   bool operator() (const tChannelID& lhs, const tChannelID& rhs)
+   bool operator() (const tChannelID& lhs, const tChannelID& rhs) const
    {
-       return lhs.ToString() < rhs.ToString();
+       return *lhs.ToString() < *rhs.ToString();
    }
 };
 
@@ -169,14 +169,14 @@ cAddEventThread::cAddEventThread(void)
 :cThread("cAddEventThread"), LastHandleEvent()
 {
 //  list = new cList<cAddEventListItem>;
-  map_list = new std::map<tChannelID,cList<cEvent *>*>;
+  map_list = new std::map<tChannelID,cList<cEvent *>*,tChannelIDCompare>;
 }
 
 cAddEventThread::~cAddEventThread(void)
 {
   LOCK_THREAD;
 //  list->cList::Clear();
-  std::map<tChannelID,cList<cEvent *>*>::iterator it;
+  std::map<tChannelID,cList<cEvent *>*,tChannelIDCompare>::iterator it;
   for ( it=map_list->begin() ; it != map_list->end(); it++ )
     (*it).second->cList::Clear();
   Cancel(3);
@@ -197,7 +197,7 @@ void cAddEventThread::Action(void)
 //           EpgHandlers.DropOutdated(schedule, e->GetEvent()->StartTime(), e->GetEvent()->EndTime(), e->GetEvent()->TableID(), e->GetEvent()->Version());
 //           list->Del(e);
 //           }
-     std::map<tChannelID,cList<cEvent *>*>::iterator it;
+     std::map<tChannelID,cList<cEvent *>*,tChannelIDCompare>::iterator it;
      if (schedules) {
        for ( it=map_list->begin() ; it != map_list->end(); it++ ) {
          (*it).second->cList::Clear();
