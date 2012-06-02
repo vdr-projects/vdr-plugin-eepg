@@ -30,6 +30,18 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100)
     return true;
 
+  //TODO!!! not for commit upsteram
+  if (EitEvent->getDurationHour() > 10) {
+    LogD(3, prep("Event longer than 10h Duration:%d DurationHour:%d StartTimeHour:%d"), EitEvent->getDuration(), EitEvent->getDurationHour(), EitEvent->getStartTimeHour());
+    const cEvent* exEvent = Schedule->GetEventAround(EitEvent->getStartTime()+EitEvent->getDuration()/2);
+    if (exEvent) {
+      LogD(3, prep("10h Existing event %s startTime %d"), exEvent->Title(), exEvent->StartTime());
+      return true;
+    }
+  }
+  //if (EitEvent->getDurationHour() > 3)
+//    return true;
+
   return false;
   //	return true;
 }

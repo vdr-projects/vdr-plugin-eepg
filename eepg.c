@@ -893,7 +893,8 @@ void sortSchedules(cSchedules * Schedules, tChannelID channelID){
       pSchedule->Sort();
       Schedules->SetModified(pSchedule);
     }
-  EquivHandler->sortEquivalents(channelID, Schedules);
+  if (EquivHandler->getEquiChanMap().count(*channelID.ToString()) > 0)
+    EquivHandler->sortEquivalents(channelID, Schedules);
 }
 
 
@@ -1069,7 +1070,7 @@ int cFilterEEPG::GetThemesMHW2 (const u_char * Data, int Length)
                   if (Length >= (pSubThemeName + lenSubThemeName))
                     if (lenSubThemeName > 0)
                       if ((lenThemeName + lenSubThemeName + 2) < 256) {
-                        Themes[pThemeId][lenThemeName] = ' ';
+                        Themes[pThemeId][lenThemeName] = '-';
                         decodeText2(&Data[pSubThemeName],lenSubThemeName,(char*)&Themes[pThemeId][lenThemeName + 1],256);
                         //memcpy (&Themes[pThemeId][lenThemeName + 1], &Data[pSubThemeName], lenSubThemeName);
                       }
@@ -1327,24 +1328,47 @@ void cFilterEEPG::WriteToSchedule (tChannelID channelID, cSchedules* pSchedules,
     }
     Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
     Event->SetShortText (tmp);
+    free(tmp);
     //strreplace(t, '|', '\n');
     if (SummText != 0x00) {
       WrittenSummary = true;
       CleanString ((uchar *) SummText);
+
+      //Add themes and categories epgsearch style
+      char *theme;
+      Asprintf (&theme, "%s", Themes[ThemeId]);
+      if (theme && 0 != strcmp(theme,"")) {
+        char *category, *genre;
+        category = NULL;
+        genre = NULL;
+        char *split = strchr(theme, '-'); // Look for '-' delim to separate category from genre
+        if (split){
+          *split = 0;
+          category = theme;
+          genre = (split[1] == 0x20) ? split + 2 : split + 1;
+        }else{
+          category = theme;
+        }
+        string fmt;
+        fmt = "%s";
+        if (stripspace(category)) {
+          fmt += "\nCategory: %s";
+        }
+        if (genre) {
+          fmt += "\nGenre: %s";
+        }
+        Asprintf (&tmp, fmt.c_str(), SummText, category, stripspace (genre));
+
+        Event->SetDescription (tmp);
+        free(tmp);
+        free(theme);
+    }
+    else
       Event->SetDescription (SummText);
     }
-    free (tmp);
     if (ps && newEvent)
       ps->AddEvent (newEvent);
-
-    EquivHandler->updateEquivalent(pSchedules, channelID, Event);
-
-    if (!ps) {
-        //the event is not send to VDR so it has to be deleted.
-        delete Event;
-        Event = NULL;
-    }
-        //newEvent->FixEpgBugs (); causes segfault
+    //newEvent->FixEpgBugs (); causes segfault
   }
       /*      else
             esyslog ("EEPG: ERROR, somehow not able to add/update event.");*///at this moment only reports RejectTableId events
@@ -2470,6 +2494,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
   int LostSync = 0;
   remembersummary = -1;
 
+  {
   cSchedulesLock SchedulesLock (true);
   cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
   if (s) {
@@ -2590,6 +2615,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
   else
     LogE (0, prep("Error: could not lock schedules."));
 
+  }//release ScheduleLock
   cSchedules::Cleanup (true); //deletes all past events
 
   //isyslog ("EEPG: found %i equivalents channels", nEquivChannels);
@@ -3098,30 +3124,28 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
       if (DishEventDescriptor) {
         if (DishEventDescriptor->getName())
           pEvent->SetTitle(DishEventDescriptor->getName());
-        //LogD(2, prep("channelID: %s DishTitle: %s"), *channel->GetChannelID().ToString(), DishShortEventDescriptor->getText());
-        //         pEvent->SetDescription(DishExtendedEventDescriptor->getText());
+        //LogD(2, prep("channelID: %s DishTitle: %s"), *channel->GetChannelID().ToString(), DishEventDescriptor->getName());
+        pEvent->SetShortText(DishEventDescriptor->getShortText());
         char *tmp;
         string fmt;
+
+        const char * description = DishEventDescriptor->getDescription();
+        //BEV sets the description previously with ExtendedEventDescriptor
+        if (0 == strcmp(DishEventDescriptor->getDescription(),"") && pEvent->Description())
+          description = pEvent->Description();
+
+
         fmt = "%s";
-        if (0 != strcmp(DishEventDescriptor->getShortText(),"") && DishEventDescriptor->hasTheme()) {
-          fmt += " - ";
+        if (DishEventDescriptor->hasTheme()) {
+          fmt += "\nTheme: ";
         }
         fmt += "%s";
-        if (DishEventDescriptor->hasTheme() && DishEventDescriptor->hasCategory()) {
-          fmt += " ~ ";
+        if (DishEventDescriptor->hasCategory()) {
+          fmt += "\nCategory: ";
         }
         fmt += "%s";
 
-        Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getShortText()
-                  , DishEventDescriptor->getTheme()
-                  , DishEventDescriptor->getCategory());
-        pEvent->SetShortText(tmp);
-        //LogD(2, prep("EEPGDEBUG:DishTheme:%x-DishCategory:%x)"), DishTheme, DishCategory);
-        free(tmp);
-
-        fmt = "%s";
-        if (0 != strcmp(DishEventDescriptor->getDescription(),"")
-          && (0 != strcmp(DishEventDescriptor->getRating(),"")
+        if ((0 != strcmp(DishEventDescriptor->getRating(),"")
             || 0 != strcmp(DishEventDescriptor->getStarRating(),""))) {
           fmt += "\n\nRating: ";
         }
@@ -3137,18 +3161,17 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
           dateok = strftime (datestr,80," Original Air Date: %a %b %d %Y",gmtime(&orgAirDate)) > 0;
         }
 
-        Asprintf (&tmp, fmt.c_str(), DishEventDescriptor->getDescription()
-                  , DishEventDescriptor->getRating()
-                  , DishEventDescriptor->getStarRating()
-                  , DishEventDescriptor->getProgramId()
-                  , DishEventDescriptor->getSeriesId()
-                  , orgAirDate == 0 || !dateok ? "" : datestr);
+        Asprintf (&tmp, fmt.c_str(), description
+            , DishEventDescriptor->getTheme(), DishEventDescriptor->getCategory()
+            , DishEventDescriptor->getRating(), DishEventDescriptor->getStarRating()
+            , DishEventDescriptor->getProgramId(), DishEventDescriptor->getSeriesId()
+            , orgAirDate == 0 || !dateok ? "" : datestr);
         pEvent->SetDescription(tmp);
         free(tmp);
 
 
-        //LogD(2, prep("DishDescription: %s"), DishExtendedEventDescriptor->getText());
-        //LogD(2, prep("DishShortText: %s"), DishExtendedEventDescriptor->getShortText());
+        //LogD(2, prep("DishDescription: %s"), DishEventDescriptor->getDescription());
+        //LogD(2, prep("DishShortText: %s"), DishEventDescriptor->getShortText());
       }
 
     }
@@ -3537,7 +3560,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             if (((Source() == cSource::FromString("S119.0W")
                 && Transponder() == cChannel::Transponder(12472,'H'))
                 || (Source() == cSource::FromString("S91.0W")
-                && Transponder() == cChannel::Transponder(12224,'R')))
+                && Transponder() == cChannel::Transponder(12224,'V')))
                 && !UnprocessedFormat[DISH_BEV]) {
               UnprocessedFormat[DISH_BEV] = stream.getPid ();
             }
