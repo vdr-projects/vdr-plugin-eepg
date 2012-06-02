@@ -7,6 +7,7 @@
 #include "util.h"
 #include <vdr/channels.h>
 #include <vdr/thread.h>
+#include <vdr/epg.h>
 
 namespace util
 {

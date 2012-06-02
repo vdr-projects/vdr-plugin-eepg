@@ -114,9 +114,9 @@ void cEquivHandler::loadEquivalentChannelMap (void)
     }      //while
     fclose (File);
     equiChanFileTime = st.st_mtim.tv_nsec;
-    LogD(3, prep("Loaded %i equivalents."), equiChanMap.size());
+    LogD(2, prep("Loaded %i equivalents."), equiChanMap.size());
     for ( it2=equiChanMap.begin() ; it2 != equiChanMap.end(); it2++ )
-      LogD(3, prep("Original ID %s <-> Equivalent ID %s"), (*it2).first.c_str(), it2->second.c_str());
+      LogD(2, prep("Original ID %s <-> Equivalent ID %s"), (*it2).first.c_str(), it2->second.c_str());
   }  //if file
 }
 
@@ -124,24 +124,24 @@ void cEquivHandler::updateEquivalent(cSchedules * Schedules, tChannelID channelI
   multimap<string,string>::iterator it;
   pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
 
-  LogD(3, prep("Start updateEquivalent %s"), *channelID.ToString());
+  LogD(2, prep("Start updateEquivalent %s"), *channelID.ToString());
 
   ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
-    LogD(1, prep("equivalent channel exists"));
+    LogD(2, prep("equivalent channel exists"));
     tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
     cChannel *equChannel = GetChannelByID (equChannelID, false);
     if (equChannel) {
-      LogD(3, prep("found Equivalent channel %s"), *equChannelID.ToString());
+      LogD(2, prep("found Equivalent channel %s"), *equChannelID.ToString());
       cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (equChannel, true);
       cEvent *pEqvEvent = (cEvent *) pSchedule->GetEvent (pEvent->EventID(), pEvent->StartTime());
       if (pEqvEvent) {
-        LogD(1, prep("equivalent event exists"));
+        LogD(3, prep("equivalent event exists"));
         if (pEqvEvent == pEvent) {
-          LogD(1, prep("equal event exists"));
+          LogD(3, prep("equal event exists"));
 
         } else {
-          LogD(1, prep("remove equivalent"));
+          LogD(2, prep("remove equivalent"));
           pSchedule->DelEvent(pEqvEvent);
           cEvent* newEvent = new cEvent (pEvent->EventID());
           newEvent->SetTableID (pEvent->TableID());
@@ -162,7 +162,7 @@ void cEquivHandler::updateEquivalent(cSchedules * Schedules, tChannelID channelI
         }
 
       } else {
-        LogD(1, prep("equivalent event does not exist"));
+        LogD(3, prep("equivalent event does not exist"));
         cEvent* newEvent = new cEvent (pEvent->EventID());
         newEvent->SetTableID (pEvent->TableID());
         newEvent->SetStartTime (pEvent->StartTime());
@@ -188,11 +188,11 @@ void cEquivHandler::updateEquivalent(tChannelID channelID, cEvent *pEvent){
   multimap<string,string>::iterator it;
   pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
 
-  LogD(3, prep("Start updateEquivalent %s"), *channelID.ToString());
+  LogD(2, prep("Start updateEquivalent %s"), *channelID.ToString());
 
   ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
-    LogD(1, prep("equivalent channel exists"));
+    LogD(2, prep("equivalent channel exists"));
     tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
     cEvent* newEvent = new cEvent (pEvent->EventID());
     newEvent->SetTableID (pEvent->TableID());
@@ -245,21 +245,21 @@ void cEquivHandler::sortEquivalents(tChannelID channelID, cSchedules* Schedules)
   multimap<string, string>::iterator it;
   pair < multimap < string, string > ::iterator, multimap < string, string
       > ::iterator > ret;
-  ret = cEquivHandler::getEquiChanMap().equal_range(*channelID.ToString());
+  LogD(2, prep("sortEquivalents for channel %s count: %d"), *channelID.ToString(), cEquivHandler::getEquiChanMap().count(*channelID.ToString()));
+  
+  ret = equiChanMap.equal_range(*channelID.ToString());
   for (it = ret.first; it != ret.second; ++it)
+  {
+    LogD(3, prep("equivalent channel exists"));
+    tChannelID equChannelID(tChannelID::FromString((*it).second.c_str()));
+    cChannel* pChannel = GetChannelByID(equChannelID, false);
+    if (pChannel)
     {
-      LogD(3, prep("equivalent channel exists"));
-      tChannelID equChannelID(tChannelID::FromString((*it).second.c_str()));
-      cChannel* pChannel = GetChannelByID(equChannelID, false);
-      if (pChannel)
-        {
-          LogD(3, prep("found Equivalent channel %s"),
-              *equChannelID.ToString());
-          cSchedule* pSchedule = (cSchedule *) Schedules->GetSchedule(pChannel,
-              true);
+      LogD(2, prep("found Equivalent channel %s"), *equChannelID.ToString());
+      cSchedule* pSchedule = (cSchedule *) Schedules->GetSchedule(pChannel, true);
 
-          pSchedule->Sort();
-          Schedules->SetModified(pSchedule);
-        }
+      pSchedule->Sort();
+      Schedules->SetModified(pSchedule);
     }
+  }
 }

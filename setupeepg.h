@@ -7,6 +7,7 @@
 
 #ifndef SETUPEEPG_H_
 #define SETUPEEPG_H_
+#include <string.h>
 
 class cSetupEEPG
 {
@@ -31,7 +32,10 @@ public:
 
   void  setConfDir(char* confDir)
   {
-    ConfDir = confDir;
+    if (ConfDir)
+      delete ConfDir;
+    ConfDir = new char[strlen(confDir)+1];
+    strcpy(ConfDir, confDir);
   }
 
 private:

@@ -10,6 +10,7 @@
 #include <time.h>
 class cChannel;
 struct tChannelID;
+class cEvent;
 
 namespace util
 {
