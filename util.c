@@ -141,12 +141,21 @@ void CleanString (unsigned char *String)
 //  ~cAddEventListItem() { }
 //};
 
+struct tChannelIDCompare
+{
+   bool operator() (const tChannelID& lhs, const tChannelID& rhs)
+   {
+       return lhs.ToString() < rhs.ToString();
+   }
+};
+
+
 class cAddEventThread : public cThread
 {
 private:
   cTimeMs LastHandleEvent;
 //  cList<cAddEventListItem> *list;
-  std::map<tChannelID,cList<cEvent *>*> *map_list;
+  std::map<tChannelID,cList<cEvent *>*,tChannelIDCompare> *map_list;
   enum { INSERT_TIMEOUT_IN_MS = 10000 };
 protected:
   virtual void Action(void);
@@ -194,7 +203,7 @@ void cAddEventThread::Action(void)
          (*it).second->cList::Clear();
          cSchedule *schedule = (cSchedule *)schedules->GetSchedule(Channels.GetByChannelID((*it).first), true);
          while (schedules && ((*it).second->First()) != NULL) {
-           cEvent* event = (*it).second->First();
+           cEvent* event = *(*it).second->First();
 
            cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
            if (pEqvEvent)
@@ -218,7 +227,7 @@ void cAddEventThread::AddEvent(cEvent *Event, tChannelID ChannelID)
   if (map_list->empty() || map_list->count(ChannelID) == 0) {
       cList<cEvent *>* list = new cList<cEvent *>;
       list->Add(Event);
-      map_list->insert(std::pair<tChannelID,cList<cEvent *>*>(ChannelID, list));
+      map_list->insert(std::make_pair(ChannelID, list));
   } else {
       (*map_list->find(ChannelID)).second->Add(Event);
   }
