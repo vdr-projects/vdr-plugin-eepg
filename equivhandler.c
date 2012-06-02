@@ -144,18 +144,7 @@ void cEquivHandler::updateEquivalent(cSchedules * Schedules, tChannelID channelI
           LogD(2, prep("remove equivalent"));
           pSchedule->DelEvent(pEqvEvent);
           cEvent* newEvent = new cEvent (pEvent->EventID());
-          newEvent->SetTableID (pEvent->TableID());
-          newEvent->SetStartTime (pEvent->StartTime());
-          newEvent->SetDuration (pEvent->Duration());
-          newEvent->SetVersion (pEvent->Version());
-//        newEvent->SetContents(pEvent->Contents());
-          newEvent->SetParentalRating(pEvent->ParentalRating());
-          newEvent->SetVps (pEvent->Vps());
-          newEvent->SetTitle (pEvent->Title ());
-          newEvent->SetShortText (pEvent->ShortText ());
-          newEvent->SetDescription (pEvent->Description ());
-//        newEvent->SetComponents (pEvent->Components());
-          newEvent->FixEpgBugs ();
+          cloneEvent(newEvent, pEvent);
 
           pSchedule->AddEvent(newEvent);
 
@@ -164,18 +153,7 @@ void cEquivHandler::updateEquivalent(cSchedules * Schedules, tChannelID channelI
       } else {
         LogD(3, prep("equivalent event does not exist"));
         cEvent* newEvent = new cEvent (pEvent->EventID());
-        newEvent->SetTableID (pEvent->TableID());
-        newEvent->SetStartTime (pEvent->StartTime());
-        newEvent->SetDuration (pEvent->Duration());
-        newEvent->SetVersion (pEvent->Version());
-//      newEvent->SetContents(pEvent->Contents());
-        newEvent->SetParentalRating(pEvent->ParentalRating());
-        newEvent->SetVps (pEvent->Vps());
-        newEvent->SetTitle (pEvent->Title ());
-        newEvent->SetShortText (pEvent->ShortText ());
-        newEvent->SetDescription (pEvent->Description ());
-//      newEvent->SetComponents (pEvent->Components());
-        newEvent->FixEpgBugs ();
+        cloneEvent(newEvent, pEvent);
 
         pSchedule->AddEvent(newEvent);
 
@@ -195,49 +173,11 @@ void cEquivHandler::updateEquivalent(tChannelID channelID, cEvent *pEvent){
     LogD(2, prep("equivalent channel exists"));
     tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
     cEvent* newEvent = new cEvent (pEvent->EventID());
-    newEvent->SetTableID (pEvent->TableID());
-    newEvent->SetStartTime (pEvent->StartTime());
-    newEvent->SetDuration (pEvent->Duration());
-    newEvent->SetVersion (pEvent->Version());
-//        newEvent->SetContents(pEvent->Contents());
-    newEvent->SetParentalRating(pEvent->ParentalRating());
-    newEvent->SetVps (pEvent->Vps());
-    newEvent->SetTitle (pEvent->Title ());
-    newEvent->SetShortText (pEvent->ShortText ());
-    newEvent->SetDescription (pEvent->Description ());
-//        newEvent->SetComponents (pEvent->Components());
+    cloneEvent(newEvent, pEvent);
+
     AddEvent(newEvent, equChannelID);
   }
 }
-
-
-//cSchedule * findFisrtSchedule (cSchedule * Schedule) {
-//  if (Schedule->Prev())
-//    return findFisrtSchedule((cSchedule *)Schedule->Prev());
-//  else
-//    return Schedule;
-//}
-//
-//cSchedule * findSchedule (cSchedule * Schedule, tChannelID channelID) {
-//  if (Schedule->ChannelID() == channelID)
-//    return Schedule;
-//
-//  if (Schedule->Next())
-//    return findSchedule((cSchedule *)Schedule->Next(), channelID);
-//  else
-//    return NULL;
-//}
-//
-//cSchedule * findEqvSchedule (cSchedule * Schedule, tChannelID channelID) {
-//  cSchedule* foundSchedule = findSchedule(findFisrtSchedule(Schedule),channelID);
-//
-//  if (foundSchedule)
-//    return foundSchedule;
-//
-//  cSchedule* sch = new cSchedule(channelID);
-//  Schedule->Insert(sch);
-//  return sch;
-//}
 
 
 void cEquivHandler::sortEquivalents(tChannelID channelID, cSchedules* Schedules)
@@ -263,3 +203,31 @@ void cEquivHandler::sortEquivalents(tChannelID channelID, cSchedules* Schedules)
     }
   }
 }
+
+void cEquivHandler::cloneEvent(cEvent *Source, cEvent *Dest) {
+
+  Dest->SetEventID(Source->EventID());
+  Dest->SetTableID(Source->TableID());
+  Dest->SetVersion(Source->Version());
+  Dest->SetRunningStatus(Source->RunningStatus());
+  Dest->SetTitle(Source->Title());
+  Dest->SetShortText(Source->ShortText());
+  Dest->SetDescription(Source->Description());
+  cComponents *components = new cComponents();
+  if (Source->Components()) {
+     for (int i = 0; i < Source->Components()->NumComponents(); ++i)
+         components->SetComponent(i, Source->Components()->Component(i)->ToString());
+     }
+  Dest->SetComponents(components);
+  uchar contents[MaxEventContents];
+  for (int i = 0; i < MaxEventContents; ++i)
+      contents[i] = Source->Contents(i);
+  Dest->SetContents(contents);
+  Dest->SetParentalRating(Source->ParentalRating());
+  Dest->SetStartTime(Source->StartTime());
+  Dest->SetDuration(Source->Duration());
+  Dest->SetVps(Source->Vps());
+  if (Source->Seen())
+     Dest->SetSeen();
+}
+

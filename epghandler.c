@@ -30,17 +30,16 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100)
     return true;
 
-  //TODO!!! not for commit upsteram
-  if (EitEvent->getDurationHour() > 10) {
-    LogD(3, prep("Event longer than 10h Duration:%d DurationHour:%d StartTimeHour:%d"), EitEvent->getDuration(), EitEvent->getDurationHour(), EitEvent->getStartTimeHour());
-    const cEvent* exEvent = Schedule->GetEventAround(EitEvent->getStartTime()+EitEvent->getDuration()/2);
-    if (exEvent) {
-      LogD(3, prep("10h Existing event %s startTime %d"), exEvent->Title(), exEvent->StartTime());
+  //TODO Should it be added in setup?
+  if (EitEvent->getDurationHour() > _LONG_EVENT_HOURS) {
+    LogD(4, prep("Event longer than 10h Duration:%d DurationHour:%d StartTimeHour:%d"), EitEvent->getDuration(), EitEvent->getDurationHour(), EitEvent->getStartTimeHour());
+    const cEvent* exEvent = Schedule->GetEventAround(EitEvent->getStartTime()+EitEvent->getDuration()/3);
+    const cEvent* exEvent2 = (const cEvent*)exEvent->Next();
+    if (exEvent && exEvent2 && difftime (exEvent2->EndTime(),EitEvent->getStartTime()+EitEvent->getDuration()) <= 0 ) {
+      LogD(3, prep("EitEvent overrides existing events '%s', '%s' ... Skipping"), exEvent->Title(), exEvent2->Title());
       return true;
     }
   }
-  //if (EitEvent->getDurationHour() > 3)
-//    return true;
 
   return false;
   //	return true;
@@ -54,7 +53,7 @@ bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
   LogD(3, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
 
-  if (!Event->Title() || Title && (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),Title))))
+  if (!Event->Title() || (Title && (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),Title)))))
     Event->SetTitle(Title);
   return true;
 }
