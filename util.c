@@ -198,22 +198,23 @@ void cAddEventThread::Action(void)
 //           list->Del(e);
 //           }
      std::map<tChannelID,cList<cEvent *>*,tChannelIDCompare>::iterator it;
-     if (schedules) {
-       for ( it=map_list->begin() ; it != map_list->end(); it++ ) {
-         cSchedule *schedule = (cSchedule *)schedules->GetSchedule(Channels.GetByChannelID((*it).first), true);
-         while (schedules && ((*it).second->First()) != NULL) {
-           cEvent* event = *(*it).second->First();
+     it=map_list->begin();
+     while (schedules && it != map_list->end()) {
+       cSchedule *schedule = (cSchedule *)schedules->GetSchedule(Channels.GetByChannelID((*it).first), true);
+       while (((*it).second->First()) != NULL) {
+         cEvent* event = *(*it).second->First();
 
-           cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
-           if (pEqvEvent)
-             schedule->DelEvent(pEqvEvent);
+         cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
+         if (pEqvEvent)
+           schedule->DelEvent(pEqvEvent);
 
-           schedule->AddEvent(event);
-           (*it).second->Del(event);
-         }
-         EpgHandlers.SortSchedule(schedule);
-
+         schedule->AddEvent(event);
+         (*it).second->Del(event);
        }
+       EpgHandlers.SortSchedule(schedule);
+       delete (*it).second;
+       map_list->erase(it++);
+
      }
      Unlock();
      cCondWait::SleepMs(10);

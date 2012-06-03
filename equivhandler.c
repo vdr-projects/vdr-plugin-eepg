@@ -166,11 +166,11 @@ void cEquivHandler::updateEquivalent(tChannelID channelID, cEvent *pEvent){
   multimap<string,string>::iterator it;
   pair<multimap<string,string>::iterator,multimap<string,string>::iterator> ret;
 
-  LogD(2, prep("Start updateEquivalent %s"), *channelID.ToString());
+  LogD(3, prep("Start updateEquivalent %s"), *channelID.ToString());
 
   ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
-    LogD(2, prep("equivalent channel exists"));
+    LogD(3, prep("equivalent channel exists"));
     tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
     cEvent* newEvent = new cEvent (pEvent->EventID());
     cloneEvent(pEvent, newEvent);
