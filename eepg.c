@@ -1368,6 +1368,15 @@ void cFilterEEPG::WriteToSchedule (tChannelID channelID, cSchedules* pSchedules,
     }
     if (ps && newEvent)
       ps->AddEvent (newEvent);
+
+    EquivHandler->updateEquivalent(pSchedules, channelID, Event);
+
+    if (!ps) {
+    //the event is not send to VDR so it has to be deleted.
+      delete Event;
+      Event = NULL;
+    }
+
     //newEvent->FixEpgBugs (); causes segfault
   }
       /*      else

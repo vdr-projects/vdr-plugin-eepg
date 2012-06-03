@@ -34,12 +34,15 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   if (EitEvent->getDurationHour() > _LONG_EVENT_HOURS) {
     LogD(4, prep("Event longer than 10h Duration:%d DurationHour:%d StartTimeHour:%d"), EitEvent->getDuration(), EitEvent->getDurationHour(), EitEvent->getStartTimeHour());
     const cEvent* exEvent = Schedule->GetEventAround(EitEvent->getStartTime()+EitEvent->getDuration()/3);
-    const cEvent* exEvent2 = (const cEvent*)exEvent->Next();
-    if (exEvent && exEvent2 && difftime (exEvent2->EndTime(),EitEvent->getStartTime()+EitEvent->getDuration()) <= 0 ) {
-      LogD(3, prep("EitEvent overrides existing events '%s', '%s' ... Skipping"), exEvent->Title(), exEvent2->Title());
-      return true;
+    if (exEvent) {
+      const cEvent* exEvent2 = Schedule->GetEventAround(EitEvent->getStartTime()+EitEvent->getDuration()/3*2);
+      if (exEvent2 && exEvent != exEvent2) {
+        LogD(2, prep("EitEvent overrides existing events '%s', '%s' ... Skipping"), *exEvent->Title(), *exEvent2->Title());
+        return true;
+      }
     }
   }
+
 
   return false;
   //	return true;
