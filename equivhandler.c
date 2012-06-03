@@ -144,7 +144,7 @@ void cEquivHandler::updateEquivalent(cSchedules * Schedules, tChannelID channelI
           LogD(2, prep("remove equivalent"));
           pSchedule->DelEvent(pEqvEvent);
           cEvent* newEvent = new cEvent (pEvent->EventID());
-          cloneEvent(newEvent, pEvent);
+          cloneEvent(pEvent, newEvent);
 
           pSchedule->AddEvent(newEvent);
 
@@ -153,7 +153,7 @@ void cEquivHandler::updateEquivalent(cSchedules * Schedules, tChannelID channelI
       } else {
         LogD(3, prep("equivalent event does not exist"));
         cEvent* newEvent = new cEvent (pEvent->EventID());
-        cloneEvent(newEvent, pEvent);
+        cloneEvent(pEvent, newEvent);
 
         pSchedule->AddEvent(newEvent);
 
@@ -173,7 +173,7 @@ void cEquivHandler::updateEquivalent(tChannelID channelID, cEvent *pEvent){
     LogD(2, prep("equivalent channel exists"));
     tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
     cEvent* newEvent = new cEvent (pEvent->EventID());
-    cloneEvent(newEvent, pEvent);
+    cloneEvent(pEvent, newEvent);
 
     AddEvent(newEvent, equChannelID);
   }
