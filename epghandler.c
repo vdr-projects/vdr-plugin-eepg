@@ -43,6 +43,25 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
     }
   }
 
+  //VDR creates new event if the EitEvent StartTime is different than EEPG time so 
+  //the EEPG event has to be deleted but the data should be kept
+  const cEvent* ev = Schedule->GetEvent(EitEvent->getEventId(),EitEvent->getStartTime());
+  if (!ev){
+      ev = Schedule->GetEvent(EitEvent->getEventId());
+      if (ev && ((ev->StartTime()>EitEvent->getStartTime() && ev->StartTime()<=EitEvent->getStartTime()+EitEvent->getDuration())
+          || (EitEvent->getStartTime() > ev->StartTime() && EitEvent->getStartTime() <= ev->EndTime()))) {
+        LogD(0, prep("!!!Deleting Event id:%d title:%s start_time:%d new_start_time:%d duration:%d new_duration:%d"), ev->EventID(), ev->Title(), ev->StartTime(), EitEvent->getStartTime(), ev->Duration(), EitEvent->getDuration());
+
+        if (ev->Description() && strcmp(ev->Description(),"") != 0)
+          origDescription = ev->Description();
+        if (ev->ShortText() && strcmp(ev->ShortText(),"") != 0)
+          origShortText = ev->ShortText();
+        Schedule->DropOutdated(ev->StartTime()-1,ev->EndTime()+1,ev->TableID()-1,ev->Version());
+        LogD(0, prep("!!!End Deleting Event"));
+      }
+  }
+
+
 
   return false;
   //	return true;
