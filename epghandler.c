@@ -9,7 +9,9 @@
 #if APIVERSNUM > 10725
 #include "log.h"
 #include "equivhandler.h"
+#include "eit2.h"
 #include <vdr/sources.h>
+#include <libsi/si.h>
 
 cEEpgHandler::cEEpgHandler() {
   LogD(4, prep("cEEpgHandler()"));
@@ -27,8 +29,11 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   //DISH NID 0x1001 to 0x100B BEV 0x100 and 0x101
   //TODO move the eit handling code at least for NA providers here instead of discarding.
   int nid = Schedule->ChannelID().Nid();
-  if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100)
+  if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100) {
+    SI::cEIT2 eit2(Schedule);
+    eit2.ProcessEitEvent(Schedule, EitEvent, TableID, Version);
     return true;
+  }
 
   //TODO Should it be added in setup?
   if (EitEvent->getDurationHour() > _LONG_EVENT_HOURS) {

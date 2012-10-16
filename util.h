@@ -28,5 +28,8 @@ time_t LocalTime2UTC (time_t t);
 time_t UTC2LocalTime (time_t t);
 void GetLocalTimeOffset (void);
 void CleanString (unsigned char *String);
+
+#define Asprintf(a, b, c...) void( asprintf(a, b, c) < 0 ? esyslog("memory allocation error - %s", b) : void() )
+
 }
 #endif /* UTIL_H_ */

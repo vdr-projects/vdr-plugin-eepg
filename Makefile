@@ -65,7 +65,7 @@ DEFINES += -D_GNU_SOURCE -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
 
 ### The object files (add further files here):
 
-OBJS = $(PLUGIN).o dish.o epghandler.o setupeepg.o equivhandler.o util.o
+OBJS = $(PLUGIN).o dish.o epghandler.o setupeepg.o equivhandler.o util.o eit2.o
 
 ifdef DBG
 CXXFLAGS += -g

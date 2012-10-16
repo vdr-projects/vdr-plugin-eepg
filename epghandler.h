@@ -34,6 +34,8 @@ public:
     virtual bool SortSchedule(cSchedule *Schedule);
     virtual bool DropOutdated(cSchedule *Schedule, time_t SegmentStart, time_t SegmentEnd, uchar TableID, uchar Version);
 
+//    bool ParseEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
+
 private:
     std::string origShortText;
     std::string origDescription;
