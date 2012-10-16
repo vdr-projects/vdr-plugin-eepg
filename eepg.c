@@ -45,6 +45,7 @@
 #include "setupeepg.h"
 #include "equivhandler.h"
 #include "util.h"
+#include "eit2.h"
 
 #include <map>
 #include <string>

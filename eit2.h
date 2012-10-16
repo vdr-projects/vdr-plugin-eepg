@@ -3,6 +3,7 @@
 #include <libsi/section.h>
 #include <libsi/descriptor.h>
 #include <libsi/si.h>
+#include <vdr/epg.h>
 
 namespace SI
 {
@@ -28,10 +29,9 @@ public:
   cEvent* ProcessEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
 
 private:
-    void
-    ProcessEventDescriptors(bool ExternalData,
-        int Source, u_char Tid, const SI::EIT::Event* SiEitEvent, cEvent* pEvent,
-        cSchedules* Schedules, cChannel* channel);
+  void ProcessEventDescriptors(bool ExternalData,
+    int Source, u_char Tid, const SI::EIT::Event* SiEitEvent, cEvent* pEvent,
+    cSchedules* Schedules, cChannel* channel);
 
 private:
     bool Empty;

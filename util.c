@@ -204,6 +204,123 @@ void AddEvent(cEvent *Event, tChannelID ChannelID)
      AddEventThread.Start();
 }
 
+/** \brief Decode an EPG string as necessary
+ *
+ *  \param src - Possibly encoded string
+ *  \param size - Size of the buffer
+ *
+ *  \retval NULL - Can't decode
+ *  \return A decoded string
+ */
+char *freesat_huffman_decode (const unsigned char *src, size_t size)
+{
+  int tableid;
+//  freesat_decode_error = 0;
+
+  if (src[0] == 0x1f && (src[1] == 1 || src[1] == 2)) {
+    int uncompressed_len = 30;
+    char *uncompressed = (char *) calloc (1, uncompressed_len + 1);
+    unsigned value = 0, byte = 2, bit = 0;
+    int p = 0;
+    unsigned char lastch = START;
+
+    tableid = src[1] - 1;
+    while (byte < 6 && byte < size) {
+      value |= src[byte] << ((5 - byte) * 8);
+      byte++;
+    }
+    //freesat_table_load ();    /**< Load the tables as necessary */
+
+    do {
+      bool found = false;
+      unsigned bitShift = 0;
+      if (lastch == ESCAPE) {
+        char nextCh = (value >> 24) & 0xff;
+        found = true;
+        // Encoded in the next 8 bits.
+        // Terminated by the first ASCII character.
+        bitShift = 8;
+        if ((nextCh & 0x80) == 0)
+          lastch = nextCh;
+        if (p >= uncompressed_len) {
+          uncompressed_len += 10;
+          uncompressed = (char *) REALLOC (uncompressed, uncompressed_len + 1);
+        }
+        uncompressed[p++] = nextCh;
+        uncompressed[p] = 0;
+      } else {
+        int j;
+        for (j = 0; j < table_size[tableid][lastch]; j++) {
+          unsigned mask = 0, maskbit = 0x80000000;
+          short kk;
+          for (kk = 0; kk < tables[tableid][lastch][j].bits; kk++) {
+            mask |= maskbit;
+            maskbit >>= 1;
+          }
+          if ((value & mask) == tables[tableid][lastch][j].value) {
+            char nextCh = tables[tableid][lastch][j].next;
+            bitShift = tables[tableid][lastch][j].bits;
+            if (nextCh != STOP && nextCh != ESCAPE) {
+              if (p >= uncompressed_len) {
+                uncompressed_len += 10;
+                uncompressed = (char *) REALLOC (uncompressed, uncompressed_len + 1);
+              }
+              uncompressed[p++] = nextCh;
+              uncompressed[p] = 0;
+            }
+            found = true;
+            lastch = nextCh;
+            break;
+          }
+        }
+      }
+      if (found) {
+        // Shift up by the number of bits.
+        unsigned b;
+        for (b = 0; b < bitShift; b++) {
+          value = (value << 1) & 0xfffffffe;
+          if (byte < size)
+            value |= (src[byte] >> (7 - bit)) & 1;
+          if (bit == 7) {
+            bit = 0;
+            byte++;
+          } else
+            bit++;
+        }
+      } else {
+        LogE (0, prep("Missing table %d entry: <%s>"), tableid + 1, uncompressed);
+        // Entry missing in table.
+        return uncompressed;
+      }
+    } while (lastch != STOP && value != 0);
+
+    return uncompressed;
+  }
+  return NULL;
+}
+
+void decodeText2 (const unsigned char *from, int len, char *buffer, int buffsize)
+{
+  if (from[0] == 0x1f) {
+    char *temp = freesat_huffman_decode (from, len);
+    if (temp) {
+      len = strlen (temp);
+      len = len < buffsize - 1 ? len : buffsize - 1;
+      strncpy (buffer, temp, len);
+      buffer[len] = 0;
+      free (temp);
+      return;
+    }
+  }
+
+  SI::String convStr;
+  SI::CharArray charArray;
+  charArray.assign(from, len);
+  convStr.setData(charArray, len);
+  //LogE(5, prep("decodeText2 from %s - length %d"), from, len);
+  convStr.getText(buffer,  buffsize);
+  //LogE(5, prep("decodeText2 buffer %s - buffsize %d"), buffer, buffsize);
+}
 
 }
 

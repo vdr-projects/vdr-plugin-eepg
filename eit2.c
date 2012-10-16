@@ -10,6 +10,7 @@
 #include <vdr/config.h>
 #include "log.h"
 #include "util.h"
+#include "dish.h"
 
 using namespace std;
 using namespace util;
@@ -110,8 +111,8 @@ namespace SI
     cComponents *Components = NULL;
 
 
-
-    for (SI::Loop::Iterator it2; (d = SiEitEvent->eventDescriptors.getNext(it2)); )
+    DescriptorLoop dl = SiEitEvent->eventDescriptors;
+    for (SI::Loop::Iterator it2; (d = dl.getNext(it2)); )
     {
       if (ExternalData && d->getDescriptorTag() != SI::ComponentDescriptorTag)
       {
