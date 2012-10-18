@@ -65,14 +65,6 @@
 static const char *VERSION = "0.0.6pre";
 static const char *DESCRIPTION = trNOOP ("Parses Extended EPG data");
 
-template <class T> T REALLOC(T Var, size_t Size)
-{
-  T p = (T)realloc(Var, Size);
-  if (!p)
-    free(Var);
-  return p;
-}
-
 using namespace std;
 using namespace util;
 
@@ -101,7 +93,6 @@ char *cs_hexdump (int m, const uchar * buf, int n)
 }
 
 cSetupEEPG* SetupPE = cSetupEEPG::getInstance();
-cEquivHandler* EquivHandler;
 
 // --- cMenuSetupPremiereEpg ------------------------------------------------------------
 
@@ -313,21 +304,21 @@ void syslog_with_tid (int priority, const char *format, ...) __attribute__ ((for
 
 
 
-struct hufftab {
-  unsigned int value;
-  short bits;
-  char next;
-};
+//struct hufftab {
+//  unsigned int value;
+//  short bits;
+//  char next;
+//};
+//
+//#define START   '\0'
+//#define STOP    '\0'
+//#define ESCAPE  '\1'
 
-#define START   '\0'
-#define STOP    '\0'
-#define ESCAPE  '\1'
 
+//int freesat_decode_error = 0; /* If set an error has occurred during decoding */
 
-int freesat_decode_error = 0; /* If set an error has occurred during decoding */
-
-static struct hufftab *tables[2][128];
-static int table_size[2][128];
+//static struct hufftab *tables[2][128];
+//static int table_size[2][128];
 static sNodeH* sky_tables[2];
 
 /** \brief Convert a textual character description into a value
@@ -569,7 +560,7 @@ static bool load_sky_file (const char *filename)
 char *freesat_huffman_decode (const unsigned char *src, size_t size)
 {
   int tableid;
-  freesat_decode_error = 0;
+//  freesat_decode_error = 0;
 
   if (src[0] == 0x1f && (src[1] == 1 || src[1] == 2)) {
     int uncompressed_len = 30;
@@ -839,44 +830,28 @@ bool cFilterEEPG::InitDictionary (void)
   return true;
 }
 
-void decodeText2 (const unsigned char *from, int len, char *buffer, int buffsize)
-{
-  if (from[0] == 0x1f) {
-    char *temp = freesat_huffman_decode (from, len);
-    if (temp) {
-      len = strlen (temp);
-      len = len < buffsize - 1 ? len : buffsize - 1;
-      strncpy (buffer, temp, len);
-      buffer[len] = 0;
-      free (temp);
-      return;
-    }
-  }
-
-  SI::String convStr;
-  SI::CharArray charArray;
-  charArray.assign(from, len);
-  convStr.setData(charArray, len);
-  //LogE(5, prep("decodeText2 from %s - length %d"), from, len);
-  convStr.getText(buffer,  buffsize);
-  //LogE(5, prep("decodeText2 buffer %s - buffsize %d"), buffer, buffsize);
-}
-
-void sortSchedules(cSchedules * Schedules, tChannelID channelID){
-
-  LogD(3, prep("Start sortEquivalent %s"), *channelID.ToString());
-
-  cChannel *pChannel = GetChannelByID (channelID, false);
-  cSchedule *pSchedule;
-  if (pChannel) {
-    pSchedule = (cSchedule *) (Schedules->GetSchedule(pChannel, true));
-      pSchedule->Sort();
-      Schedules->SetModified(pSchedule);
-    }
-  if (EquivHandler->getEquiChanMap().count(*channelID.ToString()) > 0)
-    EquivHandler->sortEquivalents(channelID, Schedules);
-}
-
+//void decodeText2 (const unsigned char *from, int len, char *buffer, int buffsize)
+//{
+//  if (from[0] == 0x1f) {
+//    char *temp = freesat_huffman_decode (from, len);
+//    if (temp) {
+//      len = strlen (temp);
+//      len = len < buffsize - 1 ? len : buffsize - 1;
+//      strncpy (buffer, temp, len);
+//      buffer[len] = 0;
+//      free (temp);
+//      return;
+//    }
+//  }
+//
+//  SI::String convStr;
+//  SI::CharArray charArray;
+//  charArray.assign(from, len);
+//  convStr.setData(charArray, len);
+//  //LogE(5, prep("decodeText2 from %s - length %d"), from, len);
+//  convStr.getText(buffer,  buffsize);
+//  //LogE(5, prep("decodeText2 buffer %s - buffsize %d"), buffer, buffsize);
+//}
 
 /**
  * \brief Get MHW channels

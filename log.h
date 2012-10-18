@@ -9,7 +9,8 @@
 #define LOG_H_
 
 #include <string>
-#include <stdarg.h>
+#include <vdr/tools.h>
+#include <vdr/thread.h>
 #include "setupeepg.h"
 
 #define VERBOSE 1

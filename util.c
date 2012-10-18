@@ -5,6 +5,8 @@
  *      Author: d.petrovski
  */
 #include "util.h"
+#include "log.h"
+#include "equivhandler.h"
 #include <vdr/channels.h>
 #include <vdr/thread.h>
 #include <vdr/epg.h>
@@ -18,6 +20,12 @@ int NumberOfAvailableSources = 0;
 int Yesterday;
 int YesterdayEpoch;
 int YesterdayEpochUTC;
+
+struct hufftab *tables[2][128];
+int table_size[2][128];
+
+EFormat Format;
+cEquivHandler* EquivHandler;
 
 cChannel *GetChannelByID(tChannelID & channelID, bool searchOtherPos)
 {
@@ -320,6 +328,21 @@ void decodeText2 (const unsigned char *from, int len, char *buffer, int buffsize
   //LogE(5, prep("decodeText2 from %s - length %d"), from, len);
   convStr.getText(buffer,  buffsize);
   //LogE(5, prep("decodeText2 buffer %s - buffsize %d"), buffer, buffsize);
+}
+
+void sortSchedules(cSchedules * Schedules, tChannelID channelID){
+
+  LogD(3, prep("Start sortEquivalent %s"), *channelID.ToString());
+
+  cChannel *pChannel = GetChannelByID (channelID, false);
+  cSchedule *pSchedule;
+  if (pChannel) {
+    pSchedule = (cSchedule *) (Schedules->GetSchedule(pChannel, true));
+      pSchedule->Sort();
+      Schedules->SetModified(pSchedule);
+    }
+  if (EquivHandler->getEquiChanMap().count(*channelID.ToString()) > 0)
+    EquivHandler->sortEquivalents(channelID, Schedules);
 }
 
 }

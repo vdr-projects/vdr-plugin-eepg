@@ -17,21 +17,6 @@
 //#define NAGRA 		6
 //#define HIGHEST_FORMAT 	6
 
-enum EFormat {
-//First all batchmode, load ONCE protocols:
-  MHW1  = 0,
-  MHW2     ,
-  SKY_IT   ,
-  SKY_UK   ,
-  NAGRA    ,
-//Than all CONTinuous protocols, so they will be processed LAST:
-  PREMIERE ,
-  FREEVIEW ,
-  DISH_BEV ,
-  EIT ,
-//the highest number of EPG-formats that is supported by this plugin
-  HIGHEST_FORMAT = EIT
-} Format;
 
 #define NAGRA_TABLE_ID  	0x55 //the lower the table Id, the more "current" it is; table_id 0x00 never gets overwritten, now/next are at 0x4e or 0x4f!
 #define DEFAULT_TABLE_ID 	0x30
