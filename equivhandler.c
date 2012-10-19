@@ -170,8 +170,8 @@ void cEquivHandler::updateEquivalent(tChannelID channelID, cEvent *pEvent){
 
   ret = equiChanMap.equal_range(*channelID.ToString());
   for (it=ret.first; it!=ret.second; ++it) {
-    LogD(3, prep("equivalent channel exists"));
     tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
+    LogD(3, prep("equivalent channel '%s' exists"), *equChannelID.ToString());
     cEvent* newEvent = new cEvent (pEvent->EventID());
     cloneEvent(pEvent, newEvent);
 
