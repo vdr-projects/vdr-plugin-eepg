@@ -14,6 +14,7 @@ cSetupEEPG* cSetupEEPG::_setupEEPG = NULL;
 
 cSetupEEPG::cSetupEEPG (void)
 {
+  ConfDir = NULL;
   OptPat = 1;
   OrderInfo = 1;
   RatingInfo = 1;

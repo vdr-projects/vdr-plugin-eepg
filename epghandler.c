@@ -172,6 +172,7 @@ bool cEEpgHandler::HandleEvent(cEvent* Event) {
   return true;
 }
 
+
 bool cEEpgHandler::SortSchedule(cSchedule* Schedule) {
 
   Schedule->Sort();
