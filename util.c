@@ -213,7 +213,8 @@ void cAddEventThread::Action(void)
        }
        EpgHandlers.SortSchedule(schedule);
        delete (*it).second;
-       map_list->erase(it++);
+       map_list->erase(it);
+       it=map_list->begin();
 
      }
      Unlock();
