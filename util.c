@@ -121,7 +121,7 @@ void CleanString (unsigned char *String)
     }
     Src++;
   }
-  if (Spaces > 0) {
+  if (Spaces > 0 && String > Dst) {
     Dst--;
     *Dst = 0;
   } else {
