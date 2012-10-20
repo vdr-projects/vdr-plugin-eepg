@@ -238,6 +238,8 @@ public:
 
 cFilterEEPG::cFilterEEPG (void)
 {
+  nSummaries = 0;
+  nTitles = 0;
   Trigger ();
   //Set (0x00, 0x00);
 }

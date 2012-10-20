@@ -183,11 +183,17 @@ void cAddEventThread::Action(void)
      cSchedules *schedules = (cSchedules *)cSchedules::Schedules(SchedulesLock);
      Lock();
      while (schedules && (e = list->First()) != NULL) {
+       tChannelID chID = e->GetChannelID();
            cSchedule *schedule = (cSchedule *)schedules->GetSchedule(Channels.GetByChannelID(e->GetChannelID()), true);
+       while (schedules && (e = list->First()) != NULL) {
+
+         if (chID == e->GetChannelID()) {
            schedule->AddEvent(e->GetEvent());
-           EpgHandlers.SortSchedule(schedule);
-           EpgHandlers.DropOutdated(schedule, e->GetEvent()->StartTime(), e->GetEvent()->EndTime(), e->GetEvent()->TableID(), e->GetEvent()->Version());
            list->Del(e);
+         }
+       }
+           EpgHandlers.SortSchedule(schedule);
+//           EpgHandlers.DropOutdated(schedule, e->GetEvent()->StartTime(), e->GetEvent()->EndTime(), e->GetEvent()->TableID(), e->GetEvent()->Version());
            }
      Unlock();
      cCondWait::SleepMs(10);

@@ -16,6 +16,7 @@
 cEEpgHandler::cEEpgHandler() {
   LogD(4, prep("cEEpgHandler()"));
   equivHandler = new cEquivHandler();
+  modified = false;
 }
 
 cEEpgHandler::~cEEpgHandler() {
@@ -48,6 +49,7 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
     }
   }
 
+  modified = false;
   //VDR creates new event if the EitEvent StartTime is different than EEPG time so 
   //the EEPG event has to be deleted but the data should be kept
   const cEvent* ev = Schedule->GetEvent(EitEvent->getEventId(),EitEvent->getStartTime());
@@ -63,6 +65,7 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
           origShortText = ev->ShortText();
         Schedule->DropOutdated(ev->StartTime()-1,ev->EndTime()+1,ev->TableID()-1,ev->Version());
         LogD(0, prep("!!!End Deleting Event"));
+        //TODO equivalent channels !!!
       }
   }
 
@@ -80,8 +83,11 @@ bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
   LogD(3, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
 
-  if (!Event->Title() || (Title && (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),Title)))))
+  if (!Event->Title() || (Title && (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),Title))))) {
+    //LogD(0, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
+    modified = true;
     Event->SetTitle(Title);
+  }
   return true;
 }
 
@@ -107,6 +113,10 @@ bool cEEpgHandler::SetDescription(cEvent* Event, const char* Description) {
     origDescription = Event->Description();
   else
     origDescription.clear();
+    
+  //Based on asumption that SetDescription is always called after SetTitle
+  if (!modified && Description && (!Event->Description() || strcmp(Event->Description(),Description) ))
+    modified = true;
 
   //if (!Event->Description() || Description && (!strcmp(Event->Description(),"") || (strcmp(Description,"") && strcmp(Event->Description(),Description))))
   Event->SetDescription(Description);
@@ -146,14 +156,15 @@ bool cEEpgHandler::HandleEvent(cEvent* Event) {
   if (!Event->ShortText() || !strcmp(Event->ShortText(),""))
     Event->SetShortText(origShortText.c_str());
 
-  if (!Event->Description() && !origDescription.empty()) {
+  if ((!Event->Description() && !origDescription.empty()) || (Event->Description() && !origDescription.empty() && origDescription.find(Event->Description()) != string::npos) ) {
     Event->SetDescription(origDescription.c_str());
   }
 
   if (equivHandler->getEquiChanMap().count(*Event->ChannelID().ToString()) <= 0)
     return true;
 
-  equivHandler->updateEquivalent(Event->ChannelID(), Event);
+  if (modified)
+    equivHandler->updateEquivalent(Event->ChannelID(), Event);
 
 //  cSchedulesLock SchedulesLock (true);
 //  cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
