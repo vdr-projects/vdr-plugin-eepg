@@ -63,7 +63,8 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
           origDescription = ev->Description();
         if (ev->ShortText() && strcmp(ev->ShortText(),"") != 0)
           origShortText = ev->ShortText();
-        Schedule->DropOutdated(ev->StartTime()-1,ev->EndTime()+1,ev->TableID()-1,ev->Version());
+        Schedule->DelEvent((cEvent *) ev);
+//        Schedule->DropOutdated(ev->StartTime()-1,ev->EndTime()+1,ev->TableID()-1,ev->Version());
         LogD(0, prep("!!!End Deleting Event"));
         //TODO equivalent channels !!!
       }
@@ -166,13 +167,6 @@ bool cEEpgHandler::HandleEvent(cEvent* Event) {
   if (modified)
     equivHandler->updateEquivalent(Event->ChannelID(), Event);
 
-//  cSchedulesLock SchedulesLock (true);
-//  cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
-//  if (s) {
-//    equivHandler->updateEquivalent(s, Event->ChannelID(), Event);
-//  } else
-//    LogE (0, prep("Error: could not lock schedules."));
-
   //TODO just to see the difference
   //else if (!origDescription.empty() && !origDescription.compare(Event->Description())) {
   //	origDescription.append(" | EIT: ");
@@ -187,14 +181,6 @@ bool cEEpgHandler::HandleEvent(cEvent* Event) {
 bool cEEpgHandler::SortSchedule(cSchedule* Schedule) {
 
   Schedule->Sort();
-
-  //NOK
-//  cSchedulesLock SchedulesLock (true);
-//  cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
-//  if (s) {
-//    equivHandler->sortEquivalents(Schedule->ChannelID(), s);
-//  } else
-//    LogE (0, prep("Error: could not lock schedules."));
 
   return true;
 }
