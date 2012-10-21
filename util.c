@@ -132,23 +132,6 @@ void CleanString (unsigned char *String)
 //  LogD (1, prep("Clean: %s"), String);
 }
 
-// --- cAddEventThread ----------------------------------------
-// Taken from VDR EPGFixer Plug-in
-// http://projects.vdr-developer.org/projects/plg-epgfixer
-// by  Matti Lehtimaki
-
-//class cAddEventListItem : public cListObject
-//{
-//protected:
-//  cEvent *event;
-//  tChannelID channelID;
-//public:
-//  cAddEventListItem(cEvent *Event, tChannelID ChannelID) { event = Event; channelID = ChannelID; }
-//  tChannelID GetChannelID() { return channelID; }
-//  cEvent *GetEvent() { return event; }
-//  ~cAddEventListItem() { }
-//};
-
 struct tChannelIDCompare
 {
    bool operator() (const tChannelID& lhs, const tChannelID& rhs) const
@@ -162,7 +145,6 @@ class cAddEventThread : public cThread
 {
 private:
   cTimeMs LastHandleEvent;
-//  cList<cAddEventListItem> *list;
   std::map<tChannelID,cList<cEvent>*,tChannelIDCompare> *map_list;
   enum { INSERT_TIMEOUT_IN_MS = 10000 };
 protected:
@@ -176,14 +158,12 @@ public:
 cAddEventThread::cAddEventThread(void)
 :cThread("cAddEventThread"), LastHandleEvent()
 {
-//  list = new cList<cAddEventListItem>;
   map_list = new std::map<tChannelID,cList<cEvent>*,tChannelIDCompare>;
 }
 
 cAddEventThread::~cAddEventThread(void)
 {
   LOCK_THREAD;
-//  list->cList::Clear();
   std::map<tChannelID,cList<cEvent>*,tChannelIDCompare>::iterator it;
   for ( it=map_list->begin() ; it != map_list->end(); it++ )
     (*it).second->cList::Clear();
@@ -195,8 +175,8 @@ void cAddEventThread::Action(void)
   LogD (0, prep("Action"));
   SetPriority(19);
   while (Running() && !LastHandleEvent.TimedOut()) {
-//     cAddEventListItem *e = NULL;
-     cSchedulesLock SchedulesLock(true, 10);
+
+    cSchedulesLock SchedulesLock(true, 10);
      cSchedules *schedules = (cSchedules *)cSchedules::Schedules(SchedulesLock);
      Lock();
 //     while (schedules && (e = list->First()) != NULL) {
@@ -219,9 +199,9 @@ void cAddEventThread::Action(void)
            schedule->DelEvent(pEqvEvent);
          }
 */
-	 LogD (0, prep("schedule->AddEvent(event)"));
          //cCondWait::SleepMs(10);
          (*it).second->Del(event, false);
+         EpgHandlers.DropOutdated(schedule, event->StartTime(), event->EndTime(), event->TableID(), event->Version());
          schedule->AddEvent(event);
        }
        EpgHandlers.SortSchedule(schedule);
@@ -239,9 +219,7 @@ void cAddEventThread::Action(void)
 
 void cAddEventThread::AddEvent(cEvent *Event, tChannelID ChannelID)
 {
-  LogD (0, prep("AddEventT start"));
   LOCK_THREAD;
-  LogD (0, prep("AddEventT lock "));
   if (map_list->empty() || map_list->count(ChannelID) == 0) {
       LogD (0, prep("AddEventT if"));
       cList<cEvent>* list = new cList<cEvent>;
