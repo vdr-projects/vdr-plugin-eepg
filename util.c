@@ -121,7 +121,7 @@ void CleanString (unsigned char *String)
     }
     Src++;
   }
-  if (Spaces > 0 && String < Dst) {
+  if (Spaces > 0 && String && String < Dst) {
     Dst--;
     *Dst = 0;
   } else {
@@ -176,25 +176,32 @@ cAddEventThread::~cAddEventThread(void)
 
 void cAddEventThread::Action(void)
 {
+  LogD (0, prep("Action"));
   SetPriority(19);
   while (Running() && !LastHandleEvent.TimedOut()) {
+//     LogD (0, prep("Running"));
      cAddEventListItem *e = NULL;
      cSchedulesLock SchedulesLock(true, 10);
      cSchedules *schedules = (cSchedules *)cSchedules::Schedules(SchedulesLock);
      Lock();
      while (schedules && (e = list->First()) != NULL) {
-       tChannelID chID = e->GetChannelID();
+//       tChannelID chID = e->GetChannelID();
            cSchedule *schedule = (cSchedule *)schedules->GetSchedule(Channels.GetByChannelID(e->GetChannelID()), true);
-       while (schedules && (e = list->First()) != NULL) {
+//       while (schedules && (e = list->First()) != NULL) {
 
-         if (chID == e->GetChannelID()) {
+//         if (chID == e->GetChannelID()) {
+//           LogD (0, prep("AddEvent"));
            schedule->AddEvent(e->GetEvent());
+//           LogD (0, prep("Del"));
            list->Del(e);
-         }
-       }
+//         }
+//       }
+           LogD (0, prep("Sort"));
            EpgHandlers.SortSchedule(schedule);
-//           EpgHandlers.DropOutdated(schedule, e->GetEvent()->StartTime(), e->GetEvent()->EndTime(), e->GetEvent()->TableID(), e->GetEvent()->Version());
+           EpgHandlers.DropOutdated(schedule, e->GetEvent()->StartTime(), e->GetEvent()->EndTime(), e->GetEvent()->TableID(), e->GetEvent()->Version());
+//           LogD (0, prep("Sorted"));
            }
+//           LogD (0, prep("Unlock"));
      Unlock();
      cCondWait::SleepMs(10);
      }
@@ -203,6 +210,7 @@ void cAddEventThread::Action(void)
 void cAddEventThread::AddEvent(cEvent *Event, tChannelID ChannelID)
 {
   LOCK_THREAD;
+//  LogD (0, prep("AddEventT %s channel: <%s>"), Event->Title(), *ChannelID.ToString());
   list->Add(new cAddEventListItem(Event, ChannelID));
   LastHandleEvent.Set(INSERT_TIMEOUT_IN_MS);
 }
@@ -213,6 +221,7 @@ static cAddEventThread AddEventThread;
 
 void AddEvent(cEvent *Event, tChannelID ChannelID)
 {
+  LogD (0, prep("AddEvent %s channel: <%s>"), Event->Title(), *ChannelID.ToString());
   AddEventThread.AddEvent(Event, ChannelID);
   if (!AddEventThread.Active())
      AddEventThread.Start();

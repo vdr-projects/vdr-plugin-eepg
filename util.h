@@ -8,6 +8,8 @@
 #ifndef UTIL_H_
 #define UTIL_H_
 #include <time.h>
+#include <stdlib.h>
+
 class cChannel;
 struct tChannelID;
 class cEvent;
