@@ -41,6 +41,7 @@ private:
     std::string origDescription;
     cEquivHandler* equivHandler;
     static const int _LONG_EVENT_HOURS = 10;
+    bool modified;
 };
 
 #endif /*APIVERSNUM > 10725*/

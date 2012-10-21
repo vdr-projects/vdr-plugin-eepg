@@ -13,6 +13,7 @@
 cSetupEEPG* cSetupEEPG::_setupEEPG = NULL;
 
 cSetupEEPG::cSetupEEPG (void)
+:ConfDir(NULL)
 {
   ConfDir = NULL;
   OptPat = 1;

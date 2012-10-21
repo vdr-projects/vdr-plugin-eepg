@@ -123,7 +123,7 @@ void CleanString (unsigned char *String)
     }
     Src++;
   }
-  if (Spaces > 0) {
+  if (Spaces > 0 && String && String < Dst) {
     Dst--;
     *Dst = 0;
   } else {
@@ -192,6 +192,7 @@ cAddEventThread::~cAddEventThread(void)
 
 void cAddEventThread::Action(void)
 {
+  LogD (0, prep("Action"));
   SetPriority(19);
   while (Running() && !LastHandleEvent.TimedOut()) {
 //     cAddEventListItem *e = NULL;
@@ -251,7 +252,7 @@ void cAddEventThread::AddEvent(cEvent *Event, tChannelID ChannelID)
       LogD (0, prep("AddEventT else"));
       (*map_list->find(ChannelID)).second->Add(Event);
   }
-//  list->Add(new cAddEventListItem(Event, ChannelID));
+//  LogD (0, prep("AddEventT %s channel: <%s>"), Event->Title(), *ChannelID.ToString());
   LastHandleEvent.Set(INSERT_TIMEOUT_IN_MS);
   LogD (0, prep("AddEventT end"));
 }
@@ -262,7 +263,7 @@ static cAddEventThread AddEventThread;
 
 void AddEvent(cEvent *Event, tChannelID ChannelID)
 {
-  LogD (0, prep("AddEvent"));
+//  LogD (0, prep("AddEvent %s channel: <%s>"), Event->Title(), *ChannelID.ToString());
   AddEventThread.AddEvent(Event, ChannelID);
   if (!AddEventThread.Active())
      AddEventThread.Start();

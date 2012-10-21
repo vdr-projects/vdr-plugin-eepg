@@ -124,21 +124,16 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
 
     //LogD(2, prep("EEPGDEBUG:d->getDescriptorTAG():%x)"), d->getDescriptorTag ());
     nDescriptorTag = d->getDescriptorTag();
-    switch (nDescriptorTag)
-    {
-    case SI::ExtendedEventDescriptorTag:
-    {
-      SI::ExtendedEventDescriptor * eed =
-        (SI::ExtendedEventDescriptor *) d;
-      if (I18nIsPreferredLanguage(Setup.EPGLanguages, eed->languageCode,
-        LanguagePreferenceExt) || !ExtendedEventDescriptors)
-      {
+    switch (nDescriptorTag) {
+    case SI::ExtendedEventDescriptorTag: {
+      SI::ExtendedEventDescriptor * eed = (SI::ExtendedEventDescriptor *) d;
+      if (I18nIsPreferredLanguage(Setup.EPGLanguages, eed->languageCode, LanguagePreferenceExt)
+        || !ExtendedEventDescriptors) {
         delete ExtendedEventDescriptors;
         ExtendedEventDescriptors = new SI::ExtendedEventDescriptors;
         UseExtendedEventDescriptor = true;
       }
-      if (UseExtendedEventDescriptor)
-      {
+      if (UseExtendedEventDescriptor) {
         ExtendedEventDescriptors->Add(eed);
         d = NULL; // so that it is not deleted
       }
@@ -146,12 +141,10 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
         UseExtendedEventDescriptor = false;
     }
     break;
-    case SI::ShortEventDescriptorTag:
-    {
+    case SI::ShortEventDescriptorTag: {
       SI::ShortEventDescriptor * sed = (SI::ShortEventDescriptor *) d;
-      if (I18nIsPreferredLanguage(Setup.EPGLanguages, sed->languageCode,
-        LanguagePreferenceShort) || !ShortEventDescriptor)
-      {
+      if (I18nIsPreferredLanguage(Setup.EPGLanguages, sed->languageCode, LanguagePreferenceShort)
+        || !ShortEventDescriptor) {
         delete ShortEventDescriptor;
         ShortEventDescriptor = sed;
         d = NULL; // so that it is not deleted
@@ -159,71 +152,51 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
     }
     break;
 #if APIVERSNUM > 10711
-    case SI::ContentDescriptorTag:
-    {
+    case SI::ContentDescriptorTag: {
       SI::ContentDescriptor *cd = (SI::ContentDescriptor *) d;
       SI::ContentDescriptor::Nibble Nibble;
       int NumContents = 0;
-      uchar Contents[MaxEventContents] =
-      { 0 };
-      for (SI::Loop::Iterator it3; cd->nibbleLoop.getNext(Nibble, it3);)
-      {
-        if (NumContents < MaxEventContents)
-        {
-          Contents[NumContents] = ((Nibble.getContentNibbleLevel1()
-            & 0xF) << 4) | (Nibble.getContentNibbleLevel2() & 0xF);
+      uchar Contents[MaxEventContents] = { 0 };
+      for (SI::Loop::Iterator it3; cd->nibbleLoop.getNext(Nibble, it3);) {
+        if (NumContents < MaxEventContents) {
+          Contents[NumContents] = ((Nibble.getContentNibbleLevel1() & 0xF) << 4)
+            | (Nibble.getContentNibbleLevel2() & 0xF);
           NumContents++;
         }
-        if (DishEventDescriptor && NumContents == 1)
-        {
+        if (DishEventDescriptor && NumContents == 1) {
           DishEventDescriptor->setContent(Nibble);
         }
         //          LogD(2, prep("EEPGDEBUG:Nibble:%x-%x-%x-%x)"), Nibble.getContentNibbleLevel1(),Nibble.getContentNibbleLevel2()
-                  //              , Nibble.getUserNibble1(), Nibble.getUserNibble2());
+        //              , Nibble.getUserNibble1(), Nibble.getUserNibble2());
 
       }
       pEvent->SetContents(Contents);
     }
     break;
 #endif
-    case SI::ParentalRatingDescriptorTag:
-    {
+    case SI::ParentalRatingDescriptorTag: {
       int LanguagePreferenceRating = -1;
-      SI::ParentalRatingDescriptor *prd =
-        (SI::ParentalRatingDescriptor *) d;
+      SI::ParentalRatingDescriptor *prd = (SI::ParentalRatingDescriptor *) d;
       SI::ParentalRatingDescriptor::Rating Rating;
-      for (SI::Loop::Iterator it3; prd->ratingLoop.getNext(Rating, it3);)
-      {
-        if (I18nIsPreferredLanguage(Setup.EPGLanguages,
-          Rating.languageCode, LanguagePreferenceRating))
-        {
+      for (SI::Loop::Iterator it3; prd->ratingLoop.getNext(Rating, it3);) {
+        if (I18nIsPreferredLanguage(Setup.EPGLanguages, Rating.languageCode,
+          LanguagePreferenceRating)) {
           int ParentalRating = (Rating.getRating() & 0xFF);
-          switch (ParentalRating)
-          {
+          switch (ParentalRating) {
           // values defined by the DVB standard (minimum age = rating + 3 years):
-          case 0x01 ... 0x0F:
-          ParentalRating += 3;
-          break;
+          case 0x01 ... 0x0F: ParentalRating += 3; break;
           // values defined by broadcaster CSAT (now why didn't they just use 0x07, 0x09 and 0x0D?):
-          case 0x11:
-            ParentalRating = 10;
-            break;
-          case 0x12:
-            ParentalRating = 12;
-            break;
-          case 0x13:
-            ParentalRating = 16;
-            break;
-          default:
-            ParentalRating = 0;
+          case 0x11: ParentalRating = 10; break;
+          case 0x12: ParentalRating = 12; break;
+          case 0x13: ParentalRating = 16; break;
+          default: ParentalRating = 0;
           }
           pEvent->SetParentalRating(ParentalRating);
         }
       }
     }
     break;
-    case SI::PDCDescriptorTag:
-    {
+    case SI::PDCDescriptorTag: {
       SI::PDCDescriptor * pd = (SI::PDCDescriptor *) d;
       time_t now = time(NULL);
       struct tm tm_r;
@@ -238,23 +211,19 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
       if (month == 11 && t.tm_mon == 0) // current month is dec, but event is in jan
         t.tm_year++;
       else if (month == 0 && t.tm_mon == 11) // current month is jan, but event is in dec
-        t.tm_year--;
+      t.tm_year--;
       time_t vps = mktime(&t);
       pEvent->SetVps(vps);
     }
     break;
-    case SI::TimeShiftedEventDescriptorTag:
-    {
+    case SI::TimeShiftedEventDescriptorTag: {
       if (Schedules) {
-        SI::TimeShiftedEventDescriptor * tsed =
-          (SI::TimeShiftedEventDescriptor *) d;
+        SI::TimeShiftedEventDescriptor * tsed = (SI::TimeShiftedEventDescriptor *) d;
         cSchedule *rSchedule = (cSchedule *) Schedules->GetSchedule(
-          tChannelID(Source, channel->Nid(), channel->Tid(),
-            tsed->getReferenceServiceId()));
+          tChannelID(Source, channel->Nid(), channel->Tid(), tsed->getReferenceServiceId()));
         if (!rSchedule)
           break;
-        rEvent = (cEvent *) rSchedule->GetEvent(
-          tsed->getReferenceEventId());
+        rEvent = (cEvent *) rSchedule->GetEvent(tsed->getReferenceEventId());
         if (!rEvent)
           break;
         pEvent->SetTitle(rEvent->Title());
@@ -263,63 +232,49 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
       }
     }
     break;
-    case SI::LinkageDescriptorTag:
-    {
+    case SI::LinkageDescriptorTag: {
       SI::LinkageDescriptor * ld = (SI::LinkageDescriptor *) d;
-      tChannelID linkID(Source, ld->getOriginalNetworkId(),
-                        ld->getTransportStreamId(), ld->getServiceId());
-      if (ld->getLinkageType() == 0xB0)
-      { // Premiere World
+      tChannelID linkID(Source, ld->getOriginalNetworkId(), ld->getTransportStreamId(),
+        ld->getServiceId());
+      if (ld->getLinkageType() == 0xB0) { // Premiere World
         time_t now = time(NULL);
-      bool hit = SiEitEvent->getStartTime() <= now
-        && now
-        < SiEitEvent->getStartTime() + SiEitEvent->getDuration();
-      if (hit)
-      {
-        char linkName[ld->privateData.getLength() + 1];
-        strn0cpy(linkName, (const char *) ld->privateData.getData(),
-                 sizeof(linkName));
-        // TODO is there a standard way to determine the character set of this string?
-        cChannel *link = Channels.GetByChannelID(linkID);
-        if (link != channel)
-        { // only link to other channels, not the same one
-          //fprintf(stderr, "Linkage %s %4d %4d %5d %5d %5d %5d  %02X  '%s'\n", hit ? "*" : "", channel->Number(), link ? link->Number() : -1, SiEitEvent.getEventId(), ld->getOriginalNetworkId(), ld->getTransportStreamId(), ld->getServiceId(), ld->getLinkageType(), linkName);//XXX
-          if (link)
-          {
-            if (Setup.UpdateChannels == 1
-              || Setup.UpdateChannels >= 3)
-              link->SetName(linkName, "", "");
+        bool hit = SiEitEvent->getStartTime() <= now
+          && now < SiEitEvent->getStartTime() + SiEitEvent->getDuration();
+        if (hit) {
+          char linkName[ld->privateData.getLength() + 1];
+          strn0cpy(linkName, (const char *) ld->privateData.getData(), sizeof(linkName));
+          // TODO is there a standard way to determine the character set of this string?
+          cChannel *link = Channels.GetByChannelID(linkID);
+          if (link != channel) { // only link to other channels, not the same one
+            //fprintf(stderr, "Linkage %s %4d %4d %5d %5d %5d %5d  %02X  '%s'\n", hit ? "*" : "", channel->Number(), link ? link->Number() : -1, SiEitEvent.getEventId(), ld->getOriginalNetworkId(), ld->getTransportStreamId(), ld->getServiceId(), ld->getLinkageType(), linkName);//XXX
+            if (link) {
+              if (Setup.UpdateChannels == 1 || Setup.UpdateChannels >= 3)
+                link->SetName(linkName, "", "");
+            }
+            else if (Setup.UpdateChannels >= 4) {
+              cChannel *transponder = channel;
+              if (channel->Tid() != ld->getTransportStreamId())
+                transponder = Channels.GetByTransponderID(linkID);
+              link = Channels.NewChannel(transponder, linkName, "", "", ld->getOriginalNetworkId(),
+                ld->getTransportStreamId(), ld->getServiceId());
+            }
+            if (link) {
+              if (!LinkChannels) LinkChannels = new cLinkChannels;
+              LinkChannels->Add(new cLinkChannel(link));
+            }
           }
-          else if (Setup.UpdateChannels >= 4)
-          {
-            cChannel *transponder = channel;
-            if (channel->Tid() != ld->getTransportStreamId())
-              transponder = Channels.GetByTransponderID(linkID);
-            link = Channels.NewChannel(transponder, linkName,
-              "", "", ld->getOriginalNetworkId(),
-              ld->getTransportStreamId(), ld->getServiceId());
-          }
-          if (link)
-          {
-            if (!LinkChannels)
-              LinkChannels = new cLinkChannels;
-            LinkChannels->Add(new cLinkChannel(link));
-          }
+          else
+            channel->SetPortalName(linkName);
         }
-        else
-          channel->SetPortalName(linkName);
-      }
       }
     }
     break;
-    case SI::ComponentDescriptorTag:
-    {
+    case SI::ComponentDescriptorTag: {
       SI::ComponentDescriptor * cd = (SI::ComponentDescriptor *) d;
       uchar Stream = cd->getStreamContent();
       uchar Type = cd->getComponentType();
       //if (1 <= Stream && Stream <= 3 && Type != 0) { // 1=video, 2=audio, 3=subtitles
-      if (1 <= Stream && Stream <= 6 && Type != 0)
-      { // 1=MPEG2-video, 2=MPEG1-audio, 3=subtitles, 4=AC3-audio, 5=H.264-video, 6=HEAAC-audio
+      if (1 <= Stream && Stream <= 6 && Type != 0) { // 1=MPEG2-video, 2=MPEG1-audio, 3=subtitles, 4=AC3-audio, 5=H.264-video, 6=HEAAC-audio
         if (!Components)
           Components = new cComponents;
         char buffer[Utf8BufSize (256)];
@@ -329,36 +284,27 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
       }
     }
     break;
-    case SI::DishExtendedEventDescriptorTag:
-    {
-      SI::UnimplementedDescriptor *deed =
-        (SI::UnimplementedDescriptor *) d;
-      if (!DishEventDescriptor)
-      {
+    case SI::DishExtendedEventDescriptorTag: {
+      SI::UnimplementedDescriptor *deed = (SI::UnimplementedDescriptor *) d;
+      if (!DishEventDescriptor) {
         DishEventDescriptor = new SI::DishDescriptor();
       }
       DishEventDescriptor->setExtendedtData(Tid + 1, deed->getData());
       //          HasExternalData = true;
     }
     break;
-    case SI::DishShortEventDescriptorTag:
-    {
-      SI::UnimplementedDescriptor *dsed =
-        (SI::UnimplementedDescriptor *) d;
-      if (!DishEventDescriptor)
-      {
+    case SI::DishShortEventDescriptorTag: {
+      SI::UnimplementedDescriptor *dsed = (SI::UnimplementedDescriptor *) d;
+      if (!DishEventDescriptor) {
         DishEventDescriptor = new SI::DishDescriptor();
       }
       DishEventDescriptor->setShortData(Tid + 1, dsed->getData());
       //          HasExternalData = true;
     }
     break;
-    case SI::DishRatingDescriptorTag:
-    {
-      if (d->getLength() == 4)
-      {
-        if (!DishEventDescriptor)
-        {
+    case SI::DishRatingDescriptorTag: {
+      if (d->getLength() == 4) {
+        if (!DishEventDescriptor) {
           DishEventDescriptor = new SI::DishDescriptor();
         }
         uint16_t rating = d->getData().TwoBytes(2);
@@ -366,13 +312,10 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
       }
     }
     break;
-    case SI::DishSeriesDescriptorTag:
-    {
-      if (d->getLength() == 10)
-      {
+    case SI::DishSeriesDescriptorTag: {
+      if (d->getLength() == 10) {
         //LogD(2, prep("DishSeriesDescriptorTag: %s)"), (const char*) d->getData().getData());
-        if (!DishEventDescriptor)
-        {
+        if (!DishEventDescriptor) {
           DishEventDescriptor = new SI::DishDescriptor();
         }
         DishEventDescriptor->setEpisodeInfo(d->getData());
@@ -466,7 +409,6 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
                 , orgAirDate == 0 || !dateok ? "" : datestr);
       pEvent->SetDescription(tmp);
       free(tmp);
-
 
       //LogD(2, prep("DishDescription: %s"), DishEventDescriptor->getDescription());
       //LogD(2, prep("DishShortText: %s"), DishEventDescriptor->getShortText());
@@ -632,7 +574,7 @@ cEIT2::cEIT2 (cSchedule * Schedule)
 
   bool searchOtherSatPositions = Format == DISH_BEV;
 
-  tChannelID channelID (Schedule->ChannelID().Source(), getOriginalNetworkId (), getTransportStreamId (), getServiceId ());
+  tChannelID channelID = Schedule->ChannelID();
   channel = GetChannelByID (channelID, searchOtherSatPositions);
   if (!channel) {
     LogD(3, prep("!channel channelID: %s"), *channelID.ToString());
