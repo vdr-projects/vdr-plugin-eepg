@@ -172,13 +172,13 @@ cAddEventThread::~cAddEventThread(void)
 
 void cAddEventThread::Action(void)
 {
-  LogD (0, prep("Action"));
+  //LogD (0, prep("Action"));
   SetPriority(19);
   while (Running() && !LastHandleEvent.TimedOut()) {
 
     cSchedulesLock SchedulesLock(true, 10);
-     cSchedules *schedules = (cSchedules *)cSchedules::Schedules(SchedulesLock);
-     Lock();
+    cSchedules *schedules = (cSchedules *) cSchedules::Schedules(SchedulesLock);
+    Lock();
 //     while (schedules && (e = list->First()) != NULL) {
 //           cSchedule *schedule = (cSchedule *)schedules->GetSchedule(Channels.GetByChannelID(e->GetChannelID()), true);
 //           schedule->AddEvent(e->GetEvent());
@@ -186,12 +186,13 @@ void cAddEventThread::Action(void)
 //           EpgHandlers.DropOutdated(schedule, e->GetEvent()->StartTime(), e->GetEvent()->EndTime(), e->GetEvent()->TableID(), e->GetEvent()->Version());
 //           list->Del(e);
 //           }
-     std::map<tChannelID,cList<cEvent>*,tChannelIDCompare>::iterator it;
-     it=map_list->begin();
-     while (schedules && it != map_list->end()) {
-       cSchedule *schedule = (cSchedule *)schedules->GetSchedule(Channels.GetByChannelID((*it).first), true);
-       while (((*it).second->First()) != NULL) {
-         cEvent* event = (*it).second->First();
+    std::map<tChannelID, cList<cEvent>*, tChannelIDCompare>::iterator it;
+    it = map_list->begin();
+    while (schedules && it != map_list->end()) {
+      cSchedule *schedule = (cSchedule *) schedules->GetSchedule(
+        Channels.GetByChannelID((*it).first), true);
+      while (((*it).second->First()) != NULL) {
+        cEvent* event = (*it).second->First();
 
 /*         cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
          if (pEqvEvent){
@@ -200,38 +201,36 @@ void cAddEventThread::Action(void)
          }
 */
          //cCondWait::SleepMs(10);
-         (*it).second->Del(event, false);
-         EpgHandlers.DropOutdated(schedule, event->StartTime(), event->EndTime(), event->TableID(), event->Version());
-         schedule->AddEvent(event);
-       }
-       EpgHandlers.SortSchedule(schedule);
+        (*it).second->Del(event, false);
+        EpgHandlers.DropOutdated(schedule, event->StartTime(), event->EndTime(), event->TableID(),
+          event->Version());
+        schedule->AddEvent(event);
+      }
+      EpgHandlers.SortSchedule(schedule);
        //sortSchedules(schedules, (*it).first);
        //schedule->Sort();
-       delete (*it).second;
-       map_list->erase(it);
-       it=map_list->begin();
+      delete (*it).second;
+      map_list->erase(it);
+      it = map_list->begin();
 
-     }
-     Unlock();
-     cCondWait::SleepMs(10);
-     }
+    }
+    Unlock();
+    cCondWait::SleepMs(10);
+  }
 }
 
 void cAddEventThread::AddEvent(cEvent *Event, tChannelID ChannelID)
 {
   LOCK_THREAD;
   if (map_list->empty() || map_list->count(ChannelID) == 0) {
-      LogD (0, prep("AddEventT if"));
       cList<cEvent>* list = new cList<cEvent>;
       list->Add(Event);
       map_list->insert(std::make_pair(ChannelID, list));
   } else {
-      LogD (0, prep("AddEventT else"));
       (*map_list->find(ChannelID)).second->Add(Event);
   }
 //  LogD (0, prep("AddEventT %s channel: <%s>"), Event->Title(), *ChannelID.ToString());
   LastHandleEvent.Set(INSERT_TIMEOUT_IN_MS);
-  LogD (0, prep("AddEventT end"));
 }
 
 static cAddEventThread AddEventThread;
