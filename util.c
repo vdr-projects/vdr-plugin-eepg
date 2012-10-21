@@ -213,17 +213,16 @@ void cAddEventThread::Action(void)
        while (((*it).second->First()) != NULL) {
          cEvent* event = (*it).second->First();
 
-         cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
+/*         cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
          if (pEqvEvent){
 	   LogD (0, prep("schedule->DelEvent(event)"));
            schedule->DelEvent(pEqvEvent);
          }
-
+*/
 	 LogD (0, prep("schedule->AddEvent(event)"));
          //cCondWait::SleepMs(10);
-         if (event)
-            schedule->AddEvent(event);
-         (*it).second->Del(event);
+         (*it).second->Del(event, false);
+         schedule->AddEvent(event);
        }
        EpgHandlers.SortSchedule(schedule);
        //sortSchedules(schedules, (*it).first);
