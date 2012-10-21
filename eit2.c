@@ -574,7 +574,7 @@ cEIT2::cEIT2 (cSchedule * Schedule)
 
   bool searchOtherSatPositions = Format == DISH_BEV;
 
-  tChannelID channelID (Schedule->ChannelID().Source(), getOriginalNetworkId (), getTransportStreamId (), getServiceId ());
+  tChannelID channelID = Schedule->ChannelID();
   channel = GetChannelByID (channelID, searchOtherSatPositions);
   if (!channel) {
     LogD(3, prep("!channel channelID: %s"), *channelID.ToString());
