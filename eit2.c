@@ -398,8 +398,8 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
       time_t orgAirDate = DishEventDescriptor->getOriginalAirDate();
       char datestr [80];
       bool dateok = false;
-      if (orgAirDate == 0) {
-        dateok = strftime (datestr,80," Original Air Date: %a %b %d %Y",gmtime(&orgAirDate)) > 0;
+      if (orgAirDate != 0) {
+        dateok = strftime (datestr,80," \nOriginal Air Date: %a %b %d %Y",gmtime(&orgAirDate)) > 0;
       }
 
       Asprintf (&tmp, fmt.c_str(), description
