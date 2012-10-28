@@ -222,7 +222,7 @@ protected:
   //virtual void FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES]);
   virtual void WriteToSchedule (tChannelID channelID, cSchedules* s, unsigned int EventId, unsigned int StartTime,
                                 unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId,
-                                unsigned short int TableId, unsigned short int Version, char Rating = 0x00);
+                                unsigned short int TableId, unsigned short int Version, char Rating = 0x00, unsigned char ShortTextLenght = 0);
   virtual void LoadIntoSchedule (void);
   //virtual void LoadEquivalentChannels (void);
 
@@ -1235,7 +1235,11 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
  * \param Duration the Duration of the event in minutes
  * \param ps points to array of schedules ps[eq], where eq is equivalence number of the channel. If channelId is invalid then ps[eq]=NULL
  */
-void cFilterEEPG::WriteToSchedule (tChannelID channelID, cSchedules* pSchedules, unsigned int EventId, unsigned int StartTime, unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId, unsigned short int TableId, unsigned short int Version, char Rating)
+void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
+    unsigned int EventId, unsigned int StartTime, unsigned int Duration,
+    char *Text, char *SummText, unsigned short int ThemeId,
+    unsigned short int TableId, unsigned short int Version, char Rating,
+    unsigned char ShTxtLen)
 {
   bool WrittenTitle = false;
   bool WrittenSummary = false;
@@ -1277,21 +1281,53 @@ void cFilterEEPG::WriteToSchedule (tChannelID channelID, cSchedules* pSchedules,
     if (Rating) {
       Event->SetParentalRating(Rating);
     }
-    char *tmp;
     if (Text != 0x00) {
       WrittenTitle = true;
       CleanString ((uchar *) Text);
       Event->SetTitle (Text);
     }
-    Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
+
+    char *tmp = NULL;
+    if (SummText && ShTxtLen) {
+    
+      //TODO DPE template
+      tmp = (char *) malloc(2*ShTxtLen);
+      if (!tmp) {
+        LogE(0, prep("tmp memory allocation error."));
+        return;
+      }
+//      decodeText2((unsigned char *)SummText, ShTxtLen, tmp, ShTxtLen + 1);
+      memcpy(tmp, SummText, ShTxtLen);
+      tmp[ShTxtLen] = '\0';
+
+      //Do not use Subtitle if it is substring of Title
+      if (strncmp(Text, tmp, ShTxtLen) == 0) {
+        free(tmp);
+        tmp = NULL;
+      }
+
+    }
+    if (!tmp)
+      Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
     Event->SetShortText (tmp);
     free(tmp);
+
+/*
+    char *tmp;
+    if (!ShortText || strcmp(ShortText, Text) == 0) {
+      Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
+      Event->SetShortText (tmp);
+      free(tmp);
+    } else
+      Event->SetShortText (ShortText);
+*/
     //strreplace(t, '|', '\n');
     if (SummText != 0x00) {
       WrittenSummary = true;
       CleanString ((uchar *) SummText);
 
       //Add themes and categories epgsearch style
+      //TODO DPE move this
       char *theme;
       Asprintf (&theme, "%s", Themes[ThemeId]);
       if (theme && 0 != strcmp(theme,"")) {
@@ -2008,6 +2044,7 @@ int cFilterEEPG::GetSummariesMHW1 (const u_char * Data, int Length)
             S->NumReplays = Summary->NumReplays;
             S->EventId = HILO32 (Summary->ProgramId);
             S->Text = Text;
+            S->ShortTextLength = 0; //TODO find for MHW1
             int i = 0;
             do {
               S->Replays[i].MjdTime = 0; //only used for SKY
@@ -2118,14 +2155,18 @@ int cFilterEEPG::GetSummariesMHW2 (const u_char * Data, int Length)
           }
         }
         S->Text = (unsigned char *) malloc (SummaryLength + 2);
-        S->Text[SummaryLength] = '\0'; //end string with NULL character
         if (S->Text == NULL) {
           LogE(0, prep("Summaries memory allocation error."));
           return 0; //fatal error
         }
+        S->Text[SummaryLength] = '\0'; //end string with NULL character
+
         //memcpy (S->Text, tmp, SummaryLength);
         decodeText2(tmp,SummaryLength,(char*)S->Text,SummaryLength + 1);
         CleanString (S->Text);
+        char * delim = strchr ( (char *)S->Text, '\n' );
+        S->ShortTextLength = delim == NULL ? 0 : delim - (char *)S->Text;
+
         LogI(3, prep("EventId %08x Summnr %d:%.30s."), S->EventId, nSummaries, S->Text);
         nSummaries++;
       } else {
@@ -2349,6 +2390,7 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
   unsigned short int MjdTime;
   int Len1;
   int Len2;
+  const char* STxtDelim = Format == SKY_UK?": ":" - ";
 
   if (Length < 20) {
     return 1; //non fatal error I assume
@@ -2372,6 +2414,7 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
           S->Replays[0].MjdTime = MjdTime;
           S->NumReplays = 0; //not used
           S->EventId = (Data[p] << 8) | Data[p + 1];
+          S->ShortTextLength = 0;
           Len1 = ((Data[p + 2] & 0x0f) << 8) | Data[p + 3];
           if (Data[p + 4] != 0xb9) {
             LogD(5, prep("Data error signature for title - Data[p + 4] != 0xb5"));
@@ -2397,6 +2440,8 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
           memcpy (S->Text, tmp, Len2);
           S->Text[Len2] = '\0'; //end string with NULL character
           CleanString (S->Text);
+          char * delim = strstr ( (char *)S->Text, STxtDelim );
+          S->ShortTextLength = delim == NULL ? 0 : delim - (char *)S->Text;
           LogI(3, prep("EventId %08x Summnr %d:%.30s."), S->EventId, nSummaries, S->Text);
           p += Len1;
           nSummaries++;
@@ -2518,9 +2563,13 @@ void cFilterEEPG::LoadIntoSchedule (void)
             TableId = T->TableId;
           }
 
+//          LogD (0, prep("EventId %08x Titlenr %d:SummAv:%x,Un1:%x,Un2:%x,Un3:%x,Name:%s,STxtLn:%dSummary:%s."),
+//                      T->EventId, i, T->SummaryAvailable, T->Unknown1, T->Unknown2, T->Unknown3, T->Text, S->ShortTextLength, S->Text);
+
           WriteToSchedule (chanID, s, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
-                           (char *) S->Text, T->ThemeId, TableId, 0, rating);
+                           (char *) S->Text, T->ThemeId, TableId, 0, rating, S->ShortTextLength);
           sortSchedules(s, chanID);
+          //if (shortText != NULL) delete [] shortText;
 
           //FinishWriteToSchedule (C, s, p);
           //Replays--;
@@ -2563,7 +2612,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
             rating = T->Rating;
           }
           WriteToSchedule (chanID, s, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
-                           NULL, T->ThemeId, DEFAULT_TABLE_ID, 0, rating);
+                           NULL, T->ThemeId, DEFAULT_TABLE_ID, 0, rating, S->ShortTextLength);
           //FinishWriteToSchedule (C, s, p);
           sortSchedules(s, chanID);
 

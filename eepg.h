@@ -70,6 +70,7 @@ typedef struct {
   unsigned int EventId;//short is not sufficient for Nagra
   unsigned short int NumReplays;
   unsigned char * Text;
+  unsigned char ShortTextLength;
 } Summary_t;
 
 
