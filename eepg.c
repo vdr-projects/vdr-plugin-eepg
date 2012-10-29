@@ -1865,7 +1865,7 @@ int cFilterEEPG::GetTitlesMHW1 (const u_char * Data, int Length)
           LogE(0, prep("Titles memory allocation error."));
           return 0;
         }
-        T->Text[46] = '\0'; //end string with NULL character
+        //T->Text[46] = '\0'; //end string with NULL character
         //memcpy (T->Text, &Title->Title, 23);
         decodeText2((unsigned char *)&Title->Title, 23, (char*)T->Text, 47);
         CleanString (T->Text);
@@ -1941,13 +1941,13 @@ int cFilterEEPG::GetTitlesMHW2 (const u_char * Data, int Length)
         T->Duration = (((Data[Pos + 5] << 8) | Data[Pos + 6]) >> 4) * 60;
         Len = Data[Pos + 7] & 0x3f;
         //isyslog ("EEPGDebug: Len:%d", Len);
-        T->Text = (unsigned char *) malloc (Len + 2);
+        T->Text = (unsigned char *) malloc (2 * Len + 1);
         if (T->Text == NULL) {
           LogE(0, prep("Titles memory allocation error."));
           return 0; //fatal error
         }
-        T->Text[Len] = '\0'; //end string with NULL character
-        decodeText2(&Data[Pos + 8],Len,(char*)T->Text,Len+1);
+        decodeText2(&Data[Pos + 8],Len,(char*)T->Text,2 * Len + 1);
+        //T->Text[Len] = '\0'; //end string with NULL character
         //memcpy (T->Text, &Data[Pos + 8], Len);
         CleanString (T->Text);
         Pos += Len + 8; // Sub Theme starts here
@@ -2108,7 +2108,7 @@ int cFilterEEPG::GetSummariesMHW2 (const u_char * Data, int Length)
               memcpy (&tmp[SummaryLength], &Data[Pos], lenText);
               SummaryLength += lenText;
               if (Loop > 1) {
-                tmp[SummaryLength] = '\n';
+                tmp[SummaryLength] = ' ';// This is considered as an EPG bug in VDR '\n';
                 SummaryLength += 1;
               }
             } else
@@ -2117,14 +2117,14 @@ int cFilterEEPG::GetSummariesMHW2 (const u_char * Data, int Length)
             Loop--;
           }
         }
-        S->Text = (unsigned char *) malloc (SummaryLength + 2);
-        S->Text[SummaryLength] = '\0'; //end string with NULL character
+        S->Text = (unsigned char *) malloc (2 * SummaryLength + 1);
         if (S->Text == NULL) {
           LogE(0, prep("Summaries memory allocation error."));
           return 0; //fatal error
         }
         //memcpy (S->Text, tmp, SummaryLength);
-        decodeText2(tmp,SummaryLength,(char*)S->Text,SummaryLength + 1);
+        //S->Text[SummaryLength] = '\0'; //end string with NULL character
+        decodeText2(tmp,SummaryLength,(char*)S->Text,2 * SummaryLength + 1);
         CleanString (S->Text);
         LogI(3, prep("EventId %08x Summnr %d:%.30s."), S->EventId, nSummaries, S->Text);
         nSummaries++;
@@ -2588,7 +2588,8 @@ void cFilterEEPG::LoadIntoSchedule (void)
   isyslog ("EEPG: found %i themes", nThemes);
   isyslog ("EEPG: found %i channels", nChannels);
   isyslog ("EEPG: found %i titles", nTitles);
-  isyslog ("EEPG: of which %i reported to have no summary available; skipping these BIENTOT titles", NoSummary);
+  if (NoSummary != 0)
+    isyslog ("EEPG: of which %i reported to have no summary available; skipping these BIENTOT titles", NoSummary);
   isyslog ("EEPG: found %i summaries", nSummaries);
   if (SummariesNotFound != 0)
     esyslog ("EEPG: %i summaries not found", SummariesNotFound);
