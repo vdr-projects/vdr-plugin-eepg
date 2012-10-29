@@ -1299,7 +1299,6 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
 
     char* tmp = NULL;
     string shText;
-    string shText;
     if (SummText && ShTxtLen) {
     
       shText.assign(SummText,ShTxtLen);
