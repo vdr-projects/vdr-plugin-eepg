@@ -184,6 +184,12 @@ bool cEEpgHandler::SortSchedule(cSchedule* Schedule) {
   return true;
 }
 
+bool cEEpgHandler::FixEpgBugs(cEvent* Event)
+{
+  //TODO to see which channels have bugs - disable fixing with true
+  return false;
+}
+
 bool cEEpgHandler::DropOutdated(cSchedule* Schedule, time_t SegmentStart,
                                 time_t SegmentEnd, uchar TableID, uchar Version) {
   return false;

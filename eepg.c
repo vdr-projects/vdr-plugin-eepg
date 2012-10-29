@@ -266,6 +266,13 @@ void cFilterEEPG::SetStatus (bool On)
     for (int i = 0; i <= HIGHEST_FORMAT; i++)
       UnprocessedFormat[i] = 0; //pid 0 is assumed to be nonvalid for EEPG transfers
     AddFilter (0, 0);
+    if (Channel()->Nid() == 0x01) {
+      setenv("VDR_CHARSET_OVERRIDE", "ISO-8859-9", true);
+      LogD(0, prep("setenv VDR_CHARSET_OVERRIDE ISO-8859-9"));
+    } else {
+      unsetenv("VDR_CHARSET_OVERRIDE");
+      LogD(0, prep("clear VDR_CHARSET_OVERRIDE"));
+    }
   }
   cFilter::SetStatus (On);
   Trigger ();
@@ -1288,30 +1295,43 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
     }
 
     char *tmp = NULL;
+    string shText;
     if (SummText && ShTxtLen) {
     
-      //TODO DPE template
-      tmp = (char *) malloc(2*ShTxtLen);
-      if (!tmp) {
-        LogE(0, prep("tmp memory allocation error."));
-        return;
-      }
-//      decodeText2((unsigned char *)SummText, ShTxtLen, tmp, ShTxtLen + 1);
-      memcpy(tmp, SummText, ShTxtLen);
-      tmp[ShTxtLen] = '\0';
+      shText.assign(SummText,ShTxtLen);
 
-      //Do not use Subtitle if it is substring of Title
-      if (strncmp(Text, tmp, ShTxtLen) == 0) {
-        free(tmp);
-        tmp = NULL;
+      string tmpTitle(Text);
+      if (Format == MHW2 && !shText.empty()) {
+        //TODO (HD) channels
+        size_t found = tmpTitle.find(" (HD)");
+        if (found != string::npos)
+          tmpTitle.erase(found, 5);
+        found = shText.compare(0, tmpTitle.size() + 2, string(tmpTitle + ": "));
+        if (shText.compare(0, tmpTitle.size() + 2, string(tmpTitle + ": "))==0)
+          shText.erase(0, tmpTitle.size() + 2);
       }
+
+     //Do not use Subtitle if it is substring of Title
+      if (tmpTitle.compare(0, shText.size(), shText) == 0)
+        shText.clear();
+
+#define MAX_USEFUL_EPISODE_LENGTH 40
+      // From VDR FixEPG Bugs
+      // Some channels put a whole lot of information in the ShortText and leave
+      // the Description totally empty. So if the ShortText length exceeds
+      // MAX_USEFUL_EPISODE_LENGTH, let's put this into the Description
+      // instead:
+      if (!shText.empty() && shText.size() > MAX_USEFUL_EPISODE_LENGTH)
+        shText.clear();
 
     }
-    if (!tmp)
+    if (!shText.empty())
+      Event->SetShortText (shText.c_str());
+    else {
       Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
-    Event->SetShortText (tmp);
-    free(tmp);
-
+      Event->SetShortText (tmp);
+      free(tmp);
+    }
 /*
     char *tmp;
     if (!ShortText || strcmp(ShortText, Text) == 0) {
@@ -2159,7 +2179,6 @@ int cFilterEEPG::GetSummariesMHW2 (const u_char * Data, int Length)
           LogE(0, prep("Summaries memory allocation error."));
           return 0; //fatal error
         }
-
         //memcpy (S->Text, tmp, SummaryLength);
         //S->Text[SummaryLength] = '\0'; //end string with NULL character
         decodeText2(tmp,SummaryLength,(char*)S->Text,2 * SummaryLength + 1);

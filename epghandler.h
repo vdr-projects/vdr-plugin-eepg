@@ -29,7 +29,7 @@ public:
     virtual bool SetStartTime(cEvent *Event, time_t StartTime);
     virtual bool SetDuration(cEvent *Event, int Duration);
     virtual bool SetVps(cEvent *Event, time_t Vps);
-    virtual bool FixEpgBugs(cEvent *Event) { return false; }
+    virtual bool FixEpgBugs(cEvent *Event);
     virtual bool HandleEvent(cEvent *Event);
     virtual bool SortSchedule(cSchedule *Schedule);
     virtual bool DropOutdated(cSchedule *Schedule, time_t SegmentStart, time_t SegmentEnd, uchar TableID, uchar Version);
