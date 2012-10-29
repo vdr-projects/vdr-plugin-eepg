@@ -18,6 +18,7 @@ public:
   int FixEpg;
   int DisplayMessage;
   int ProcessEIT;
+  int ReplaceEmptyShText;
 #ifdef DEBUG
   int LogLevel;
 #endif

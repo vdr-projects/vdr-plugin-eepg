@@ -22,6 +22,8 @@ cSetupEEPG::cSetupEEPG (void)
   FixEpg = 0;
   DisplayMessage = 1;
   ProcessEIT = 0;
+  ReplaceEmptyShText = 0;
+
 #ifdef DEBUG
   LogLevel = 0;
 #endif

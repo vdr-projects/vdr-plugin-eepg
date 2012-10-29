@@ -121,7 +121,9 @@ cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
   Add (new cMenuEditBoolItem (tr ("Show order information"), &data->OrderInfo));
   Add (new cMenuEditBoolItem (tr ("Show rating information"), &data->RatingInfo));
   Add (new cMenuEditBoolItem (tr ("Fix EPG data"), &data->FixEpg));
+  SetSection (tr ("General"));
   Add (new cMenuEditBoolItem (tr ("Display summary message"), &data->DisplayMessage));
+  Add (new cMenuEditBoolItem (tr ("Replace Empty Short Text with Category - Genre"), &data->ReplaceEmptyShText));
 #ifdef DEBUG
   Add (new cMenuEditIntItem (tr ("Level of logging verbosity"), &data->LogLevel, 0, 5));
   Add (new cMenuEditBoolItem (tr ("Process EIT info with EEPG"), &data->ProcessEIT));
@@ -136,6 +138,7 @@ void cMenuSetupPremiereEpg::Store (void)
   SetupStore ("RatingInfo", SetupPE->RatingInfo);
   SetupStore ("FixEpg", SetupPE->FixEpg);
   SetupStore ("DisplayMessage", SetupPE->DisplayMessage);
+  SetupStore ("ReplaceEmptyShText", SetupPE->ReplaceEmptyShText);
 #ifdef DEBUG
   SetupStore ("LogLevel", SetupPE->LogLevel);
   SetupStore ("ProcessEIT", SetupPE->ProcessEIT);
@@ -1294,7 +1297,8 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
       Event->SetTitle (Text);
     }
 
-    char *tmp = NULL;
+    char* tmp = NULL;
+    string shText;
     string shText;
     if (SummText && ShTxtLen) {
     
@@ -1327,7 +1331,7 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
     }
     if (!shText.empty())
       Event->SetShortText (shText.c_str());
-    else {
+    else if (SetupPE->ReplaceEmptyShText) {
       Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
       Event->SetShortText (tmp);
       free(tmp);
@@ -2842,6 +2846,14 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
 //  LogD(2, prep("Pid: 0x%02x Tid: %d Length: %d PMT pid: 0x%04x"), Pid, Tid, Length, pmtpid);
 //  LogD(2, prep("Source: %d Transponder: %d"), Source () , Transponder ());
 
+  if (Channel()->Nid() == 0x01) {
+    setenv("VDR_CHARSET_OVERRIDE", "ISO-8859-9", true);
+    LogD(0, prep("setenv VDR_CHARSET_OVERRIDE ISO-8859-9"));
+  }
+  else {
+    unsetenv("VDR_CHARSET_OVERRIDE");
+    LogD(0, prep("clear VDR_CHARSET_OVERRIDE"));
+  }
   if (Pid == 0 && Tid == SI::TableIdPAT) {
     if (!pmtnext || now > pmtnext) {
       if (pmtpid)
@@ -3687,6 +3699,8 @@ bool cPluginEEPG::SetupParse (const char *Name, const char *Value)
     SetupPE->FixEpg = atoi (Value);
   else if (!strcasecmp (Name, "DisplayMessage"))
     SetupPE->DisplayMessage = atoi (Value);
+  else if (!strcasecmp (Name, "ReplaceEmptyShText"))
+    SetupPE->ReplaceEmptyShText = atoi (Value);
 #ifdef DEBUG
   else if (!strcasecmp (Name, "LogLevel"))
     SetupPE->LogLevel = atoi (Value);
