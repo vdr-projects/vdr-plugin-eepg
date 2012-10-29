@@ -35,16 +35,20 @@ CXXFLAGS ?= -O2 -fPIC -Wall -Woverloaded-virtual
 
 ### The directory environment:
 
-VDRDIR = ../../..
-LIBDIR = ../../lib
-TMPDIR = /tmp
+VDRDIR ?= ../../..
+LIBDIR ?= ../../lib
+TMPDIR ?= /tmp
+
+### Make sure that necessary options are included:
+
+include $(VDRDIR)/Make.global
 
 ### Allow user defined options to overwrite defaults:
 
 -include $(VDRDIR)/Make.config
 -include Make.config
 
-### The version number of VDR (taken from VDR's "config.h"):
+### The version number of VDR's plugin API (taken from VDR's "config.h"):
 
 VDRVERSION = $(shell sed -ne '/define VDRVERSION/ s/^.*"\(.*\)".*$$/\1/p' $(VDRDIR)/config.h)
 APIVERSION = $(shell sed -ne '/define APIVERSION/ s/^.*"\(.*\)".*$$/\1/p' $(VDRDIR)/config.h)
@@ -63,23 +67,21 @@ INCLUDES += -I$(VDRDIR)/include
 
 DEFINES += -D_GNU_SOURCE -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
 
-### The object files (add further files here):
-
-OBJS = $(PLUGIN).o dish.o epghandler.o setupeepg.o equivhandler.o util.o eit2.o
-
 ifdef DBG
 CXXFLAGS += -g
 endif
 
-### Internationalization (I18N):
+### The object files (add further files here):
 
-PODIR     = po
-I18Npot   = $(PODIR)/$(PLUGIN).pot
-I18Nmsgs  = $(addprefix $(LOCALEDIR)/,$(addsuffix /LC_MESSAGES/vdr-$(PLUGIN).mo,$(notdir $(foreach file, $(wildcard $(PODIR)/*.po), $(basename $(file))))))
-LOCALEDIR = $(VDRDIR)/locale
+OBJS = $(PLUGIN).o dish.o epghandler.o setupeepg.o equivhandler.o util.o eit2.o
 
 ### Default Target
 default: $(OBJS)
+
+### Implicit rules:
+
+%.o: %.c
+	$(CXX) $(CXXFLAGS) -c $(DEFINES) $(INCLUDES) $<
 
 ### Dependencies:
 
@@ -90,47 +92,47 @@ $(DEPFILE): Makefile
 
 -include $(DEPFILE)
 
-### Targets:
+### Internationalization (I18N):
 
-TARGETS = libvdr-$(PLUGIN).so
-ifneq ($(shell grep -l 'Phrases' $(VDRDIR)/i18n.c),$(VDRDIR)/i18n.c)
-TARGETS += i18n
-endif
+PODIR     = po
+LOCALEDIR = $(VDRDIR)/locale
+I18Npo    = $(wildcard $(PODIR)/*.po)
+I18Nmsgs  = $(addprefix $(LOCALEDIR)/, $(addsuffix /LC_MESSAGES/vdr-$(PLUGIN).mo, $(notdir $(foreach file, $(I18Npo), $(basename $(file))))))
+I18Npot   = $(PODIR)/$(PLUGIN).pot
 
-all: $(TARGETS)
-.PHONY: i18n
-
-%.o: %.c
-	$(CXX) $(CXXFLAGS) -c $(DEFINES) $(INCLUDES) $<
-
-libvdr-$(PLUGIN).so: $(OBJS)
-	$(CXX) $(CXXFLAGS) -shared $(OBJS) -o $@
-	@cp $@ $(LIBDIR)/$@.$(APIVERSION)
-
-$(I18Npot): $(shell grep -rl '\(tr\|trNOOP\)(\".*\")' *.c $(SYSDIR))
-	xgettext -C -cTRANSLATORS --no-wrap -F -k -ktr -ktrNOOP  -o $@ $^
-
-%.po: $(I18Npot)
-	msgmerge -U --no-wrap -F --backup=none -q $@ $<
-	@touch $@
+### target All not default since it stops VDR
+all: libvdr-$(PLUGIN).so i18n
 
 %.mo: %.po
 	msgfmt -c -o $@ $<
+
+$(I18Npot): $(wildcard *.c)
+	xgettext -C -cTRANSLATORS --no-wrap --no-location -k -ktr -ktrNOOP --package-name=vdr-$(PLUGIN) --package-version=$(VERSION) --msgid-bugs-address='<see README>' -o $@ $^
+
+%.po: $(I18Npot)
+	msgmerge -U --no-wrap --no-location --backup=none -q $@ $<
+	@touch $@
 
 $(I18Nmsgs): $(LOCALEDIR)/%/LC_MESSAGES/vdr-$(PLUGIN).mo: $(PODIR)/%.mo
 	@mkdir -p $(dir $@)
 	cp $< $@
 
-i18n: $(I18Nmsgs)
+.PHONY: i18n
+i18n: $(I18Nmsgs) $(I18Npot)
 
-dist: clean
+### Targets:
+
+libvdr-$(PLUGIN).so: $(OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -shared $(OBJS) -o $@
+	@cp --remove-destination $@ $(LIBDIR)/$@.$(APIVERSION)
+
+dist: $(I18Npo) clean
 	@-rm -rf $(TMPDIR)/$(ARCHIVE)
 	@mkdir $(TMPDIR)/$(ARCHIVE)
 	@cp -a * $(TMPDIR)/$(ARCHIVE)
-	@tar czf $(PACKAGE).tar.gz -C $(TMPDIR) $(ARCHIVE)
+	@tar czf $(PACKAGE).tgz -C $(TMPDIR) $(ARCHIVE)
 	@-rm -rf $(TMPDIR)/$(ARCHIVE)
-	@echo Distribution package created as $(PACKAGE).tar.gz
+	@echo Distribution package created as $(PACKAGE).tgz
 
 clean:
-	@-rm -f $(OBJS) $(DEPFILE) *.so *.tar.gz core* *~
-#	@-rm -f $(PODIR)/*.mo $(PODIR)/*.pot
+	@-rm -f $(OBJS) $(DEPFILE) *.so *.tgz core* *~ $(PODIR)/*.mo $(PODIR)/*.pot
