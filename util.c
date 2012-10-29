@@ -167,7 +167,7 @@ public:
 };
 
 cAddEventThread::cAddEventThread(void)
-:cThread("cAddEventThread"), LastHandleEvent()
+:cThread("cAddEEPGEventThread"), LastHandleEvent()
 {
   map_list = new std::map<tChannelID,cList<cEvent>*,tChannelIDCompare>;
 }
@@ -178,7 +178,7 @@ cAddEventThread::~cAddEventThread(void)
   Cancel(3);
   std::map<tChannelID,cList<cEvent>*,tChannelIDCompare>::iterator it;
   for ( it=map_list->begin() ; it != map_list->end(); it++ )
-    (*it).second->cList::Clear();
+    (*it).second->Clear();
 }
 
 void cAddEventThread::Action(void)
