@@ -284,6 +284,7 @@ protected:
     time_t originalAirDate;
     char* seriesId;
     char* programId;
+    char* ratingStr;
 
     struct HuffmanTable
     {

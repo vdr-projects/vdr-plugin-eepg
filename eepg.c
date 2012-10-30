@@ -3404,11 +3404,6 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
           }
           tChannelID channelID (Source (), nid, tid, sid);
           cChannel *channel = Channels.GetByChannelID (channelID, true);
-#ifdef USE_NOEPG
-          // only use epg from channels not blocked by noEPG-patch
-          if (!allowedEPG (channelID))
-            continue;
-#endif /* NOEPG */
 
           if (!channel)
             continue;
