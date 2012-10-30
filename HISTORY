@@ -15,7 +15,20 @@ Release 0.0.6pre:
 - Added setup option to display message after finish of writing epg
 - Added Dish Network and Bell ExpressVU support, thanks to the VDR patch, Mrgandalf and VDR User
 - Applied patch to Load Huffman dictionaries only on first use, thanks to Torsten Lang
-
+- Fixed update of equivalents for Freesat
+- Add category and genere to the description usable with epgsearch
+- Added EpgHandler for manipulation of the EPG for VDR > 1.7.26
+- Try to discard very long events that override more than one existing event
+- Equivalents stored in map for all equivalents for better handling
+- Move equivalence to separate file/class
+- Move utilities to separate files
+- Added cAddEventThread from VDR EPGFixer Plug-in to update equivalent channels in separate thread
+- Try to discard very long events that override more than one existing event
+- Use map instead of list in cAddEventThread to reduce sorting
+- Move cEIT2 in a separate file and try to use it in epghandler also
+- Drop unmanaged NOEPG support, there is a separate plugin for that
+- Drop unmanaged Disable Double EPG entry. EEPG tries to handle this anyway
+- Aditional fixes logged at http://projects.vdr-developer.org/git/vdr-plugin-eepg.git/
 
 Release 0.0.5:
 -changed TableId's so that Now/Next overwrites Nagra which overwrites MHW
