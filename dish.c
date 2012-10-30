@@ -56,6 +56,7 @@ namespace SI
         originalAirDate = 0;
         programId = NULL;
         seriesId = NULL;
+        ratingStr = NULL;
     }
 
     DishDescriptor::~DishDescriptor()
@@ -418,7 +419,9 @@ namespace SI
          str += "]";
        }
 
-      return str.c_str();
+      if (!ratingStr) ratingStr = new char[19];
+      if (ratingStr) strcpy(ratingStr,str.c_str());
+      return ratingStr;
 
 //      return isempty(buffer) ? "" : buffer;
     }

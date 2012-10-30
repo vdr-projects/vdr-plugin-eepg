@@ -33,7 +33,7 @@ public:
   void  setConfDir(char* confDir)
   {
     if (ConfDir)
-      delete ConfDir;
+      delete [] ConfDir;
     ConfDir = new char[strlen(confDir)+1];
     strcpy(ConfDir, confDir);
   }
