@@ -427,8 +427,10 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
   //      LogD(2, prep("ID: %d Title: %s Time: %d Tid: 0x%x"), pEvent->EventID(), pEvent->Title(), pEvent->StartTime(), pEvent->TableID());
   //    }
 
-  //      if (!HasExternalData)
-  pEvent->FixEpgBugs ();
+  //FixEpgBugs removes newlines from description which is not wanted especially for DISH/BEV
+  if (Format != DISH_BEV)
+    pEvent->FixEpgBugs();
+
   if (LinkChannels)
     channel->SetLinkChannels (LinkChannels);
 }

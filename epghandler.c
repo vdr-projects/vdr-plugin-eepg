@@ -10,8 +10,11 @@
 #include "log.h"
 #include "equivhandler.h"
 #include "eit2.h"
+#include "util.h"
 #include <vdr/sources.h>
 #include <libsi/si.h>
+
+using namespace util;
 
 cEEpgHandler::cEEpgHandler() {
   LogD(4, prep("cEEpgHandler()"));
@@ -30,6 +33,9 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   //DISH NID 0x1001 to 0x100B BEV 0x100 and 0x101
   int nid = Schedule->ChannelID().Nid();
   if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100) {
+    //Set the Format for Eit events so that the new lines are not erased with FixEpgBugs
+    if (Format != DISH_BEV) Format = DISH_BEV;
+
     SI::cEIT2 eit2(Schedule);
     eit2.ProcessEitEvent(Schedule, EitEvent, TableID, Version);
     return true;
