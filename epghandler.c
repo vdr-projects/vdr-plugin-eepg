@@ -163,7 +163,7 @@ bool cEEpgHandler::HandleEvent(cEvent* Event) {
   if (equivHandler->getEquiChanMap().count(*Event->ChannelID().ToString()) <= 0)
     return true;
 
-  //if (modified)
+  if (modified)
     equivHandler->updateEquivalent(Event->ChannelID(), Event);
 
   //TODO just to see the difference

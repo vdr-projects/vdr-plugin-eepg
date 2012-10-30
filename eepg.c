@@ -111,7 +111,13 @@ public:
 cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
 {
   data = cSetupEEPG::getInstance();
-  SetSection (tr ("PremiereEPG"));
+  cOsdItem *item = new cOsdItem(tr ("PremiereEPG"));
+
+  if (item) {
+    item->SetSelectable(false);
+    Add(item);
+  }
+//  AddCategory (tr ("PremiereEPG"));
   optDisp[0] = tr ("off");
   for (unsigned int i = 1; i < NUM_PATS; i++) {
     snprintf (buff[i], sizeof (buff[i]), optPats[i], "Event", 1);
@@ -121,7 +127,12 @@ cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
   Add (new cMenuEditBoolItem (tr ("Show order information"), &data->OrderInfo));
   Add (new cMenuEditBoolItem (tr ("Show rating information"), &data->RatingInfo));
   Add (new cMenuEditBoolItem (tr ("Fix EPG data"), &data->FixEpg));
-  SetSection (tr ("General"));
+  item = new cOsdItem(tr ("General"));
+  if (item) {
+    item->SetSelectable(false);
+    Add(item);
+  }
+//  AddCategory (tr ("General"));
   Add (new cMenuEditBoolItem (tr ("Display summary message"), &data->DisplayMessage));
   Add (new cMenuEditBoolItem (tr ("Replace Empty Short Text with Category - Genre"), &data->ReplaceEmptyShText));
 #ifdef DEBUG
@@ -178,6 +189,7 @@ private:
   bool EndChannels, EndThemes; //only used for ??
   int MHWStartTime; //only used for MHW1
   bool ChannelsOk;
+  int prevNid;
   //int Format; //the format that this filter currently is processing
   std::map < int, int >ChannelSeq; // ChannelSeq[ChannelId] returns the recordnumber of the channel
 
@@ -243,6 +255,7 @@ cFilterEEPG::cFilterEEPG (void)
 {
   nSummaries = 0;
   nTitles = 0;
+  prevNid = 0;
   Trigger ();
   //Set (0x00, 0x00);
 }
@@ -269,12 +282,16 @@ void cFilterEEPG::SetStatus (bool On)
     for (int i = 0; i <= HIGHEST_FORMAT; i++)
       UnprocessedFormat[i] = 0; //pid 0 is assumed to be nonvalid for EEPG transfers
     AddFilter (0, 0);
-    if (Channel()->Nid() == 0x01) {
-      setenv("VDR_CHARSET_OVERRIDE", "ISO-8859-9", true);
-      LogD(0, prep("setenv VDR_CHARSET_OVERRIDE ISO-8859-9"));
-    } else {
-      unsetenv("VDR_CHARSET_OVERRIDE");
-      LogD(0, prep("clear VDR_CHARSET_OVERRIDE"));
+    int nid = Channel()->Nid();
+    if (nid != prevNid) {
+      if (nid == 0x01 && prevNid != 0x01) {
+        setenv("VDR_CHARSET_OVERRIDE", "ISO-8859-9", true);
+        LogD(0, prep("setenv VDR_CHARSET_OVERRIDE ISO-8859-9"));
+      } else if (nid != 0x01 && (prevNid == 0x01 || prevNid == 0)){
+        unsetenv("VDR_CHARSET_OVERRIDE");
+        LogD(0, prep("clear VDR_CHARSET_OVERRIDE"));
+     }
+     prevNid = nid;
     }
   }
   cFilter::SetStatus (On);
@@ -2845,14 +2862,6 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
 //  LogD(2, prep("Pid: 0x%02x Tid: %d Length: %d PMT pid: 0x%04x"), Pid, Tid, Length, pmtpid);
 //  LogD(2, prep("Source: %d Transponder: %d"), Source () , Transponder ());
 
-  if (Channel()->Nid() == 0x01) {
-    setenv("VDR_CHARSET_OVERRIDE", "ISO-8859-9", true);
-    LogD(0, prep("setenv VDR_CHARSET_OVERRIDE ISO-8859-9"));
-  }
-  else {
-    unsetenv("VDR_CHARSET_OVERRIDE");
-    LogD(0, prep("clear VDR_CHARSET_OVERRIDE"));
-  }
   if (Pid == 0 && Tid == SI::TableIdPAT) {
     if (!pmtnext || now > pmtnext) {
       if (pmtpid)

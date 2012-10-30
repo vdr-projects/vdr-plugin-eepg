@@ -150,7 +150,7 @@ struct tChannelIDCompare
 };
 
 cTimeMs LastAddEventThread;
-enum { INSERT_TIMEOUT_IN_MS = 10000 };
+enum { INSERT_TIMEOUT_IN_MS = 5000 };
 
 class cAddEventThread : public cThread
 {
@@ -250,7 +250,7 @@ void AddEvent(cEvent *Event, tChannelID ChannelID)
 //  if (!AddEventThread.Active())
 //     AddEventThread.Start();
   if (!AddEventThread.Active() && LastAddEventThread.TimedOut()){
-    LastAddEventThread.Set(INSERT_TIMEOUT_IN_MS * 2);
+    LastAddEventThread.Set(INSERT_TIMEOUT_IN_MS * 1.5);
     AddEventThread.Start();
   }
 
