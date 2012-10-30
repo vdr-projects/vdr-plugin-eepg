@@ -1,23 +1,40 @@
 
-This is the Extended EPG (EEPG) plugin for VDR.
+This is the Extended EPG (EEPG) "plugin" for the Video Disk Recorder (VDR).
 
+Written by:                  Dingo35
 
-See the file COPYING for license information.
+Mainnained by:               Dimitar Petrovski <dimeptr@gmail.com>
+
+Project's homepage:          http://projects.vdr-developer.org/projects/plg-eepg
+
+Latest stable version available at:       
+    http://projects.vdr-developer.org/git/vdr-plugin-eepg.git/snapshot/vdr-plugin-eepg-master.tar.bz2
+Latest experimental version available at: 
+    http://projects.vdr-developer.org/git/vdr-plugin-eepg.git/snapshot/vdr-plugin-eepg-experimental.tar.bz2
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+See the file COPYING for more information.
 
 ----------------------------------------------------------------------
+
+Description:
 
 This plugin parses the extended (2 to 10 day) EPG data which is send by 
 providers on their portal channels. This EEPG data is transmitted in a 
 non-standard format on a non-standard PID.
 
 Currently the following EEPG formats are supported:
--Mediahighway 1 (CanaalDigitaalNL, CSat, Cyfra+)
--Mediahighway 2 (Digital+)
--Sky Italy
--Sky UK
--Freesat
--Premiere
--NagraGuide (CanaalDigitaalNL, only in test)
+* Mediahighway 1 (CanaalDigitaalNL, CSat, Cyfra+)
+* Mediahighway 2 (Digital+)
+* Sky Italy
+* Sky UK
+* Freesat
+* Premiere
+* NagraGuide (CanaalDigitaalNL, only in test)
+* NA Dish and BEV
 
 INSTALL
 Unpack, make and make plugins like any other plugin. Call like any other
@@ -29,6 +46,10 @@ E.g., CanaalDigitaalNL still sends Dorcel EEPG data on S19.2E, which can be used
 for Dorcel on S13.0E.
 Some sample eepg.equiv files are included.
 
+Scripts
+The provided scripts in the package can also help generate the eepg.equiv file.
+For more information see README in scripts/
+
 USE
 The plugin has no mainmenu entry, and only a few settings for Premiere. 
 When one of VDR's devices is tuned to a transponder (by tuning, a recording or 
@@ -36,7 +57,7 @@ an EPG scan triggered by VDR), the plugin scans all channels on the transponder
 for the supported EEPG formats. When all of the supported formats are detected, 
 all available EEPG data is loaded into the schedule of VDR.
 Additionally, the EEPG data is loaded into additional channels if they are specified 
-in the eepg.equiv file (not for Premiere or Freesat).
+in the eepg.equiv file (not for Premiere).
 Everything is done automatically and transparently, all is done concurrently
 with recordings and live viewings.
 Freesat and Premiere are loading their EEPG info continuously.
@@ -54,15 +75,15 @@ New, unknown EEPG transponders will be detected automatically (MHW1, MHW2, Frees
 have to be added (Sky uses different huffman decoding tables for every country).
 
 Currently known transponders that send EEPG data:
--Sky Italia       S13.0E:11881V (OpenTV)
--Sky UK           S28.2E:11778V (OpenTV)
--Cyfra+           S13.0E:10719V (Mediahighway 1)
--CSat             S19.2E:12363V (Mediahighway 1)
--Canal DigitaalNL S19.2E:12515H (Mediahighway 1, NagraGuide)
--Digital+         S19.2E:10847V (Mediahighway 2)
--Premiere         Sport Portal, Premiere Direkt Portal
--Freesat          all freesat channels
--Dish and BEV	  S119.0W:12472H S91.0W12224R
+* Sky Italia       S13.0E:11881V (OpenTV)
+* Sky UK           S28.2E:11778V (OpenTV)
+* Cyfra+           S13.0E:10719V (Mediahighway 1)
+* CSat             S19.2E:12363V (Mediahighway 1)
+* Canal DigitaalNL S19.2E:12515H (Mediahighway 1, NagraGuide)
+* Digital+         S19.2E:10847V (Mediahighway 2)
+* Premiere         Sport Portal, Premiere Direkt Portal
+* Freesat          all freesat channels
+* Dish and BEV	  S119.0W:12472H S91.0W12224R
 
 Please note that the NagraGuide broadcasts of Canal DigitaalNL are stil in betatest; 
 therefore its information is not always reliable. It seems that sometimes, when no summaries 
@@ -84,13 +105,14 @@ The plugin setup menu is only for Premiere protocol!
 
 THANKS
 This code is based on:
- -Premiere plugin (C) 2005-2007 Stefan Huelswitt <s.huelswitt@gmx.de>
- -mhwepg program  (C) 2002, 2003 Jean-Claude Repetto <mhwepg@repetto.org>
- -LoadEpg plugin written by Luca De Pieri <dpluca@libero.it>
- -Freesat patch written by dom /at/ suborbital.org.uk
- -Dish/BEV patch written by 
+* Premiere plugin (C) 2005-2007 Stefan Huelswitt <s.huelswitt@gmx.de>
+* mhwepg program  (C) 2002, 2003 Jean-Claude Repetto <mhwepg@repetto.org>
+* LoadEpg plugin written by Luca De Pieri <dpluca@libero.it>
+* Freesat patch written by dom /at/ suborbital.org.uk
+* Dish/BEV patch written by 
+* cAddEventThread from EPGFixer plugin by Matti Lehtimaki matti.lehtimaki /at/ gmail.com
 Thanks to mrgandalf, and the others who helped map NA eit.
-Thanks to VDR User for testing.
+Thanks to VDR User for testing and providing <> script.
 
 We wish to thank all authors for the great work they have been doing, decoding
 this EEPG data; this plugin tries to combine the best of all worlds.
@@ -106,7 +128,7 @@ information.
 
 
 KNOWN BUGS
--Equivalents file is not used for Freesat, Premiere.
+-Equivalents file is not used for Premiere.
 -On Sky Italy and Sky UK, a lot of "summaries not found" are reported. This is 
  because it is not (yet) known where the "summary available" flag is coded in the
  OpenTV protocol used, so all titles are assumed to have a summary available.
