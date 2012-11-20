@@ -18,7 +18,7 @@ class cEEpgHandler : public cEpgHandler {
 public:
     cEEpgHandler();
     virtual ~cEEpgHandler();
-    virtual bool IgnoreChannel(const cChannel *Channel) { return false; }
+    virtual bool IgnoreChannel(const cChannel *Channel);
     virtual bool HandleEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
     virtual bool SetEventID(cEvent *Event, tEventID EventID);
     virtual bool SetTitle(cEvent *Event, const char *Title);
@@ -35,13 +35,19 @@ public:
     virtual bool DropOutdated(cSchedule *Schedule, time_t SegmentStart, time_t SegmentEnd, uchar TableID, uchar Version);
 
 //    bool ParseEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
+private:
+    const char*  FixCharset(const char* text);
+
 
 private:
     std::string origShortText;
     std::string origDescription;
+    std::string fixCharset;
     cEquivHandler* equivHandler;
     static const int _LONG_EVENT_HOURS = 10;
     bool modified;
+    const char* CharsetOverride;
+
 };
 
 #endif /*APIVERSNUM > 10725*/

@@ -189,7 +189,6 @@ private:
   bool EndChannels, EndThemes; //only used for ??
   int MHWStartTime; //only used for MHW1
   bool ChannelsOk;
-  int prevNid;
   //int Format; //the format that this filter currently is processing
   std::map < int, int >ChannelSeq; // ChannelSeq[ChannelId] returns the recordnumber of the channel
 
@@ -255,7 +254,6 @@ cFilterEEPG::cFilterEEPG (void)
 {
   nSummaries = 0;
   nTitles = 0;
-  prevNid = 0;
   Trigger ();
   //Set (0x00, 0x00);
 }
@@ -282,7 +280,7 @@ void cFilterEEPG::SetStatus (bool On)
     for (int i = 0; i <= HIGHEST_FORMAT; i++)
       UnprocessedFormat[i] = 0; //pid 0 is assumed to be nonvalid for EEPG transfers
     AddFilter (0, 0);
-    int nid = Channel()->Nid();
+/*    int nid = Channel()->Nid();
     if (nid != prevNid) {
       if (nid == 0x01 && prevNid != 0x01) {
         setenv("VDR_CHARSET_OVERRIDE", "ISO-8859-9", true);
@@ -293,6 +291,7 @@ void cFilterEEPG::SetStatus (bool On)
      }
      prevNid = nid;
     }
+    */
   }
   cFilter::SetStatus (On);
   Trigger ();
@@ -1322,7 +1321,6 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
 
       string tmpTitle(Text);
       if (Format == MHW2 && !shText.empty()) {
-        //TODO (HD) channels
         size_t found = tmpTitle.find(" (HD)");
         if (found != string::npos)
           tmpTitle.erase(found, 5);
@@ -1331,9 +1329,14 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
           shText.erase(0, tmpTitle.size() + 2);
       }
 
-     //Do not use Subtitle if it is substring of Title
+      //Do not use Subtitle if it is substring of Title
       if (tmpTitle.compare(0, shText.size(), shText) == 0)
         shText.clear();
+
+      //The subtitle is wrong if contains '.'
+      if (Format == SKY_UK && !shText.empty() && shText.find('.') != string::npos) {
+        shText.clear();
+      }
 
 #define MAX_USEFUL_EPISODE_LENGTH 40
       // From VDR FixEPG Bugs
@@ -1365,6 +1368,18 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
     if (SummText != 0x00) {
       WrittenSummary = true;
       CleanString ((uchar *) SummText);
+
+      //Fix MHW1 formating
+      if (Format == MHW1) {
+        char * pch;
+        pch=strchr(SummText,'s');
+        while (pch!=NULL)
+        {
+          if (*(pch-1) != ' ' && *(pch-1) != '\n')
+            *pch = ' ';
+          pch=strchr(pch+1,'s');
+        }
+      }
 
       //Add themes and categories epgsearch style
       //TODO DPE move this
@@ -2070,7 +2085,7 @@ int cFilterEEPG::GetSummariesMHW1 (const u_char * Data, int Length)
               LogE(0, prep("Summaries memory allocation error."));
               return 0;
             }
-            Text[SummaryLength+1] = '\0'; //end string with NULL character
+            //Text[SummaryLength+1] = '\0'; //end string with NULL character
             //memcpy (Text, &Data[SummaryOffset], SummaryLength);
             decodeText2(&Data[SummaryOffset], SummaryLength, (char*)Text, 2*SummaryLength + 1);
 //     CleanString (Text);
@@ -2083,6 +2098,8 @@ int cFilterEEPG::GetSummariesMHW1 (const u_char * Data, int Length)
             Summaries[nSummaries] = S;
             S->NumReplays = Summary->NumReplays;
             S->EventId = HILO32 (Summary->ProgramId);
+//            unsigned short SectionLength = ((Summary->SectionLengthHigh & 0x0f) << 8) | Summary->SectionLengthLow;
+//            Asprintf((char **)&Text, "%s \n\n SecLength:%d SLHigh:%d SLLow:%d", Text, SectionLength, Summary->SectionLengthHigh, Summary->SectionLengthLow);
             S->Text = Text;
             S->ShortTextLength = 0; //TODO find for MHW1
             int i = 0;

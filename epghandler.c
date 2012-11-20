@@ -16,16 +16,28 @@
 
 using namespace util;
 
+cCharSetConv* conv;//("UTF-8",CharsetOverride);
+cCharSetConv* conv2;//(fixCharset.c_str());
+
 cEEpgHandler::cEEpgHandler() {
   LogD(4, prep("cEEpgHandler()"));
   equivHandler = new cEquivHandler();
   modified = false;
+
+  CharsetOverride = getenv("VDR_CHARSET_OVERRIDE");
+  if (!CharsetOverride) CharsetOverride = "ISO6937";
+
 }
 
 cEEpgHandler::~cEEpgHandler() {
   delete equivHandler;
   equivHandler = NULL;
+  delete conv;
+  conv = NULL;
+  delete conv2;
+  conv2 = NULL;
 }
+
 
 bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
                                   const SI::EIT::Event* EitEvent, uchar TableID, uchar Version) {
@@ -86,13 +98,61 @@ bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
   return true;
 }
 
+const char* cEEpgHandler::FixCharset(const char* text)
+{
+  if (!text) return text;
+
+  //LogD(0, prep("FixCharset fixCharset:%s charsetOverride:%s text:%s"), fixCharset.c_str(), CharsetOverride, text);
+  const char* fixed = NULL;
+  if (!fixCharset.empty()) {
+
+    if (fixCharset != CharsetOverride) {
+      //LogD(0, prep("FixCharset2 fixCharset:%s charsetOverride:%s text:%s"), fixCharset.c_str(), CharsetOverride, text);
+      fixed = conv->Convert(text);
+      //LogD(0, prep("conv 1 fixed:%s"),fixed);
+      fixed = conv2->Convert(fixed);
+      //LogD(0, prep("Fixed text:%s"), fixed);
+    }
+  }
+  if (!fixed) fixed = text;
+  return fixed;
+}
+
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
   LogD(3, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
 
-  if (!Event->Title() || (Title && (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),Title))))) {
+  const char* title = FixCharset(Title);
+
+  //Sometimes same events overlap and have different EventID
+  if (origDescription.empty() && origShortText.empty()) {
+    cEvent* eqEvent = NULL;
+    cEvent* ev = (cEvent*)Event->Next();
+    if (ev && strcasecmp(ev->Title(),title) == 0
+       && Event->StartTime() <= ev->StartTime() && Event->EndTime() > ev->StartTime())
+      eqEvent = ev;
+    if (!eqEvent && (ev = (cEvent*)Event->Prev()) != NULL && strcasecmp(ev->Title(),title) == 0
+       && ev->StartTime() <= Event->StartTime() && ev->EndTime() > Event->StartTime())
+      eqEvent = ev;
+    if (eqEvent) {
+      if (ev->Description() && strcmp(ev->Description(),"") != 0)
+        origDescription = ev->Description();
+      if (ev->ShortText() && strcmp(ev->ShortText(),"") != 0)
+        origShortText = ev->ShortText();
+      //origDescription = eqEvent->Description();
+      //origShortText = eqEvent->ShortText();
+
+      LogD(0, prep("!!! !Deleting Event id:%d title:%s start_time:%d new_start_time:%d duration:%d new_duration:%d")
+         , ev->EventID(), ev->Title(), ev->StartTime(), Event->StartTime(), ev->Duration(), Event->Duration());
+
+      cSchedule* schedule = (cSchedule*)Event->Schedule();
+      schedule->DelEvent((cEvent*)eqEvent);
+    }
+  }
+
+  if (!Event->Title() || (title && (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),title))))) {
     //LogD(0, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
     modified = true;
-    Event->SetTitle(Title);
+    Event->SetTitle(title);
   }
   return true;
 }
@@ -107,8 +167,10 @@ bool cEEpgHandler::SetShortText(cEvent* Event, const char* ShortText) {
     origShortText.clear();
   }
 
+  const char*  shText = FixCharset(ShortText);
+
   //if (!Event->ShortText() || ShortText && (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText))))
-  Event->SetShortText(ShortText);
+  Event->SetShortText(shText);
   return true;
 }
 
@@ -119,13 +181,15 @@ bool cEEpgHandler::SetDescription(cEvent* Event, const char* Description) {
     origDescription = Event->Description();
   else
     origDescription.clear();
-    
+
+  const char*  desc = FixCharset(Description);
+
   //Based on asumption that SetDescription is always called after SetTitle
-  if (!modified && Description && (!Event->Description() || strcmp(Event->Description(),Description) ))
+  if (!modified && desc && (!Event->Description() || strcmp(Event->Description(),desc) ))
     modified = true;
 
   //if (!Event->Description() || Description && (!strcmp(Event->Description(),"") || (strcmp(Description,"") && strcmp(Event->Description(),Description))))
-  Event->SetDescription(Description);
+  Event->SetDescription(desc);
   return true;
 }
 
@@ -157,13 +221,52 @@ bool cEEpgHandler::SetVps(cEvent* Event, time_t Vps) {
 bool cEEpgHandler::HandleEvent(cEvent* Event) {
 
   LogD(3, prep("HandleEvent st:%s ost:%s desc:%s odesc:%s"),Event->ShortText(),origShortText.c_str(),Event->Description(),origDescription.c_str());
-
   //After FixEpgBugs of cEvent set the original Short Text if empty
   if (!Event->ShortText() || !strcmp(Event->ShortText(),""))
     Event->SetShortText(origShortText.c_str());
 
-  if ((!Event->Description() && !origDescription.empty()) || (Event->Description() && !origDescription.empty() && origDescription.find(Event->Description()) != string::npos) ) {
+  /*old if ((!Event->Description() && !origDescription.empty()) || (Event->Description() && !origDescription.empty() && origDescription.find(Event->Description()) != string::npos) ) {
     Event->SetDescription(origDescription.c_str());
+  }*/
+
+  //Handle the Category and Genre, and optionally future tags
+  if (!origDescription.empty() &&
+      (!Event->Description() ||
+          (Event->Description() && origDescription.find(Event->Description()) != string::npos))) {
+    Event->SetDescription(origDescription.c_str());
+  } else if (!origDescription.empty() && Event->Description()) {
+    string category, genre;
+
+    //LogD(0, prep("HandleEvent origDescription:%s"),origDescription.c_str());
+    size_t catpos = origDescription.find("Category: ");
+    size_t genpos = origDescription.find("Genre: ");
+
+    if (catpos != string::npos) {
+      size_t pos = origDescription.find('\n',catpos+10);
+      category = origDescription.substr(catpos+10, pos-catpos-10);
+      //LogD(0, prep("HandleEvent category:%s, catpos:%i, pos:%i"),category.c_str(), catpos, pos);
+    }
+    if (genpos != string::npos) {
+      size_t pos = origDescription.find('\n',genpos+7);
+      genre = origDescription.substr(genpos+7, pos-genpos-7);
+      //LogD(0, prep("HandleEvent genre:%s, genpos:%i, pos:%i"),genre.c_str(), genpos, pos);
+    }
+
+    char* tmp = NULL;
+
+    string fmt;
+    fmt = "%s";
+    if (!category.empty()) {
+      fmt += "\nCategory: %s";
+    }
+    if (!genre.empty()) {
+      fmt += "\nGenre: %s";
+    }
+    Asprintf (&tmp, fmt.c_str(), Event->Description(), category.c_str(), genre.c_str());
+
+    Event->SetDescription (tmp);
+    free(tmp);
+
   }
 
   if (equivHandler->getEquiChanMap().count(*Event->ChannelID().ToString()) <= 0)
@@ -193,6 +296,45 @@ bool cEEpgHandler::SortSchedule(cSchedule* Schedule) {
 bool cEEpgHandler::FixEpgBugs(cEvent* Event)
 {
   //TODO to see which channels have bugs - disable fixing with true
+  return false;
+}
+
+bool cEEpgHandler::IgnoreChannel(const cChannel* Channel)
+{
+  
+  //TODO
+  //return false;
+
+  if (conv) {
+    delete conv;
+    conv = NULL;
+  }
+  if (conv2) {
+    delete conv2;
+    conv2 = NULL;
+  }
+  if (strcasecmp( Channel->Provider(), "Skylink") == 0 || strcasecmp( Channel->Provider(), "UPC Direct") == 0
+      || strcasecmp( Channel->Provider(), "CYFRA +") == 0) {
+    fixCharset = "ISO6937";
+  } else if (strcasecmp( Channel->Provider(), "Polsat") != 0) {
+    fixCharset = "ISO-8859-2";
+  } else if (Channel->Nid() == 0x01) {
+    fixCharset = "ISO-8859-9";
+  } else {
+    fixCharset = "";
+  }
+
+  
+  if (!fixCharset.empty()) {
+    conv2 = new cCharSetConv(fixCharset.c_str());
+    if (strcasecmp( Channel->Provider(), "CYFRA +") == 0) {
+      conv = new cCharSetConv(NULL,"ISO-8859-5");
+    }else {
+      conv = new cCharSetConv(NULL,CharsetOverride);
+    }
+  }
+
+
   return false;
 }
 
