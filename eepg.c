@@ -280,18 +280,6 @@ void cFilterEEPG::SetStatus (bool On)
     for (int i = 0; i <= HIGHEST_FORMAT; i++)
       UnprocessedFormat[i] = 0; //pid 0 is assumed to be nonvalid for EEPG transfers
     AddFilter (0, 0);
-/*    int nid = Channel()->Nid();
-    if (nid != prevNid) {
-      if (nid == 0x01 && prevNid != 0x01) {
-        setenv("VDR_CHARSET_OVERRIDE", "ISO-8859-9", true);
-        LogD(0, prep("setenv VDR_CHARSET_OVERRIDE ISO-8859-9"));
-      } else if (nid != 0x01 && (prevNid == 0x01 || prevNid == 0)){
-        unsetenv("VDR_CHARSET_OVERRIDE");
-        LogD(0, prep("clear VDR_CHARSET_OVERRIDE"));
-     }
-     prevNid = nid;
-    }
-    */
   }
   cFilter::SetStatus (On);
   Trigger ();
@@ -330,23 +318,6 @@ void syslog_with_tid (int priority, const char *format, ...) __attribute__ ((for
 #define isyslog(a...)  fprintf(stderr,a)
 #endif
 
-
-
-//struct hufftab {
-//  unsigned int value;
-//  short bits;
-//  char next;
-//};
-//
-//#define START   '\0'
-//#define STOP    '\0'
-//#define ESCAPE  '\1'
-
-
-//int freesat_decode_error = 0; /* If set an error has occurred during decoding */
-
-//static struct hufftab *tables[2][128];
-//static int table_size[2][128];
 static sNodeH* sky_tables[2];
 
 /** \brief Convert a textual character description into a value
@@ -765,11 +736,6 @@ nextloop1:
   return p;
 }
 
-//here all declarations for global variables over all devices
-
-//char *ConfDir;
-
-//unsigned char DecodeErrorText[4096];  //TODO only used for debugging?
 
 bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB stream?
 {
@@ -857,29 +823,6 @@ bool cFilterEEPG::InitDictionary (void)
   }
   return true;
 }
-
-//void decodeText2 (const unsigned char *from, int len, char *buffer, int buffsize)
-//{
-//  if (from[0] == 0x1f) {
-//    char *temp = freesat_huffman_decode (from, len);
-//    if (temp) {
-//      len = strlen (temp);
-//      len = len < buffsize - 1 ? len : buffsize - 1;
-//      strncpy (buffer, temp, len);
-//      buffer[len] = 0;
-//      free (temp);
-//      return;
-//    }
-//  }
-//
-//  SI::String convStr;
-//  SI::CharArray charArray;
-//  charArray.assign(from, len);
-//  convStr.setData(charArray, len);
-//  //LogE(5, prep("decodeText2 from %s - length %d"), from, len);
-//  convStr.getText(buffer,  buffsize);
-//  //LogE(5, prep("decodeText2 buffer %s - buffsize %d"), buffer, buffsize);
-//}
 
 /**
  * \brief Get MHW channels
@@ -1218,42 +1161,6 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
   return (char *) Text;
 }
 
-/**
- * \brief Prepare to Write to Schedule
- *
- * gets a channel and returns an array of schedules that WriteToSchedule can write to.
- * Call this routine before a batch of titles with the same ChannelId will be WriteToScheduled; batchsize can be 1
- *
- * \param C channel to prepare
- * \param s VDR epg schedules
- * \param ps pointer to the schedules that WriteToSchedule can write to
- */
-//void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps/*[MAX_EQUIVALENCES]*/)
-//{
-//  //for (int eq = 0; eq < C->NumberOfEquivalences; eq++) {
-//    tChannelID channelID = tChannelID (C->Src/*[eq]*/, C->Nid/*[eq]*/, C->Tid/*[eq]*/, C->Sid/*[eq]*/);
-//#ifdef USE_NOEPG
-//    if (allowedEPG (channelID) && (channelID.Valid ()))
-//#else
-//    if (channelID.Valid ()) //only add channels that are known to vdr
-//#endif /* NOEPG */
-//      ps/*[eq]*/ = s->AddSchedule (channelID); //open a a schedule for each equivalent channel
-//    else {
-//      ps/*[eq]*/ = NULL;
-////      LogE(5, prep("ERROR: Title block has invalid (equivalent) channel ID: Equivalence: %i, Source:%x, C->Nid:%x,C->Tid:%x,C->Sid:%x."),
-////           eq, C->Src[eq], C->Nid[eq], C->Tid[eq], C->Sid[eq]);
-//    }
-//  //}
-//}
-
-//void cFilterEEPG::FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES])
-//{
-//  for (int eq = 0; eq < C->NumberOfEquivalences; eq++)
-//    if (ps[eq]) {
-//      ps[eq]->Sort ();
-//      s->SetModified (ps[eq]);
-//    }
-//}
 
 /**
  * \brief write event to schedule
@@ -1355,17 +1262,8 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
       Event->SetShortText (tmp);
       free(tmp);
     }
-/*
-    char *tmp;
-    if (!ShortText || strcmp(ShortText, Text) == 0) {
-      Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
-      Event->SetShortText (tmp);
-      free(tmp);
-    } else
-      Event->SetShortText (ShortText);
-*/
-    //strreplace(t, '|', '\n');
-    if (SummText != 0x00) {
+
+    if (SummText) {
       WrittenSummary = true;
       CleanString ((uchar *) SummText);
 
@@ -1397,6 +1295,7 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
         }else{
           category = theme;
         }
+        /*
         string fmt;
         fmt = "%s";
         if (stripspace(category)) {
@@ -1409,6 +1308,13 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
 
         Event->SetDescription (tmp);
         free(tmp);
+        */
+        string desc = SummText;
+        if (stripspace(category)) desc.append("\n").append(CATEGORY).append(category);
+        //if (stripspace(category)) desc += '\n' << CATEGORY << category;
+        if (stripspace(genre)) desc += '\n' + string(GENRE) + genre;
+        Event->SetDescription (desc.c_str());
+
         free(theme);
     }
     else
@@ -1988,29 +1894,7 @@ int cFilterEEPG::GetTitlesMHW2 (const u_char * Data, int Length)
   if (Length > 18) {
     int Pos = 18;
     int Len = 0;
-    /*bool Check = false;
-    while (Pos < Length) {
-      Check = false;
-      Pos += 7;
-      if (Pos < Length) {
-        Pos += 3;
-        if (Pos < Length)
-          if (Data[Pos] > 0xc0) {
-            Pos += (Data[Pos] - 0xc0);
-            Pos += 4;
-            if (Pos < Length) {
-              if (Data[Pos] == 0xff) {
-                Pos += 1;
-                Check = true;
-              }
-            }
-          }
-      }
-      if (Check == false){
-        isyslog ("EEPGDebug: Check==false");
-        return 1; // I assume nonfatal error or success
-        }
-    }*/
+
     if (memcmp (InitialTitle, Data, 16) == 0) { //data is the same as initial title
       return 2; //last item processed
     } else {
@@ -3697,17 +3581,6 @@ cMenuSetupPage *cPluginEEPG::SetupMenu (void)
 
 bool cPluginEEPG::SetupParse (const char *Name, const char *Value)
 {
-//  LogF(0, "!!!! Dime test LogF");
-//  LogF(0, "!!!! Dime test LogF %d", 2);
-//  LogI(0, "!!!! Dime test LogI");
-//  LogI(0, "!!!! Dime test LogI %d", 2);
-//  LogI(0, prep2("!!!! Dime test prep"));
-//  LogI(0, prep2("!!!! Dime test prep %d"), 2);
-//  LogD(0, "!!!! Dime test LogD");
-//  LogD(0, "!!!! Dime test LogD %d", 2);
-//  LogE(0, "!!!! Dime test LogE");
-//  LogE(0, "!!!! Dime test LogE %d", 2);
-
 
   if (!strcasecmp (Name, "OptionPattern"))
     SetupPE->OptPat = atoi (Value);

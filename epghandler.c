@@ -218,6 +218,19 @@ bool cEEpgHandler::SetVps(cEvent* Event, time_t Vps) {
   return true;
 }
 
+string cEEpgHandler::ExtractAttribute(const char* name)
+{
+  string attribute;
+  size_t apos = origDescription.find(name);
+  if (apos != string::npos) {
+    apos += strlen(name);
+    size_t npos = origDescription.find('\n', apos);
+    attribute = origDescription.substr(apos, npos - apos);
+    //LogD(0, prep("ExtractAttribute attribute:%s, apos:%i, pos:%i"),attribute.c_str(), catpos, pos);
+  }
+  return attribute;
+}
+
 bool cEEpgHandler::HandleEvent(cEvent* Event) {
 
   LogD(3, prep("HandleEvent st:%s ost:%s desc:%s odesc:%s"),Event->ShortText(),origShortText.c_str(),Event->Description(),origDescription.c_str());
@@ -225,47 +238,20 @@ bool cEEpgHandler::HandleEvent(cEvent* Event) {
   if (!Event->ShortText() || !strcmp(Event->ShortText(),""))
     Event->SetShortText(origShortText.c_str());
 
-  /*old if ((!Event->Description() && !origDescription.empty()) || (Event->Description() && !origDescription.empty() && origDescription.find(Event->Description()) != string::npos) ) {
-    Event->SetDescription(origDescription.c_str());
-  }*/
-
   //Handle the Category and Genre, and optionally future tags
   if (!origDescription.empty() &&
       (!Event->Description() ||
           (Event->Description() && origDescription.find(Event->Description()) != string::npos))) {
     Event->SetDescription(origDescription.c_str());
   } else if (!origDescription.empty() && Event->Description()) {
-    string category, genre;
 
-    //LogD(0, prep("HandleEvent origDescription:%s"),origDescription.c_str());
-    size_t catpos = origDescription.find("Category: ");
-    size_t genpos = origDescription.find("Genre: ");
+    string category = ExtractAttribute(CATEGORY);
+    string genre = ExtractAttribute(GENRE);
 
-    if (catpos != string::npos) {
-      size_t pos = origDescription.find('\n',catpos+10);
-      category = origDescription.substr(catpos+10, pos-catpos-10);
-      //LogD(0, prep("HandleEvent category:%s, catpos:%i, pos:%i"),category.c_str(), catpos, pos);
-    }
-    if (genpos != string::npos) {
-      size_t pos = origDescription.find('\n',genpos+7);
-      genre = origDescription.substr(genpos+7, pos-genpos-7);
-      //LogD(0, prep("HandleEvent genre:%s, genpos:%i, pos:%i"),genre.c_str(), genpos, pos);
-    }
-
-    char* tmp = NULL;
-
-    string fmt;
-    fmt = "%s";
-    if (!category.empty()) {
-      fmt += "\nCategory: %s";
-    }
-    if (!genre.empty()) {
-      fmt += "\nGenre: %s";
-    }
-    Asprintf (&tmp, fmt.c_str(), Event->Description(), category.c_str(), genre.c_str());
-
-    Event->SetDescription (tmp);
-    free(tmp);
+    string desc = Event->Description() ? Event->Description() : "";
+    if (!category.empty()) desc += '\n' + string(CATEGORY) + category;
+    if (!genre.empty()) desc += '\n' + string(GENRE) + genre;
+    Event->SetDescription (desc.c_str());
 
   }
 
@@ -316,7 +302,7 @@ bool cEEpgHandler::IgnoreChannel(const cChannel* Channel)
   if (strcasecmp( Channel->Provider(), "Skylink") == 0 || strcasecmp( Channel->Provider(), "UPC Direct") == 0
       || strcasecmp( Channel->Provider(), "CYFRA +") == 0) {
     fixCharset = "ISO6937";
-  } else if (strcasecmp( Channel->Provider(), "Polsat") != 0) {
+  } else if (strcasestr( Channel->Provider(), "Polsat") != 0) {
     fixCharset = "ISO-8859-2";
   } else if (Channel->Nid() == 0x01) {
     fixCharset = "ISO-8859-9";

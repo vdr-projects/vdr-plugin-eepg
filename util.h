@@ -20,10 +20,15 @@ class cSchedules;
 #define STOP    '\0'
 #define ESCAPE  '\1'
 
+
+
 #define Asprintf(a, b, c...) void( asprintf(a, b, c) < 0 ? esyslog("memory allocation error - %s", b) : void() )
 
 namespace util
 {
+
+static const char CATEGORY[] = "Category: ";
+static const char GENRE[] = "Genre: ";
 
 extern int AvailableSources[32];
 extern int NumberOfAvailableSources;

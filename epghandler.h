@@ -37,7 +37,7 @@ public:
 //    bool ParseEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
 private:
     const char*  FixCharset(const char* text);
-
+    std::string  ExtractAttribute(const char* attr);
 
 private:
     std::string origShortText;
