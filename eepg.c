@@ -289,7 +289,7 @@ void cFilterEEPG::SetStatus (bool On)
 
 void cFilterEEPG::NextPmt (void)
 {
-  Del (pmtpid, 0x02);
+  Del (pmtpid, SI::TableIdPMT);
   pmtpid = 0;
   pmtidx++;
   LogE(3, prep("PMT next\n"));
@@ -2692,28 +2692,28 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
   EndThemes = false;
   switch (Format) {
   case PREMIERE:
-    AddFilter (pid, 0xA0);
+    AddFilter (pid, SI::TableIdPremiereCIT);
     break;
   case MHW1:
-    AddFilter (0xd3, 0x92); //ThemesMHW1//TODO: all filters are serialized, strictly speaking Themes is non-fatal...
+    AddFilter (0xd3, SI::TableIdMHW1Themes); //ThemesMHW1//TODO: all filters are serialized, strictly speaking Themes is non-fatal...
     break;
   case MHW2:
-    AddFilter (0x231, 0xc8); //MHW2 Channels & Themes
+    AddFilter (0x231, SI::TableIdMHW2ChannelsThemes); //MHW2 Channels & Themes
     break;
   case SKY_IT:
   case SKY_UK:
-    AddFilter (0x11, 0x4a); //Sky Channels
+    AddFilter (0x11, SI::TableIdSKYChannels); //Sky Channels
     break;
   case FREEVIEW: //Freeview, CONT mode //TODO streamline this for other modes
     InitDictionary ();
-    AddFilter (pid, 0x4e, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
-    AddFilter (pid, 0x50, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
-    AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
-    AddFilter (0x39, 0x50, 0xf0); //event info, actual TS, Viasat
-    AddFilter (0x39, 0x60, 0xf0); //event info, other  TS, Viasat
+    AddFilter (pid, SI::TableIdEIT_presentFollowing, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (pid, SI::TableIdEIT_schedule_first, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
+    AddFilter (pid, SI::TableIdEIT_schedule_Other_first, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
+    AddFilter (0x39, SI::TableIdEIT_schedule_first, 0xf0); //event info, actual TS, Viasat
+    AddFilter (0x39, SI::TableIdEIT_schedule_Other_first, 0xf0); //event info, other  TS, Viasat
     break;
   case NAGRA:
-    AddFilter (pid, 0xb0); //perhaps TID is equal to first data byte?
+    AddFilter (pid, SI::TableIdNagraCIT); //perhaps TID is equal to first data byte?
     break;
   case DISH_BEV:
 #if APIVERSNUM < 10726
@@ -2725,9 +2725,9 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
 //    AddFilter (0x0441, 0x60, 0xf0); // Bell ExpressVU EEPG
     break;
   case EIT:
-    AddFilter (pid, 0x4e, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
-    AddFilter (pid, 0x50, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
-    AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
+    AddFilter (pid, SI::TableIdEIT_presentFollowing, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (pid, SI::TableIdEIT_schedule_first, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
+    AddFilter (pid, SI::TableIdEIT_schedule_Other_first, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
     break;
   default:
     break;
@@ -2780,7 +2780,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
               if (idx++ == pmtidx) {
                 pmtpid = assoc.getPid ();
                 pmtsid = assoc.getServiceId ();
-                Add (pmtpid, 0x02);
+                Add (pmtpid, SI::TableIdPMT);
                 pmtnext = now + PMT_SCAN_TIMEOUT;
                 LogI(3, prep("PMT pid now 0x%04x (idx=%d)\n"), pmtpid, pmtidx);
                 break;
@@ -2833,12 +2833,12 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                 if (d->getLength () == 6 && d->getData ().FourBytes (2) == 0x46534154) //Freeview
                   prvFRV = true;
                 break;
-              case 0x52:
+              case SI::StreamIdentifierDescriptorTag:
                 //if (d->getLength () == 3 && d->getData ().FourBytes (2) == 0xb07ea882) {
                 if (d->getLength () == 3 && ((d->getData ().TwoBytes (2) & 0xff00) == 0xb000))
                   UnprocessedFormat[NAGRA] = stream.getPid ();
                 break;
-              case 0x90:
+              case SI::SkyOTVDescriptorTag:
                 //esyslog ("usr: %d %08x\n", d->getLength (), d->getData ().FourBytes (2));
                 if (d->getLength () == 6 && d->getData ().FourBytes (2) == 0x0000ffff)
                   usrData = true;
@@ -2850,19 +2850,19 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                   usrOTV = SKY_UK;
                 //Format = SKY_UK;
                 break;
-              case 0xc1: //MHW1, MHW2
+              case SI::MHW1DescriptorTag: //MHW1, MHW2
 //      esyslog("EEPGDEBUG:d->getDescriptorTAG:%d %08x\n",d->getLength(),d->getData().FourBytes(2));
                 if (d->getLength () == 10 && d->getData ().FourBytes (2) == 0x50555348) //MHw1 Cyfra
                   UnprocessedFormat[MHW1] = stream.getPid ();
                 break;
-              case 0xc2: //MHW1, MHW2
+              case SI::MHW1_2DescriptorTag: //MHW1, MHW2
                 if (d->getLength () == 10 && d->getData ().FourBytes (2) == 0x45504700) //MHw1 CanDigNL and CSat
                   UnprocessedFormat[MHW1] = stream.getPid ();
                 else if (d->getLength () == 10 && d->getData ().FourBytes (2) == 0x46494348) { //MHW2
                   UnprocessedFormat[MHW2] = stream.getPid ();
                 }
                 break;
-              case 0xd1: //Freeview
+              case SI::FreeviewDescriptorTag: //Freeview
                 LogD(4, prep("case 0xd1: //Freeview"));
                 if (d->getLength () == 3 && ((d->getData ().TwoBytes (2) & 0xff00) == 0x0100))
                   usrFRV = 0x01;
@@ -2919,39 +2919,34 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
   else if (Source ()) {
 
     if ( Pid == EIT_PID || Pid == 0x0300 || Pid == 0x0441 ) {
-      if (Tid >= 0x4E)
+      if (Tid >= SI::TableIdEIT_presentFollowing)
         ProccessContinuous(Pid, Tid, Length, Data);
       return;
     }
     int Result;
     switch (Tid) {
-    case 0xA0:
+    case SI::TableIdPremiereCIT:
       if ((Pid < 0x30) || (Pid > 0x37)) {
 
         ProcessPremiere(Data);
         break;
       } //if citpid == 0xb11 Premiere
       /* no break - used for sky also*/
-    case 0xa1:
-    case 0xa2:
-    case 0xa3:
+    case SI::TableIdSKYTitles_first ... SI::TableIdSKYTitles_last:
       Result = GetTitlesSKYBOX (Data, Length - 4);
       if (Result != 1) //when fatal error or finished
-        Del (Pid, 0xa0, 0xfc); //kill filter
+        Del (Pid, SI::TableIdSKYTitlesA0, 0xfc); //kill filter
       if (Result == 0) { //fatal error
         esyslog ("EEPG: Fatal error reading titles.");
         ProcessNextFormat (); //and go process other formats
       }
       if (Result == 2)
-        AddFilter (Pid + 0x10, 0xa8, 0xfc); //Set filter that processes summaries of this batch
+        AddFilter (Pid + 0x10, SI::TableIdSKYSummaries_first, 0xfc); //Set filter that processes summaries of this batch
       break;
-    case 0xa8:
-    case 0xa9:
-    case 0xaa:
-    case 0xab:
+    case SI::TableIdSKYSummaries_first ... SI::TableIdSKYSummaries_last:
       Result = GetSummariesSKYBOX (Data, Length - 4);
       if (Result != 1) //when fatal error or finished
-        Del (Pid, 0xa8, 0xfc); //kill filter
+        Del (Pid, SI::TableIdSKYSummaries_first, 0xfc); //kill filter
       if (Result == 0) {
         esyslog ("EEPG: Fatal error reading summaries.");
         ProcessNextFormat ();
@@ -2959,12 +2954,12 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
       if (Result == 2) {
         LoadIntoSchedule ();
         if (Pid < 0x47) //this is not the last batch//FIXME chaining is easy on the PIDs and the CPU, but error when Pid,Tid is not used at the moment...
-          AddFilter (Pid - 0x0F, 0xa0, 0xfc); //next pid, first tid
+          AddFilter (Pid - 0x0F, SI::TableIdSKYTitlesA0, 0xfc); //next pid, first tid
         else //last pid was processed
           ProcessNextFormat ();
       }
       break;
-    case 0x90:
+    case SI::TableIdMHW1TitlesSummaries:
       if (Pid == 0xd2) {
         Result = GetTitlesMHW1 (Data, Length);
         if (Result != 1) //fatal error or last processed
@@ -2974,7 +2969,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
           ProcessNextFormat ();
         }
         if (Result == 2)
-          AddFilter (0xd3, 0x90); //SummariesMHW1
+          AddFilter (0xd3, SI::TableIdMHW1TitlesSummaries); //SummariesMHW1
       } else if (Pid == 0xd3) {
         Result = GetSummariesMHW1 (Data, Length);
         if (Result != 1) //fatal error or last processed
@@ -2990,24 +2985,24 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
         }
       }
       break;
-    case 0xc8: //GetChannelsMHW2 or GetThemesMHW2
+    case SI::TableIdMHW2ChannelsThemes: //GetChannelsMHW2 or GetThemesMHW2
       if (Pid == 0x231) {
         if (Data[3] == 0x01) { //Themes it will be
-          Result = GetThemesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+          Result = GetThemesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
           //break;
           if (Result != 1)
             EndThemes = true; //also set Endthemes on true on fatal error
         } //if Data
         else if (Data[3] == 0x00) { //Channels it will be
-          Result = GetChannelsMHW (Data, Length, 2); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+          Result = GetChannelsMHW (Data, Length, 2); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
           if (Result != 1)
             EndChannels = true; //always remove filter, code 1 should never be returned since MHW2 always reads all channels..
           ChannelsOk = (Result == 2);
         }
-        if (EndChannels && EndThemes) { //those are only set withing MHW2
-          Del (0x231, 0xc8); //stop reading MHW2 themes and channels
-          if (ChannelsOk) //No channels = fatal, no themes = nonfatal
-            AddFilter (0x234, 0xe6); //start reading MHW2 titles
+        if (EndChannels && EndThemes) { //those are only set within MHW2
+          Del (0x231, SI::TableIdMHW2ChannelsThemes); //stop reading MHW2 themes and channels
+          if (ChannelsOk) //No channels = fatal, no themes = non fatal
+            AddFilter (0x234, SI::TableIdMHW2Titles); //start reading MHW2 titles
           else {
             esyslog ("EEPG: Fatal error reading channels.");
             ProcessNextFormat ();
@@ -3015,30 +3010,30 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
         }
       }    //if Pid == 0x231
       break;
-    case 0x91:
-      Result = GetChannelsMHW (Data, Length, 1); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+    case SI::TableIdMHW1Channels:
+      Result = GetChannelsMHW (Data, Length, 1); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
       Del (Pid, Tid); //always remove filter, code 1 should never be returned since MHW1 always reads all channels...
       if (Result == 2)
-        AddFilter (0xd2, 0x90); //TitlesMHW1
+        AddFilter (0xd2, SI::TableIdMHW1TitlesSummaries); //TitlesMHW1
       else {
         esyslog ("EEPG: Fatal error reading channels.");
         ProcessNextFormat ();
       }
       break;
-    case 0x92:
-      Result = GetThemesMHW1 (Data, Length); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+    case SI::TableIdMHW1Themes:
+      Result = GetThemesMHW1 (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
       if (Result != 1)
         Del (Pid, Tid);
       if (Result == 2)
-        AddFilter (0xd3, 0x91); //ChannelsMHW1
+        AddFilter (0xd3, SI::TableIdMHW1Channels); //ChannelsMHW1
       else {
-        esyslog ("EEPG: Fatal error reading themes."); //doesnt have to be fatal...
+        esyslog ("EEPG: Fatal error reading themes."); //Doesn't have to be fatal...
         ProcessNextFormat ();
       }
       break;
-    case 0xe6: //TitlesMHW2
+    case SI::TableIdMHW2Titles: //TitlesMHW2
       if (Pid == 0x234) {
-        Result = GetTitlesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+        Result = GetTitlesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
         if (Result != 1)
           Del (Pid, Tid);
         if (Result == 0) {
@@ -3046,10 +3041,10 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
           ProcessNextFormat ();
         }
         if (Result == 2)
-          AddFilter (0x236, 0x96); //start reading MHW2 summaries....
+          AddFilter (0x236, SI::TableIdMHW2Summaries); //start reading MHW2 summaries....
       }
       break;
-    case 0x96: //Summaries MHW2
+    case SI::TableIdMHW2Summaries: //Summaries MHW2
       if (Pid == 0x236) {
         Result = GetSummariesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
         if (Result != 1)
@@ -3064,7 +3059,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
         }
       } //if pid
       break;
-    case 0x4a: //Sky channels
+    case SI::TableIdSKYChannels: //Sky channels
       if (Pid == 0x11) {
         Result = GetChannelsSKYBOX (Data, Length - 4);
         if (Result != 1) //only breakoff on completion or error; do NOT clean up after success, because then not all bouquets will be read
@@ -3072,7 +3067,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
         if (Result == 2) {
           GetThemesSKYBOX (); //Sky Themes from file; must be called AFTER first channels to have lThemes initialized FIXME
           if (InitDictionary ())
-            AddFilter (0x30, 0xa0, 0xfc); //SKY Titles batch 0 of 7
+            AddFilter (0x30, SI::TableIdSKYTitlesA0, 0xfc); //SKY Titles batch 0 of 7
           else {
             esyslog ("EEPG: Fatal error reading huffman table.");
             ProcessNextFormat ();
@@ -3081,7 +3076,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
 
       } //if Pid == 0x11
       break;
-    case 0xb0: //NagraGuide
+    case SI::TableIdNagraCIT: //NagraGuide
       if (Pid == 0xc8) {
         Result = GetNagra (Data, Length);
         if (Result != 1)
@@ -3100,40 +3095,9 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
       }
       break;
 
-    case 0x4E:
-    case 0x4F:
-    case 0x50:
-    case 0x51:
-    case 0x52:
-    case 0x53:
-    case 0x54:
-    case 0x55:
-    case 0x56:
-    case 0x57:
-    case 0x58:
-    case 0x59:
-    case 0x5A:
-    case 0x5B:
-    case 0x5C:
-    case 0x5D:
-    case 0x5E:
-    case 0x5F:
-    case 0x60:
-    case 0x61:
-    case 0x62:
-    case 0x63:
-    case 0x64:
-    case 0x65:
-    case 0x66:
-    case 0x67:
-    case 0x68:
-    case 0x69:
-    case 0x6A:
-    case 0x6B:
-    case 0x6C:
-    case 0x6D:
-    case 0x6E:
-    case 0x6F:
+    case SI::TableIdEIT_presentFollowing:
+    case SI::TableIdEIT_presentFollowing_other:
+    case SI::TableIdEIT_schedule_first ... SI::TableIdEIT_schedule_Other_last:
       // Freesat:
       // Set(3842, 0x4E, 0xFE);  // event info, actual(0x4E)/other(0x4F) TS, present/following
       // Set(3842, 0x50, 0xF0);  // event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
@@ -3168,7 +3132,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
       int now = time (0);
       int nCount = 0;
       int nRating = 0;
-      unsigned char Tid = 0xa0; // TODO maybe default TableID
+      unsigned char Tid = SI::TableIdPremiereCIT; // TODO maybe default TableID
       SI::ExtendedEventDescriptors * ExtendedEventDescriptors = 0;
       SI::ShortEventDescriptor * ShortEventDescriptor = 0;
       char *order = 0, *rating = 0;
@@ -3182,7 +3146,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
         for (SI::Loop::Iterator it; (d = cit.eventDescriptors.getNext (it));) {
           nDescriptorTag = d->getDescriptorTag ();
           switch (nDescriptorTag) {
-          case 0xF0: // order information
+          case SI::PremiereOrderInfoDescriptorTag: // order information
             if (SetupPE->OrderInfo) {
               static const char *text[] = {
                 trNOOP ("Ordernumber"),
@@ -3204,7 +3168,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
                 order = strdup (buff);
             }
             break;
-          case 0xF1: // parental rating
+          case SI::PremiereRatingInfoDescriptorTag: // parental rating
             if (SetupPE->RatingInfo) {
               char buff[512];
               int p = 0;
@@ -3287,14 +3251,13 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
           int sid = pct->getServiceId ();
           if (SetupPE->FixEpg) {
             if (nid == 133) {
-              if (tid == 0x03 && sid == 0xf0) {
-                tid = 0x02;
+              if (tid == SI::TableIdTSDT && sid == 0xf0) {
+                tid = SI::TableIdPMT;
                 sid = 0xe0;
-              } else if (tid == 0x03 && sid == 0xf1) {
-                tid = 0x02;
+              } else if (tid == SI::TableIdTSDT && sid == 0xf1) {
+                tid = SI::TableIdPMT;
                 sid = 0xe1;
-              } else if (tid == 0x03 && sid == 0xf5) {
-                tid = 0x03;
+              } else if (tid == SI::TableIdTSDT && sid == 0xf5) {
                 sid = 0xdc;
               } else if (tid == 0x04 && sid == 0xd2) {
                 tid = 0x11;
@@ -3355,7 +3318,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
               } else {
                 LogI(2, "(upd)\n");
                 pEvent->SetSeen ();
-                if (pEvent->TableID () == 0x00 || pEvent->Version () == cit.getVersionNumber ()) {
+                if (pEvent->TableID () == SI::TableIdPAT || pEvent->Version () == cit.getVersionNumber ()) {
                   if (pEvent->RunningStatus () != runningStatus)
                     pSchedule->SetRunningStatus (pEvent, runningStatus, channel);
                   continue;
