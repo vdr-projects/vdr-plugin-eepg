@@ -22,6 +22,7 @@ cEEpgHandler::cEEpgHandler() {
   equivHandler = new cEquivHandler();
   modified = false;
   charsetFixer = new cCharsetFixer();
+  schedule = NULL;
 
 }
 
@@ -33,9 +34,10 @@ cEEpgHandler::~cEEpgHandler() {
 
 bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
                                   const SI::EIT::Event* EitEvent, uchar TableID, uchar Version) {
+  schedule = Schedule;
   //LogD(1, prep("HandleEitEvent"));
   //DISH NID 0x1001 to 0x100B BEV 0x100 and 0x101
-  int nid = Schedule->ChannelID().Nid();
+  int nid = schedule->ChannelID().Nid();
   if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100) {
     //Set the Format for Eit events so that the new lines are not erased with FixEpgBugs
     if (Format != DISH_BEV) Format = DISH_BEV;
@@ -59,25 +61,25 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   }
 
   modified = false;
-  //VDR creates new event if the EitEvent StartTime is different than EEPG time so 
-  //the EEPG event has to be deleted but the data should be kept
-  const cEvent* ev = Schedule->GetEvent(EitEvent->getEventId(),EitEvent->getStartTime());
-  if (!ev){
-      ev = Schedule->GetEvent(EitEvent->getEventId());
-      if (ev && ((ev->StartTime()>EitEvent->getStartTime() && ev->StartTime()<=EitEvent->getStartTime()+EitEvent->getDuration())
-          || (EitEvent->getStartTime() > ev->StartTime() && EitEvent->getStartTime() <= ev->EndTime()))) {
-        LogD(0, prep("!!!Deleting Event id:%d title:%s start_time:%d new_start_time:%d duration:%d new_duration:%d"), ev->EventID(), ev->Title(), ev->StartTime(), EitEvent->getStartTime(), ev->Duration(), EitEvent->getDuration());
-
-        if (ev->Description() && strcmp(ev->Description(),"") != 0)
-          origDescription = ev->Description();
-        if (ev->ShortText() && strcmp(ev->ShortText(),"") != 0)
-          origShortText = ev->ShortText();
-        Schedule->DelEvent((cEvent *) ev);
-//        Schedule->DropOutdated(ev->StartTime()-1,ev->EndTime()+1,ev->TableID()-1,ev->Version());
-        LogD(0, prep("!!!End Deleting Event"));
-        //TODO equivalent channels !!!
-      }
-  }
+//  //VDR creates new event if the EitEvent StartTime is different than EEPG time so
+//  //the EPG event has to be deleted but the data should be kept
+//  const cEvent* ev = schedule->GetEvent(EitEvent->getEventId(),EitEvent->getStartTime());
+//  if (!ev){
+//      ev = schedule->GetEvent(EitEvent->getEventId());
+//      if (ev && ((ev->StartTime()>EitEvent->getStartTime() && ev->StartTime()<=EitEvent->getStartTime()+EitEvent->getDuration())
+//          || (EitEvent->getStartTime() > ev->StartTime() && EitEvent->getStartTime() <= ev->EndTime()))) {
+//        LogD(0, prep("!!!Deleting Event id:%d title:%s start_time:%d new_start_time:%d duration:%d new_duration:%d"), ev->EventID(), ev->Title(), ev->StartTime(), EitEvent->getStartTime(), ev->Duration(), EitEvent->getDuration());
+//
+//        if (ev->Description() && strcmp(ev->Description(),"") != 0)
+//          origDescription = ev->Description();
+//        if (ev->ShortText() && strcmp(ev->ShortText(),"") != 0)
+//          origShortText = ev->ShortText();
+//        schedule->DelEvent((cEvent *) ev);
+////        Schedule->DropOutdated(ev->StartTime()-1,ev->EndTime()+1,ev->TableID()-1,ev->Version());
+//        LogD(0, prep("!!!End Deleting Event"));
+//        //TODO equivalent channels !!!
+//      }
+//  }
 
 
 
@@ -90,36 +92,42 @@ bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
   return true;
 }
 
+//VDR creates new event if the EitEvent StartTime is different than EEPG time so
+//the EPG event has to be deleted but the data should be kept
+void cEEpgHandler::FindDuplicate(cEvent* Event, const char* newTitle)
+{
+  //Sometimes same events overlap and have different EventID
+  if (origDescription.empty() && origShortText.empty()) {
+    cEvent* eqEvent = NULL;
+    cEvent* ev = (cEvent*) Event->Next();
+    if (ev && (ev->EventID() == Event->EventID() || strcasecmp(ev->Title(), newTitle) == 0)
+        && Event->StartTime() <= ev->StartTime() && Event->EndTime() > ev->StartTime())
+      eqEvent = ev;
+    if (!eqEvent && (ev = (cEvent*) Event->Prev()) != NULL
+        && (ev->EventID() == Event->EventID() || strcasecmp(ev->Title(), newTitle) == 0)
+        && ev->StartTime() <= Event->StartTime() && ev->EndTime() > Event->StartTime())
+      eqEvent = ev;
+    if (eqEvent) {
+      if (ev->Description() && strcmp(ev->Description(), "") != 0)
+        origDescription = ev->Description();
+      if (ev->ShortText() && strcmp(ev->ShortText(), "") != 0)
+        origShortText = ev->ShortText();
+
+      LogD(0, prep("!!!Deleting Event id o:%d n:%d; title o:%s n:%d; start_time o:%d n:%d; duration o:%d n:%d"),
+          ev->EventID(), Event->EventID(), ev->Title(), newTitle, ev->StartTime(), Event->StartTime(), ev->Duration(), Event->Duration());
+
+      schedule->DelEvent((cEvent*) eqEvent);
+    }
+  }
+}
+
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
   LogD(3, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
 
   const char* title = charsetFixer->FixCharset(Title);
 
   //Sometimes same events overlap and have different EventID
-  if (origDescription.empty() && origShortText.empty()) {
-    cEvent* eqEvent = NULL;
-    cEvent* ev = (cEvent*)Event->Next();
-    if (ev && strcasecmp(ev->Title(),title) == 0
-       && Event->StartTime() <= ev->StartTime() && Event->EndTime() > ev->StartTime())
-      eqEvent = ev;
-    if (!eqEvent && (ev = (cEvent*)Event->Prev()) != NULL && strcasecmp(ev->Title(),title) == 0
-       && ev->StartTime() <= Event->StartTime() && ev->EndTime() > Event->StartTime())
-      eqEvent = ev;
-    if (eqEvent) {
-      if (ev->Description() && strcmp(ev->Description(),"") != 0)
-        origDescription = ev->Description();
-      if (ev->ShortText() && strcmp(ev->ShortText(),"") != 0)
-        origShortText = ev->ShortText();
-      //origDescription = eqEvent->Description();
-      //origShortText = eqEvent->ShortText();
-
-      LogD(0, prep("!!! !Deleting Event id:%d title:%s start_time:%d new_start_time:%d duration:%d new_duration:%d")
-         , ev->EventID(), ev->Title(), ev->StartTime(), Event->StartTime(), ev->Duration(), Event->Duration());
-
-      cSchedule* schedule = (cSchedule*)Event->Schedule();
-      schedule->DelEvent((cEvent*)eqEvent);
-    }
-  }
+  FindDuplicate(Event, title);
 
   if (!Event->Title() || (title && (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),title))))) {
     //LogD(0, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
@@ -233,6 +241,8 @@ bool cEEpgHandler::HandleEvent(cEvent* Event) {
   if (modified)
     equivHandler->updateEquivalent(Event->ChannelID(), Event);
 
+  //Release the schedule
+  schedule = NULL;
   //TODO just to see the difference
   //else if (!origDescription.empty() && !origDescription.compare(Event->Description())) {
   //	origDescription.append(" | EIT: ");

@@ -40,12 +40,14 @@ public:
 //    bool ParseEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
 private:
     std::string  ExtractAttribute(const char* attr);
+    void  FindDuplicate(cEvent* Event, const char* newTitle);
 
 private:
     std::string origShortText;
     std::string origDescription;
     cEquivHandler* equivHandler;
     util::cCharsetFixer* charsetFixer;
+    cSchedule* schedule;
     static const int _LONG_EVENT_HOURS = 10;
     bool modified;
 
