@@ -9,12 +9,14 @@
 #define UTIL_H_
 #include <time.h>
 #include <stdlib.h>
+#include <string>
 
 class cChannel;
 struct tChannelID;
 class cEvent;
 class cEquivHandler;
 class cSchedules;
+class cCharSetConv;
 
 #define START   '\0'
 #define STOP    '\0'
@@ -93,6 +95,23 @@ struct hufftab
 extern struct hufftab *tables[2][128];
 extern int table_size[2][128];
 //static sNodeH* sky_tables[2];
+
+class cCharsetFixer
+{
+public:
+  cCharsetFixer();
+  virtual ~cCharsetFixer();
+  const char*  FixCharset(const char* text);
+  void InitCharsets(const cChannel* Channel);
+
+private:
+  cCharSetConv* conv_revert;//("UTF-8",CharsetOverride);
+  cCharSetConv* conv_to;//(fixCharset.c_str());
+  const char* charsetOverride;
+  std::string fixedCharset;
+  std::string initialCharset;
+
+};
 
 }
 #endif /* UTIL_H_ */

@@ -13,6 +13,9 @@
 #include <string>
 
 class cEquivHandler;
+namespace util {
+class cCharsetFixer;
+}
 
 class cEEpgHandler : public cEpgHandler {
 public:
@@ -36,17 +39,15 @@ public:
 
 //    bool ParseEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
 private:
-    const char*  FixCharset(const char* text);
     std::string  ExtractAttribute(const char* attr);
 
 private:
     std::string origShortText;
     std::string origDescription;
-    std::string fixCharset;
     cEquivHandler* equivHandler;
+    util::cCharsetFixer* charsetFixer;
     static const int _LONG_EVENT_HOURS = 10;
     bool modified;
-    const char* CharsetOverride;
 
 };
 

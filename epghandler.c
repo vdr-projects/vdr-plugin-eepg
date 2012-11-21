@@ -16,26 +16,18 @@
 
 using namespace util;
 
-cCharSetConv* conv;//("UTF-8",CharsetOverride);
-cCharSetConv* conv2;//(fixCharset.c_str());
 
 cEEpgHandler::cEEpgHandler() {
   LogD(4, prep("cEEpgHandler()"));
   equivHandler = new cEquivHandler();
   modified = false;
-
-  CharsetOverride = getenv("VDR_CHARSET_OVERRIDE");
-  if (!CharsetOverride) CharsetOverride = "ISO6937";
+  charsetFixer = new cCharsetFixer();
 
 }
 
 cEEpgHandler::~cEEpgHandler() {
   delete equivHandler;
   equivHandler = NULL;
-  delete conv;
-  conv = NULL;
-  delete conv2;
-  conv2 = NULL;
 }
 
 
@@ -98,30 +90,10 @@ bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
   return true;
 }
 
-const char* cEEpgHandler::FixCharset(const char* text)
-{
-  if (!text) return text;
-
-  //LogD(0, prep("FixCharset fixCharset:%s charsetOverride:%s text:%s"), fixCharset.c_str(), CharsetOverride, text);
-  const char* fixed = NULL;
-  if (!fixCharset.empty()) {
-
-    if (fixCharset != CharsetOverride) {
-      //LogD(0, prep("FixCharset2 fixCharset:%s charsetOverride:%s text:%s"), fixCharset.c_str(), CharsetOverride, text);
-      fixed = conv->Convert(text);
-      //LogD(0, prep("conv 1 fixed:%s"),fixed);
-      fixed = conv2->Convert(fixed);
-      //LogD(0, prep("Fixed text:%s"), fixed);
-    }
-  }
-  if (!fixed) fixed = text;
-  return fixed;
-}
-
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
   LogD(3, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
 
-  const char* title = FixCharset(Title);
+  const char* title = charsetFixer->FixCharset(Title);
 
   //Sometimes same events overlap and have different EventID
   if (origDescription.empty() && origShortText.empty()) {
@@ -167,7 +139,7 @@ bool cEEpgHandler::SetShortText(cEvent* Event, const char* ShortText) {
     origShortText.clear();
   }
 
-  const char*  shText = FixCharset(ShortText);
+  const char*  shText = charsetFixer->FixCharset(ShortText);
 
   //if (!Event->ShortText() || ShortText && (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText))))
   Event->SetShortText(shText);
@@ -182,7 +154,7 @@ bool cEEpgHandler::SetDescription(cEvent* Event, const char* Description) {
   else
     origDescription.clear();
 
-  const char*  desc = FixCharset(Description);
+  const char*  desc = charsetFixer->FixCharset(Description);
 
   //Based on asumption that SetDescription is always called after SetTitle
   if (!modified && desc && (!Event->Description() || strcmp(Event->Description(),desc) ))
@@ -287,39 +259,7 @@ bool cEEpgHandler::FixEpgBugs(cEvent* Event)
 
 bool cEEpgHandler::IgnoreChannel(const cChannel* Channel)
 {
-  
-  //TODO
-  //return false;
-
-  if (conv) {
-    delete conv;
-    conv = NULL;
-  }
-  if (conv2) {
-    delete conv2;
-    conv2 = NULL;
-  }
-  if (strcasecmp( Channel->Provider(), "Skylink") == 0 || strcasecmp( Channel->Provider(), "UPC Direct") == 0
-      || strcasecmp( Channel->Provider(), "CYFRA +") == 0) {
-    fixCharset = "ISO6937";
-  } else if (strcasestr( Channel->Provider(), "Polsat") != 0) {
-    fixCharset = "ISO-8859-2";
-  } else if (Channel->Nid() == 0x01) {
-    fixCharset = "ISO-8859-9";
-  } else {
-    fixCharset = "";
-  }
-
-  
-  if (!fixCharset.empty()) {
-    conv2 = new cCharSetConv(fixCharset.c_str());
-    if (strcasecmp( Channel->Provider(), "CYFRA +") == 0) {
-      conv = new cCharSetConv(NULL,"ISO-8859-5");
-    }else {
-      conv = new cCharSetConv(NULL,CharsetOverride);
-    }
-  }
-
+  charsetFixer->InitCharsets(Channel);
 
   return false;
 }

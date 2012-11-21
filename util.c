@@ -7,6 +7,7 @@
 #include "util.h"
 #include "log.h"
 #include "equivhandler.h"
+#include "setupeepg.h"
 #include <vdr/channels.h>
 #include <vdr/thread.h>
 #include <vdr/epg.h>
@@ -386,6 +387,82 @@ void sortSchedules(cSchedules * Schedules, tChannelID channelID){
     }
   if (EquivHandler->getEquiChanMap().count(*channelID.ToString()) > 0)
     EquivHandler->sortEquivalents(channelID, Schedules);
+}
+
+cCharsetFixer::cCharsetFixer()
+{
+  charsetOverride = getenv("VDR_CHARSET_OVERRIDE");
+  if (!charsetOverride) charsetOverride = "ISO6937";
+  initialCharset = charsetOverride;
+  fixedCharset = "";
+  conv_revert = NULL;
+  conv_to = NULL;
+
+}
+
+cCharsetFixer::~cCharsetFixer()
+{
+}
+
+const char* cCharsetFixer::FixCharset(const char* text)
+{
+  if (!text || !conv_revert || !conv_to) return text;
+
+  //LogD(0, prep("FixCharset fixCharset:%s charsetOverride:%s text:%s"), fixCharset.c_str(), CharsetOverride, text);
+  const char* fixed = NULL;
+  if (!fixedCharset.empty()) {
+
+    if (fixedCharset != charsetOverride) {
+      //LogD(0, prep("FixCharset2 fixCharset:%s charsetOverride:%s text:%s"), fixCharset.c_str(), CharsetOverride, text);
+      fixed = conv_revert->Convert(text);
+      //LogD(0, prep("conv 1 fixed:%s"),fixed);
+      fixed = conv_to->Convert(fixed);
+      //LogD(0, prep("Fixed text:%s"), fixed);
+    }
+  }
+  if (!fixed) fixed = text;
+  return fixed;
+
+}
+
+void cCharsetFixer::InitCharsets(const cChannel* Channel)
+{
+  if (!cSetupEEPG::getInstance()->FixCharset) return;
+
+  if (strcasecmp( Channel->Provider(), "Skylink") == 0 || strcasecmp( Channel->Provider(), "UPC Direct") == 0
+      || strcasecmp( Channel->Provider(), "CYFRA +") == 0) {
+    fixedCharset = "ISO6937";
+  } else if (strcasestr( Channel->Provider(), "Polsat") != 0) {
+    fixedCharset = "ISO-8859-2";
+  } else if (Channel->Nid() == 0x01) {
+    fixedCharset = "ISO-8859-9";
+  } else {
+    fixedCharset = "";
+  }
+
+
+  if (!fixedCharset.empty()) {
+    delete conv_to;
+    conv_to = new cCharSetConv(fixedCharset.c_str());
+
+
+    const char* chrs;
+    if (strcasecmp( Channel->Provider(), "CYFRA +") == 0) {
+      chrs = "ISO-8859-5";
+    }else {
+      chrs = charsetOverride;
+    }
+
+    if (initialCharset != chrs) {
+      delete conv_revert;
+      conv_revert = NULL;
+    }
+    if (!conv_revert || initialCharset != chrs)
+      conv_revert = new cCharSetConv(NULL,chrs);
+
+    initialCharset = chrs;
+  }
+
 }
 
 }

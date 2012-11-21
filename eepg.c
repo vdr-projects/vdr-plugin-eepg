@@ -134,7 +134,8 @@ cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
   }
 //  AddCategory (tr ("General"));
   Add (new cMenuEditBoolItem (tr ("Display summary message"), &data->DisplayMessage));
-  Add (new cMenuEditBoolItem (tr ("Replace Empty Short Text with Category - Genre"), &data->ReplaceEmptyShText));
+  Add (new cMenuEditBoolItem (tr ("Replace empty Short Text with Category - Genre"), &data->ReplaceEmptyShText));
+  Add (new cMenuEditBoolItem (tr ("Try to fix CharSet for events"), &data->FixCharset));
 #ifdef DEBUG
   Add (new cMenuEditIntItem (tr ("Level of logging verbosity"), &data->LogLevel, 0, 5));
   Add (new cMenuEditBoolItem (tr ("Process EIT info with EEPG"), &data->ProcessEIT));
@@ -150,6 +151,7 @@ void cMenuSetupPremiereEpg::Store (void)
   SetupStore ("FixEpg", SetupPE->FixEpg);
   SetupStore ("DisplayMessage", SetupPE->DisplayMessage);
   SetupStore ("ReplaceEmptyShText", SetupPE->ReplaceEmptyShText);
+  SetupStore ("FixCharset", SetupPE->FixCharset);
 #ifdef DEBUG
   SetupStore ("LogLevel", SetupPE->LogLevel);
   SetupStore ("ProcessEIT", SetupPE->ProcessEIT);
@@ -3594,6 +3596,8 @@ bool cPluginEEPG::SetupParse (const char *Name, const char *Value)
     SetupPE->DisplayMessage = atoi (Value);
   else if (!strcasecmp (Name, "ReplaceEmptyShText"))
     SetupPE->ReplaceEmptyShText = atoi (Value);
+  else if (!strcasecmp (Name, "FixCharset"))
+    SetupPE->FixCharset = atoi (Value);
 #ifdef DEBUG
   else if (!strcasecmp (Name, "LogLevel"))
     SetupPE->LogLevel = atoi (Value);
