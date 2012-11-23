@@ -57,6 +57,7 @@ typedef struct {
   unsigned char Unknown2;//FIXME
   unsigned char Unknown3;//FIXME
   unsigned char Rating;
+  unsigned char Quality;
   unsigned short int TableId;
 } Title_t;
 
@@ -7180,4 +7181,14 @@ typedef struct { //first three bytes form unknown header, then X blocks, where X
 
 #define HILO16( x ) ( ( ( x##High << 8 ) | x##Low ) & 0xffff )
 #define HILO32( x ) ( ( ( ( ( x##High << 24 ) | ( x##MediumHigh << 16 ) ) | ( x##MediumLow << 8 ) ) | x##Low ) & 0xffffffff )
-#define MjdToEpochTime(x) (((x##_hi << 8 | x##_lo)-40587)*86400)
+//#define MjdToEpochTime(x) (((x##_hi << 8 | x##_lo)-40587)*86400)
+inline time_t MjdToEpochTime(u_short mjd, u_char Hour = 0, u_char Minute = 0, u_char Sec = 0) {
+  return ((mjd - 40587) * 86400) + ( ((((Hour & 0xf0) >> 4) * 10) + (Hour & 0x0f)) * 3600 )
+      + (((((Minute & 0xf0) >> 4) * 10) + (Minute & 0x0f)) * 60)
+      + ((((Sec & 0xf0) >> 4) * 10) + (Sec & 0x0f));
+}
+inline time_t MjdToEpochTime(u_char dateHigh, u_char dateLow, u_char Hour = 0, u_char Minute = 0,u_char Sec = 0) {
+  unsigned short mjd = HILO16(date);
+  return MjdToEpochTime(mjd, Hour, Minute, Sec);
+}
+

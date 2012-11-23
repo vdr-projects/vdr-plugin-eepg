@@ -100,11 +100,11 @@ void cEEpgHandler::FindDuplicate(cEvent* Event, const char* newTitle)
   if (origDescription.empty() && origShortText.empty()) {
     cEvent* eqEvent = NULL;
     cEvent* ev = (cEvent*) Event->Next();
-    if (ev && (ev->EventID() == Event->EventID() || strcasecmp(ev->Title(), newTitle) == 0)
+    if (ev && (ev->EventID() == Event->EventID() || (newTitle && strcasecmp(ev->Title(), newTitle) == 0))
         && Event->StartTime() <= ev->StartTime() && Event->EndTime() > ev->StartTime())
       eqEvent = ev;
     if (!eqEvent && (ev = (cEvent*) Event->Prev()) != NULL
-        && (ev->EventID() == Event->EventID() || strcasecmp(ev->Title(), newTitle) == 0)
+        && (ev->EventID() == Event->EventID() || (newTitle && strcasecmp(ev->Title(), newTitle) == 0))
         && ev->StartTime() <= Event->StartTime() && ev->EndTime() > Event->StartTime())
       eqEvent = ev;
     if (eqEvent) {
@@ -113,7 +113,7 @@ void cEEpgHandler::FindDuplicate(cEvent* Event, const char* newTitle)
       if (ev->ShortText() && strcmp(ev->ShortText(), "") != 0)
         origShortText = ev->ShortText();
 
-      LogD(0, prep("!!!Deleting Event id o:%d n:%d; title o:%s n:%d; start_time o:%d n:%d; duration o:%d n:%d"),
+      LogD(0, prep("!!!Deleting Event id o:%d n:%d; title o:%s n:%s; start_time o:%d n:%d; duration o:%d n:%d"),
           ev->EventID(), Event->EventID(), ev->Title(), newTitle, ev->StartTime(), Event->StartTime(), ev->Duration(), Event->Duration());
 
       schedule->DelEvent((cEvent*) eqEvent);
