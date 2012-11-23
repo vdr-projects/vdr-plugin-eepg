@@ -219,7 +219,7 @@ protected:
   virtual bool GetThemesSKYBOX (void);
   virtual int GetTitlesSKYBOX (const u_char * Data, int Length);
   virtual int GetSummariesSKYBOX (const u_char * Data, int Length);
-  virtual int GetChannelsMHW (const u_char * Data, int Length, int MHW); //TODO replace MHW by Format?
+  virtual int GetChannelsMHW (const u_char * Data, int Length);
   virtual int GetThemesMHW1 (const u_char * Data, int Length);
   virtual int GetNagra (const u_char * Data, int Length);
   virtual void ProcessNagra (void);
@@ -831,18 +831,20 @@ bool cFilterEEPG::InitDictionary (void)
  *
  * \return 0 = fatal error, code 1 = success, code 2 = last item processed
  */
-int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
+int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length)
 {
-  if ((MHW == 1) || (nChannels == 0)) { //prevents MHW2 from reading channels twice while waiting for themes on same filter
+  if (Format != MHW1 && Format != MHW2) return 0;
+
+  if ((Format == MHW1) || (nChannels == 0)) { //prevents MHW2 from reading channels twice while waiting for themes on same filter
     sChannelMHW1 *Channel;
     int Size, Off;
     Size = sizeof (sChannelMHW1);
     Off = 4;
-    if (MHW == 1) {
+    if (Format == MHW1) {
       //Channel = (sChannelMHW1 *) (Data + 4);
       nChannels = (Length - Off) / sizeof (sChannelMHW1);
     }
-    if (MHW == 2) {
+    if (Format == MHW2) {
       if (Length > 120)
         nChannels = Data[120];
       else {
@@ -874,7 +876,7 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
         C->ChannelId = i;
         ChannelSeq[C->ChannelId] = i; //fill lookup table to go from channel-id to sequence nr in table
         C->SkyNumber = 0;
-        if (MHW == 1)
+        if (Format == MHW1)
           memcpy (C->Name, &Channel->Name, 16); //MHW1
         else {   //MHW2
           int lenName = Data[pName] & 0x0f;
@@ -935,13 +937,15 @@ int cFilterEEPG::GetThemesMHW1 (const u_char * Data, int Length)
       const u_char *ThemesIndex = (Data + 3);
       for (int i = 0; i < nThemes; i++) {
         if (ThemesIndex[ThemeId] == i) {
-          Offset = (Offset + 15) & 0xf0; //TODO do not understand this
+          //The index of the Themes in MHW1 is not incremented by 1 but with offset calculated like this
+          Offset = (Offset + 15) & 0xf0; 
           ThemeId++;
         }
         memcpy (&Themes[Offset][0], &Theme->Name, 15);
         Themes[Offset][15] = '\0'; //trailing null
         CleanString (Themes[Offset]);
-        LogI(1, prep("%.15s"), Themes[Offset]);
+//        LogI(1, prep("%.15s"), Themes[Offset]);
+        LogI(1, prep("%.15s|Offset:%06d"), Themes[Offset],Offset);
         Offset++;
         Theme++;
       }
@@ -2585,7 +2589,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
   if (SummariesNotFound)
      if (nTitles-nSummaries!=SummariesNotFound) {
         esyslog ("EEPG: %i summaries not found", SummariesNotFound);
-        esyslog ("EEPG: %i difference between no of summaries and summaries not found", nTitles-nSummaries-SummariesNotFound);
+        esyslog ("EEPG: %i difference between No. of summaries and summaries not found", nTitles-nSummaries-SummariesNotFound);
      } else
         isyslog ("EEPG: %i titles without summaries", SummariesNotFound);
   if (OldEvents)
@@ -2706,6 +2710,7 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
     break;
   case SKY_IT:
   case SKY_UK:
+    GetThemesSKYBOX (); //Sky Themes from file
     AddFilter (0x11, SI::TableIdSKYChannels); //Sky Channels
     break;
   case FREEVIEW: //Freeview, CONT mode //TODO streamline this for other modes
@@ -2997,7 +3002,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
             EndThemes = true; //also set Endthemes on true on fatal error
         } //if Data
         else if (Data[3] == 0x00) { //Channels it will be
-          Result = GetChannelsMHW (Data, Length, 2); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
+          Result = GetChannelsMHW (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
           if (Result != 1)
             EndChannels = true; //always remove filter, code 1 should never be returned since MHW2 always reads all channels..
           ChannelsOk = (Result == 2);
@@ -3014,7 +3019,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
       }    //if Pid == 0x231
       break;
     case SI::TableIdMHW1Channels:
-      Result = GetChannelsMHW (Data, Length, 1); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
+      Result = GetChannelsMHW (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
       Del (Pid, Tid); //always remove filter, code 1 should never be returned since MHW1 always reads all channels...
       if (Result == 2)
         AddFilter (0xd2, SI::TableIdMHW1TitlesSummaries); //TitlesMHW1
@@ -3068,7 +3073,6 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
         if (Result != 1) //only breakoff on completion or error; do NOT clean up after success, because then not all bouquets will be read
           Del (Pid, Tid); //Read all channels, clean up filter
         if (Result == 2) {
-          GetThemesSKYBOX (); //Sky Themes from file; must be called AFTER first channels to have lThemes initialized FIXME
           if (InitDictionary ())
             AddFilter (0x30, SI::TableIdSKYTitlesA0, 0xfc); //SKY Titles batch 0 of 7
           else {

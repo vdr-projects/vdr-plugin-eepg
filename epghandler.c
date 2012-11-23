@@ -61,27 +61,6 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   }
 
   modified = false;
-//  //VDR creates new event if the EitEvent StartTime is different than EEPG time so
-//  //the EPG event has to be deleted but the data should be kept
-//  const cEvent* ev = schedule->GetEvent(EitEvent->getEventId(),EitEvent->getStartTime());
-//  if (!ev){
-//      ev = schedule->GetEvent(EitEvent->getEventId());
-//      if (ev && ((ev->StartTime()>EitEvent->getStartTime() && ev->StartTime()<=EitEvent->getStartTime()+EitEvent->getDuration())
-//          || (EitEvent->getStartTime() > ev->StartTime() && EitEvent->getStartTime() <= ev->EndTime()))) {
-//        LogD(0, prep("!!!Deleting Event id:%d title:%s start_time:%d new_start_time:%d duration:%d new_duration:%d"), ev->EventID(), ev->Title(), ev->StartTime(), EitEvent->getStartTime(), ev->Duration(), EitEvent->getDuration());
-//
-//        if (ev->Description() && strcmp(ev->Description(),"") != 0)
-//          origDescription = ev->Description();
-//        if (ev->ShortText() && strcmp(ev->ShortText(),"") != 0)
-//          origShortText = ev->ShortText();
-//        schedule->DelEvent((cEvent *) ev);
-////        Schedule->DropOutdated(ev->StartTime()-1,ev->EndTime()+1,ev->TableID()-1,ev->Version());
-//        LogD(0, prep("!!!End Deleting Event"));
-//        //TODO equivalent channels !!!
-//      }
-//  }
-
-
 
   return false;
   //	return true;
@@ -116,7 +95,7 @@ void cEEpgHandler::FindDuplicate(cEvent* Event, const char* newTitle)
       LogD(0, prep("!!!Deleting Event id o:%d n:%d; title o:%s n:%s; start_time o:%d n:%d; duration o:%d n:%d"),
           ev->EventID(), Event->EventID(), ev->Title(), newTitle, ev->StartTime(), Event->StartTime(), ev->Duration(), Event->Duration());
 
-      schedule->DelEvent((cEvent*) eqEvent);
+      schedule->DelEvent((cEvent*) eqEvent);//The equivalents should be handled on adding equivalent event.
     }
   }
 }

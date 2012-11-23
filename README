@@ -129,7 +129,4 @@ information.
 
 KNOWN BUGS
 -Equivalents file is not used for Premiere.
--On Sky Italy and Sky UK, a lot of "summaries not found" are reported. This is 
- because it is not (yet) known where the "summary available" flag is coded in the
- OpenTV protocol used, so all titles are assumed to have a summary available.
 

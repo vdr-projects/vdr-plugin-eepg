@@ -24,7 +24,6 @@ cEquivHandler::cEquivHandler()
 
 cEquivHandler::~cEquivHandler()
 {
-  // TODO Auto-generated destructor stub
 }
 
 void cEquivHandler::loadEquivalentChannelMap (void)
@@ -78,7 +77,7 @@ void cEquivHandler::loadEquivalentChannelMap (void)
                 //int i = 0;
                 cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
                 if (!OriginalChannel) {
-                  LogI(2, prep("Warning, not found epg channel \'%s\' in channels.conf. Equivalency is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID); //TODO: skip this ing?
+                  LogI(2, prep("Warning, not found EPG channel \'%s\' in channels.conf. Equivalence is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID);
                   continue;
                 }
                 if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
@@ -87,7 +86,7 @@ void cEquivHandler::loadEquivalentChannelMap (void)
                     rid = 0;
                   }
                   tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
-                  cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false); //TODO use valid function?
+                  cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false);
                   if (EquivChannel) {
                     ret = equiChanMap.equal_range(*OriginalChID.ToString());
                     for (it=ret.first; it!=ret.second; ++it)
