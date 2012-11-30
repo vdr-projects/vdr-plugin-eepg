@@ -243,12 +243,12 @@ namespace SI
 #define SIZE_TABLE_128 128
 #define SIZE_TABLE_255 255
 
-class UnimplementedDescriptor;
+using namespace std;
 
 class DishDescriptor {
 public:
     DishDescriptor();
-   virtual ~DishDescriptor();
+    virtual ~DishDescriptor();
     const char* getName(void) const { return name; }
     const char* getShortText(void);
     const char *getDescription(void);
@@ -284,16 +284,16 @@ protected:
     time_t originalAirDate;
     char* seriesId;
     char* programId;
+    char* ratingStr;
 
-
-   struct HuffmanTable {
-      unsigned int  startingAddress;
-      unsigned char character;
-      unsigned char numberOfBits;
-   };
-   static HuffmanTable Table128[SIZE_TABLE_128];
-   static HuffmanTable Table255[SIZE_TABLE_255];
-
+    struct HuffmanTable
+    {
+        unsigned int startingAddress;
+        unsigned char character;
+        unsigned char numberOfBits;
+    };
+    static HuffmanTable Table128[SIZE_TABLE_128];
+    static HuffmanTable Table255[SIZE_TABLE_255];
 };
 
 } /* namespace SI */

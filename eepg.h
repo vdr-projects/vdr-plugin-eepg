@@ -1,13 +1,11 @@
 //#define DEBUG false
 //#define DEBUG_STARTTIME false
 
-#define EEPG_FILE_EQUIV "eepg.equiv"
-
 #define MAX_THEMES 2046 //this should always be >=256, or Nagra will go wrong!!
 #define MAX_CHANNELS 2048
 #define MAX_TITLES 262144
 
-#define MAX_EQUIVALENCES 8 //the number of equivalences one channel can have
+//#define MAX_EQUIVALENCES 8 //the number of equivalences one channel can have
 
 //Formats (need to be consecutively numbered):
 //#define PREMIERE	0
@@ -19,25 +17,11 @@
 //#define NAGRA 		6
 //#define HIGHEST_FORMAT 	6
 
-enum EFormat {
-//First all batchmode, load ONCE protocols:
-  MHW1  = 0,
-  MHW2     ,
-  SKY_IT   ,
-  SKY_UK   ,
-  NAGRA    ,
-//Than all CONTinuous protocols, so they will be processed LAST:
-  PREMIERE ,
-  FREEVIEW ,
-  DISH_BEV ,
-//the highest number of EPG-formats that is supported by this plugin
-  HIGHEST_FORMAT = DISH_BEV
-} Format;
 
 #define NAGRA_TABLE_ID  	0x55 //the lower the table Id, the more "current" it is; table_id 0x00 never gets overwritten, now/next are at 0x4e or 0x4f!
 #define DEFAULT_TABLE_ID 	0x30
 
-const char *FormatName[]= {"MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide","Premiere","FreeView","Dish/Bev"};
+const char *FormatName[]= {"MediaHighWay 1","MediaHighWay 2","Sky Italy","Sky UK","NagraGuide","Premiere","FreeView","Dish/Bev","EIT"};
 
 struct sNode
 {
@@ -52,11 +36,11 @@ typedef struct
 {
   unsigned short int ChannelId;
   unsigned short int SkyNumber;
-  unsigned short int NumberOfEquivalences;//original channel sets this value to 1, every equivalent channel adds 1
-  unsigned int Src[MAX_EQUIVALENCES];
-  unsigned short int Nid[MAX_EQUIVALENCES];
-  unsigned short int Tid[MAX_EQUIVALENCES];
-  unsigned short int Sid[MAX_EQUIVALENCES];
+  //unsigned short int NumberOfEquivalences;//original channel sets this value to 1, every equivalent channel adds 1
+  unsigned int Src;//[MAX_EQUIVALENCES];
+  unsigned short int Nid;//[MAX_EQUIVALENCES];
+  unsigned short int Tid;//[MAX_EQUIVALENCES];
+  unsigned short int Sid;//[MAX_EQUIVALENCES];
   unsigned char Name[64];
 } sChannel;
 

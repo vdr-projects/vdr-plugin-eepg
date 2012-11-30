@@ -1,4 +1,5 @@
 TODO/WISH:
+-Missing support for Freesat DVB-T
 -extend equivalents file with transponder SKIP (do not retrieve EEPG info) or 
  transponder ONCE (retrieve once a day, first possiblity after midnight). 
  TUNE (retrieve every time transponder gets tuned to) transponder CONT (retrieve continuously)
@@ -9,6 +10,5 @@ TODO/WISH:
 -stop premiere after having read all titles (from CONT to ONCE)
 -check version info for all providers
 -decode summary-available bit for OpenTV
--include DDEPG functionality
 -parallellize when not on FF card
 -NAGRA 2nd textstring is not used right now, find out when it is relevant...

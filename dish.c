@@ -12,7 +12,7 @@
 
 #include "dish.h"
 #include <libsi/si.h>
-#include <libsi/descriptor.h>
+//#include <libsi/descriptor.h>
 #include <string.h>
 #include <string>
 #include <stdlib.h>
@@ -22,23 +22,24 @@ namespace SI
 {
 
   // returns the value of a sequence of bits in the byte array
-  static unsigned int getBits(int bitIndex, int bitCount, const unsigned char *byteptr, int length)
-  {
-     union {
-        unsigned char b[4];
-        unsigned long val;
-     } chunk;
+  static unsigned int getBits(int bitIndex, int bitCount, const unsigned char *byteptr,
+      int length) {
+    union
+    {
+      unsigned char b[4];
+      unsigned long val;
+    } chunk;
 
-     int offset = bitIndex >> 3;
-     int bitnum = bitIndex - (offset << 3);
-     int rightend = 32 - bitnum - bitCount;
+    int offset = bitIndex >> 3;
+    int bitnum = bitIndex - (offset << 3);
+    int rightend = 32 - bitnum - bitCount;
 
-     chunk.b[3] = byteptr[offset];
-     chunk.b[2] = (offset+1 < length) ? byteptr[offset+1] : 0;
-     chunk.b[1] = (offset+2 < length) ? byteptr[offset+2] : 0;
-     chunk.b[0] = 0; // Never need to look this far ahead.
+    chunk.b[3] = byteptr[offset];
+    chunk.b[2] = (offset + 1 < length) ? byteptr[offset + 1] : 0;
+    chunk.b[1] = (offset + 2 < length) ? byteptr[offset + 2] : 0;
+    chunk.b[0] = 0;  // Never need to look this far ahead.
 
-     return (unsigned int)(((chunk.val & (0xFFFFFFFF >> bitnum)) >> rightend));
+    return (unsigned int) ((((((chunk.val & (0xFFFFFFFF >> bitnum)) >> rightend)))));
     }
 
     DishDescriptor::DishDescriptor()
@@ -55,6 +56,7 @@ namespace SI
         originalAirDate = 0;
         programId = NULL;
         seriesId = NULL;
+        ratingStr = NULL;
     }
 
     DishDescriptor::~DishDescriptor()
@@ -108,7 +110,7 @@ namespace SI
 
     const char *DishDescriptor::getCategory()
     {
-      using namespace DISH_CATEGORIES;
+        using namespace DISH_CATEGORIES;
 
       switch (DishCategory) {
       case Action: return "Action";
@@ -417,7 +419,9 @@ namespace SI
          str += "]";
        }
 
-      return str.c_str();
+      if (!ratingStr) ratingStr = new char[19];
+      if (ratingStr) strcpy(ratingStr,str.c_str());
+      return ratingStr;
 
 //      return isempty(buffer) ? "" : buffer;
     }
@@ -477,7 +481,6 @@ namespace SI
         decompressed[count] = 0;
         return decompressed;
     }
-
 
 struct DishDescriptor::HuffmanTable DishDescriptor::Table128[SIZE_TABLE_128] = {
    { 0x0000, 0x20, 0x03 }, { 0x0100, 0x65, 0x04 }, { 0x0180, 0x74, 0x04 }, 
@@ -613,4 +616,4 @@ struct DishDescriptor::HuffmanTable DishDescriptor::Table255[SIZE_TABLE_255] = {
    { 0x1FFD, 0x02, 0x0D }, { 0x1FFE, 0x01, 0x0D }, { 0x1FFF, 0x00, 0x0D }
 };
 
-} //end of namespace
+}  //end of namespace
