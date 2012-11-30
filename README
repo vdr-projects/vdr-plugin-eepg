@@ -102,6 +102,12 @@ In addition there are two switches in the plugin setup menu to control inclusion
 of order and parental rating information into the event description.
 The plugin setup menu is only for Premiere protocol!
 
+Optionally EEPG can try to fix the charset of providers that send the EPG data with no 
+or incorrect Charset. In order for EEPG to try to fix the charset the option must be 
+selected from the menu.
+This is a workaround fix which does double conversion and depends on
+already know data for providers that send incorrect charset.
+The real solution is for Providers to follow the standards and not to do this in the first place.
 
 THANKS
 This code is based on:
