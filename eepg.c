@@ -944,8 +944,30 @@ int cFilterEEPG::GetThemesMHW1 (const u_char * Data, int Length)
         memcpy (&Themes[Offset][0], &Theme->Name, 15);
         Themes[Offset][15] = '\0'; //trailing null
         CleanString (Themes[Offset]);
-//        LogI(1, prep("%.15s"), Themes[Offset]);
-        LogI(1, prep("%.15s|Offset:%06d"), Themes[Offset],Offset);
+
+        //reformat themes
+        if (Offset & 0x0f) {
+          char* theme;
+          char* cat;
+          Asprintf (&theme, "%s", Themes[Offset]);
+          Asprintf (&cat, "%s", Themes[Offset& 0xf0]);
+          theme = strreplace(theme,"DOC","DOCUMENTAIRE");
+          theme = strreplace(theme,"DOCUMENTAIRE.","DOCUMENTAIRE");
+          theme = strreplace(theme,"MAG","MAGAZINE");
+          //Remove category from genre. TODO Maybe they should be separated in the future
+          theme = strreplace(theme,cat,"");
+          theme = skipspace(theme);
+          if (theme[0] == '-') {
+             memmove(theme, theme+1, strlen(theme));
+             theme = skipspace(theme);
+          }
+          char* buf;
+          Asprintf(&buf,"%s - %s",cat,theme);
+          memcpy(Themes[Offset],buf,strlen(buf)+1);
+        }
+
+        LogI(1, prep("%-33.33s|Offset:0x%02x"), Themes[Offset],Offset);
+
         Offset++;
         Theme++;
       }
@@ -1007,7 +1029,7 @@ int cFilterEEPG::GetThemesMHW2 (const u_char * Data, int Length)
                         //memcpy (&Themes[pThemeId][lenThemeName + 1], &Data[pSubThemeName], lenSubThemeName);
                       }
                   CleanString (Themes[pThemeId]);
-                  LogI(1, prep("%.*s"), lenThemeName + 1 + lenSubThemeName, Themes[pThemeId]);
+                  LogI(1, prep("%.40s|id:%d"), Themes[pThemeId],pThemeId);
                   //isyslog ("%.15s", (lThemes + pThemeId)->Name);
                   nThemes++;
                   if (nThemes > MAX_THEMES) {
@@ -1277,8 +1299,7 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
       if (Format == MHW1) {
         char * pch;
         pch=strchr(SummText,'s');
-        while (pch!=NULL)
-        {
+        while (pch!=NULL) {
           if (*(pch-1) != ' ' && *(pch-1) != '\n')
             *pch = ' ';
           pch=strchr(pch+1,'s');
@@ -1303,14 +1324,29 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
         }
 
         string desc = SummText;
+//        if (stripspace(category)) desc.append("\n").append(CATEGORY).append(tr(category));
+//        if (stripspace(genre)) desc += '\n' + string(GENRE) + tr(genre);
         if (stripspace(category)) desc.append("\n").append(CATEGORY).append(category);
         if (stripspace(genre)) desc += '\n' + string(GENRE) + genre;
         Event->SetDescription (desc.c_str());
 
         free(theme);
-    }
-    else
-      Event->SetDescription (SummText);
+      }
+      else {
+#ifdef DEBUG
+        string desc = SummText;
+        if (ThemeId) {
+          char *theme;
+          Asprintf (&theme, "0x%x", ThemeId);
+          LogD(0, prep("DEBUG: missing theme ID 0x%x"), ThemeId);
+          desc += '\n' + string(GENRE) + theme;
+          free(theme);
+        }
+        Event->SetDescription (desc.c_str());
+#else
+        Event->SetDescription (SummText);
+#endif
+      }
     }
     if (ps && newEvent)
       ps->AddEvent (newEvent);
@@ -2586,12 +2622,13 @@ void cFilterEEPG::LoadIntoSchedule (void)
   if (NoSummary)
     isyslog ("EEPG: of which %i reported to have no summary available; skipping these BIENTOT titles", NoSummary);
   isyslog ("EEPG: found %i summaries", nSummaries);
-  if (SummariesNotFound)
+  if (SummariesNotFound) {
      if (nTitles-nSummaries!=SummariesNotFound) {
         esyslog ("EEPG: %i summaries not found", SummariesNotFound);
         esyslog ("EEPG: %i difference between No. of summaries and summaries not found", nTitles-nSummaries-SummariesNotFound);
      } else
         isyslog ("EEPG: %i titles without summaries", SummariesNotFound);
+  }
   if (OldEvents)
     isyslog ("EEPG: Skipped %i old events", OldEvents);
   if (NotMatching > nSummaries)
@@ -2609,7 +2646,7 @@ void cFilterEEPG::AddFilter (u_short Pid, u_char Tid)
 {
   if (!Matches (Pid, Tid)) {
     Add (Pid, Tid);
-    esyslog (prep("Filter Pid:%x,Tid:%x added."), Pid, Tid);
+    esyslog (prep("Filter Pid:0x%x,Tid:0x%x added."), Pid, Tid);
   }
 }
 
@@ -2617,7 +2654,7 @@ void cFilterEEPG::AddFilter (u_short Pid, u_char Tid, unsigned char Mask)
 {
   if (!Matches (Pid, Tid)) {
     Add (Pid, Tid, Mask);
-    esyslog (prep("Filter Pid:%x,Tid:%x,Mask:%x added."), Pid, Tid, Mask);
+    esyslog (prep("Filter Pid:0x%x,Tid:0x%x,Mask:0x%x added."), Pid, Tid, Mask);
   }
 }
 
@@ -2826,7 +2863,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
               usrFRV = 1;
               LogD(4, prep("if (data[2]==0x39) {//TODO Test This"));
             }
-            //Format = 0;               // 0 = premiere, 1 = MHW1, 2 = MHW2, 3 = Sky Italy (OpenTV), 4 = Sky UK (OpenTV), 5 = Freesat (Freeview), 6 = Nagraguide
+
             SI::Descriptor * d;
             unsigned char nDescriptorTag;
             for (SI::Loop::Iterator it; (d = stream.streamDescriptors.getNext (it));) {
@@ -3487,7 +3524,6 @@ bool cPluginEEPG::Start (void)
   CheckCreateFile("sky_uk.themes", SkyUkThemes);
   CheckCreateFile("freesat.t1", FreesatT1);
   CheckCreateFile("freesat.t2", FreesatT2);
-  CheckCreateFile("sky_uk.themes", SkyUkThemes);
 
   sky_tables[0] = NULL;
   sky_tables[1] = NULL;

@@ -159,6 +159,7 @@ private:
   cTimeMs LastHandleEvent;
   std::map<tChannelID,cList<cEvent>*,tChannelIDCompare> *map_list;
 //  enum { INSERT_TIMEOUT_IN_MS = 10000 };
+  void MergeEquivalents(cEvent* dest, cEvent* src);
 protected:
   virtual void Action(void);
 public:
@@ -184,7 +185,6 @@ cAddEventThread::~cAddEventThread(void)
 
 void cAddEventThread::Action(void)
 {
-  //LogD (0, prep("Action"));
   SetPriority(19);
   while (Running() && !LastHandleEvent.TimedOut()) {
     std::map<tChannelID, cList<cEvent>*, tChannelIDCompare>::iterator it;
@@ -200,22 +200,29 @@ void cAddEventThread::Action(void)
       while (((*it).second->First()) != NULL) {
         cEvent* event = (*it).second->First();
 
-         cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
-         if (pEqvEvent){
-//	   LogD (0, prep("schedule->DelEvent(event) size:%d"), (*it).second->Count());
-    	   (*it).second->Del(event);
-//           schedule->DelEvent(pEqvEvent);
-         } else {
+        cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
+        if (pEqvEvent){
+          (*it).second->Del(event);
+        } else {
 
-          (*it).second->Del(event, false);
-          EpgHandlers.DropOutdated(schedule, event->StartTime(), event->EndTime(), event->TableID(),
-            event->Version());
-          schedule->AddEvent(event);
+           (*it).second->Del(event, false);
+
+           cEvent *ev = (cEvent *) schedule->GetEventAround(event->StartTime());
+           if (ev && (ev->EventID() == event->EventID() || (event->Title() && strcasecmp(ev->Title(), event->Title()) == 0))
+               && event->StartTime() <= ev->StartTime() && event->EndTime() > ev->StartTime()){
+             MergeEquivalents(event, ev);
+             schedule->DelEvent(ev);
+           }
+
+           event = schedule->AddEvent(event);
+           EpgHandlers.DropOutdated(schedule, event->StartTime(), event->EndTime(), event->TableID(),
+             event->Version());
+
         }
       }
       EpgHandlers.SortSchedule(schedule);
-       //sortSchedules(schedules, (*it).first);
-       //schedule->Sort();
+      //sortSchedules(schedules, (*it).first);
+      //schedule->Sort();
       delete (*it).second;
       map_list->erase(it);
       it = map_list->begin();
@@ -239,6 +246,43 @@ void cAddEventThread::AddEvent(cEvent *Event, tChannelID ChannelID)
 //  LogD (0, prep("AddEventT %s channel: <%s> map size:%d"), Event->Title(), *ChannelID.ToString(), map_list->size());
   LastHandleEvent.Set(INSERT_TIMEOUT_IN_MS);
 }
+
+string ExtractAttributes(string text) {
+  string attribute;
+  size_t apos = 0;
+  while ((apos = text.find('\n',apos)) != string::npos) {
+    size_t npos = text.find('\n', apos);
+    string subs = text.substr(apos, npos - apos);
+    if (subs.find(": ") != string::npos)
+      attribute += subs;
+    apos = npos;
+    //LogD(0, prep("ExtractAttribute attribute:%s, apos:%i, pos:%i"),attribute.c_str(), catpos, pos);
+  }
+  return attribute;
+
+}
+
+
+inline void cAddEventThread::MergeEquivalents(cEvent* dest, cEvent* src)
+{
+  if (!dest->ShortText() || !strcmp(dest->ShortText(),""))
+    dest->SetShortText(src->ShortText());
+
+  //Handle the Category and Genre, and optionally future tags
+  if ((dest->Description() || strcmp(src->Description(),"")) &&
+      (!dest->Description() ||
+          (dest->Description() && strstr(src->Description(),dest->Description())) != 0 )) {
+    dest->SetDescription(src->Description());
+  } else if (src->Description() && !strcmp(src->Description(),"") && dest->Description()) {
+
+    string desc = dest->Description() ? dest->Description() : "";
+    desc += ExtractAttributes(desc);
+    dest->SetDescription (desc.c_str());
+
+  }
+
+}
+
 
 static cAddEventThread AddEventThread;
 
@@ -466,4 +510,3 @@ void cCharsetFixer::InitCharsets(const cChannel* Channel)
 }
 
 }
-
