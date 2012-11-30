@@ -1240,7 +1240,7 @@ static const char *SkyItThemes[] = {
   "Sport - Nuoto", // 010 10000
   "Sport - Wrestling", // 010 10001
   NULL, // 010 10010
-  NULL, // 010 10011
+  "Sport - Volley", // 010 10011
   NULL, // 010 10100
   NULL, // 010 10101
   NULL, // 010 10110
@@ -1271,7 +1271,7 @@ static const char *SkyItThemes[] = {
   "Film - Musicale", // 011 01111
   "Film - Corto", // 011 10000
   "Film - Cortometraggio", // 011 10001
-  NULL, // 011 10010
+  "Film - Erotico", // 011 10010
   NULL, // 011 10011
   NULL, // 011 10100
   NULL, // 011 10101
@@ -1358,7 +1358,7 @@ static const char *SkyItThemes[] = {
   "Ragazzi e Musica - Film", // 110 00110
   "Ragazzi e Musica - Telefilm", // 110 00111
   "Ragazzi e Musica - Magazine", // 110 01000
-  NULL, // 110 01001
+  "Ragazzi e Musica - Giochi", // 110 01001
   NULL, // 110 01010
   NULL, // 110 01011
   NULL, // 110 01100
@@ -1370,7 +1370,7 @@ static const char *SkyItThemes[] = {
   NULL, // 110 10010
   NULL, // 110 10011
   "Ragazzi e Musica - Danza", // 110 10100
-  NULL, // 110 10101
+  "Ragazzi e Musica - Videoclip", // 110 10101
   NULL, // 110 10110
   NULL, // 110 10111
   NULL, // 110 11000
@@ -1448,11 +1448,11 @@ static const char *SkyUkThemes[] = {
   NULL, // 000 11101
   NULL, // 000 11110
   NULL, // 000 11111
-  NULL, // 001 00000
+  "Specialist - Shopping", // 001 00000
   NULL, // 001 00001
   NULL, // 001 00010
   "Shopping", // 001 00011
-  NULL, // 001 00100
+  "Specialist - Gaming", // 001 00100
   NULL, // 001 00101
   NULL, // 001 00110
   NULL, // 001 00111
@@ -1488,7 +1488,7 @@ static const char *SkyUkThemes[] = {
   "Children - Under 5", // 010 00101
   "Children - Factual", // 010 00110
   "Children - Magazine", // 010 00111
-  NULL, // 010 01000
+  "Children - Games Shows", // 010 01000
   NULL, // 010 01001
   NULL, // 010 01010
   NULL, // 010 01011
@@ -1557,14 +1557,14 @@ static const char *SkyUkThemes[] = {
   "Music - Hip Hop", // 100 01010
   "Music - Soul/R&B", // 100 01011
   "Music - Dance", // 100 01100
-  NULL, // 100 01101
+  "Music - Ballet", // 100 01101
   NULL, // 100 01110
   NULL, // 100 01111
   "Music - Features", // 100 10000
   NULL, // 100 10001
-  NULL, // 100 10010
+  "Music - Factual", // 100 10010
   NULL, // 100 10011
-  NULL, // 100 10100
+  "Music - Comedy", // 100 10100
   "Music - Lifestyle", // 100 10101
   "Music - News and Weather", // 100 10110
   "Music - Easy Listening", // 100 10111
@@ -1595,11 +1595,11 @@ static const char *SkyUkThemes[] = {
   "News & Documentaries - Transport", // 101 10000
   "News & Documentaries - Docudrama", // 101 10001
   "News & Documentaries - World Affairs", // 101 10010
-  NULL, // 101 10011
-  NULL, // 101 10100
-  NULL, // 101 10101
+  "News & Documentaries - Features", // 101 10011
+  "News & Documentaries - Showbiz", // 101 10100
+  "News & Documentaries - Politics", // 101 10101
   NULL, // 101 10110
-  NULL, // 101 10111
+  "News & Documentaries - World Affairs", // 101 10111
   NULL, // 101 11000
   NULL, // 101 11001
   NULL, // 101 11010
@@ -1627,7 +1627,7 @@ static const char *SkyUkThemes[] = {
   "Movie - Fantasy", // 110 10000
   "Movie - Erotic", // 110 10001
   "Movie - Adventure", // 110 10010
-  NULL, // 110 10011
+  "Movie - War", // 110 10011
   NULL, // 110 10100
   NULL, // 110 10101
   NULL, // 110 10110
