@@ -52,7 +52,7 @@
 #include <stdarg.h>
 
 
-#if APIVERSNUM < 10401
+#if defined(APIVERSNUM) && APIVERSNUM < 10401
 #error You need at least VDR API version 1.4.1 for this plugin
 #endif
 #if APIVERSNUM < 10507
