@@ -73,7 +73,7 @@ OBJS = $(PLUGIN).o dish.o epghandler.o setupeepg.o equivhandler.o util.o eit2.o
 
 ### The main target:
 
-all: $(SOFILE) i18n
+all: $(SOFILE)
 
 ### Implicit rules:
 
