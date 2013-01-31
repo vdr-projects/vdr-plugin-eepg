@@ -745,10 +745,16 @@ bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB 
   FILE *FileThemes;
   char *Line;
   char Buffer[256];
-  if (Format == SKY_IT)
+  const char **SkyThemes;
+  bool updateFile = false;
+  if (Format == SKY_IT) {
     FileName += "/sky_it.themes";
-  else if (Format == SKY_UK)
+    SkyThemes = SkyItThemes;
+  }
+  else if (Format == SKY_UK) {
     FileName += "/sky_uk.themes";
+    SkyThemes = SkyUkThemes;
+  }
   else {
     LogE (0, prep("Error, wrong format detected in GetThemesSKYBOX. Format = %i."), Format);
     return false;
@@ -759,26 +765,49 @@ bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB 
     LogE (0, prep("Error opening file '%s'. %s"), FileName.c_str(), strerror (errno));
     return false;
   } else {
-    //int id = 0;
+    int id = 0;
     nThemes = 0;
-    char string1[256];
-    char string2[256];
-    //sTheme *T;
+    char thId[256];
+    char theme[256];
+
     while ((Line = fgets (Buffer, sizeof (Buffer), FileThemes)) != NULL) {
-      memset (string1, 0, sizeof (string1));
-      memset (string2, 0, sizeof (string2));
+      memset (thId, 0, sizeof (thId));
+      memset (theme, 0, sizeof (theme));
       if (!isempty (Line)) {
-        //T = &Themes[nThemes];
-        if (sscanf (Line, "%[^=] =%[^\n] ", string1, string2) == 2) {
-          snprintf ((char *) Themes[nThemes], 255, "%s", string2);
+        if (sscanf (Line, "%[^=] =%[^\n] ", thId, theme) == 2 && !isempty (theme)) {
+          snprintf ((char *) Themes[id], 255, "%s", theme);
+          nThemes++;
         } else {
-          Themes[nThemes][0] = '\0';
+          if (SkyThemes[id]) {
+            updateFile = true;
+            snprintf ((char *) Themes[id], 255, "%s", SkyThemes[id]);
+            LogD (1, prep("Theme '%s' missing in theme file '%s'"), SkyThemes[id], FileName.c_str());
+          } else
+              Themes[id][0] = '\0';
         }
-        //id ++;
-        nThemes++;
+        id ++;
       }
     }
     fclose (FileThemes);
+
+    if (updateFile) {
+      FileThemes = fopen (FileName.c_str(), "w");
+      if (FileThemes == NULL) {
+        LogE (0, prep("Error re-creating file '%s', %s"), FileName.c_str(), strerror (errno));
+      } else {
+        for (int i = 0; i < 256; i++) {
+          if (Themes[nThemes]) {
+            fprintf (FileThemes, "0x%02x=%s\n", i, (char *) Themes[nThemes]);
+          }
+          else {
+            fprintf (FileThemes, "0x%02x=\n", i);
+          }
+        }
+
+        LogI (0, prep("Success updating file '%s'"), FileName.c_str());
+        fclose (FileThemes);
+      }
+    }
   }
   return true;
 }
