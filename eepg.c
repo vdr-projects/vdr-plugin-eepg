@@ -3446,6 +3446,7 @@ cPluginEEPG::cPluginEEPG (void)
 void cPluginEEPG::CheckCreateFile(const char* Name, const char *fileContent[])
 {
   FILE *File;
+  bool isSkyTheme = fileContent == SkyItThemes || fileContent == SkyUkThemes;
   string FileName = string(cSetupEEPG::getInstance()->getConfDir()) + "/" + Name;
   File = fopen(FileName.c_str(), "r");
   if (File == NULL) {
@@ -3454,11 +3455,23 @@ void cPluginEEPG::CheckCreateFile(const char* Name, const char *fileContent[])
     if (File == NULL) {
       LogE (0, prep("Error creating file '%s', %s"), FileName.c_str(), strerror (errno));
     } else {
-      int i = 0;
-      while (fileContent[i] != NULL) {
-        fprintf (File, "%s\n", fileContent[i]);
-        i++;
+      if (!isSkyTheme) {
+        int i = 0;
+        while (fileContent[i] != NULL) {
+          fprintf (File, "%s\n", fileContent[i]);
+          i++;
+        }
+      } else {
+        for (int i = 0; i < 256; i++) {
+          if (fileContent[i]) {
+            fprintf (File, "0x%02x=%s\n", i, fileContent[i]);
+          }
+          else {
+            fprintf (File, "0x%02x=\n", i);
+          }
+        }
       }
+
       LogI (0, prep("Success creating file '%s'"), FileName.c_str());
       fclose (File);
     }
