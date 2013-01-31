@@ -54,62 +54,63 @@ void cEquivHandler::loadEquivalentChannelMap (void)
     char origChanID[256];
     char equiChanID[256];
     char source[256];
-    int nid = 0;
-    int tid = 0;
-    int sid = 0;
-    int rid = 0;
+    int nid, tid, sid, rid;
     while ((Line = fgets (Buffer, sizeof (Buffer), File)) != NULL) {
       Line = compactspace (skipspace (stripspace (Line)));
-      if (!isempty (Line)) {
-        if (sscanf (Line, "%[^ ] %[^ ] %[^\n]\n", origChanID, equiChanID, source) == 3) {
-          if (origChanID[0] != '#' && origChanID[0] != ';') {
-            nid = 0;
-            tid = 0;
-            sid = 0;
-            rid = 0;
-            if (sscanf (origChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4)
-              if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
-                if (sscanf (origChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid) != 5) {
-                  rid = 0;
-                }
-                tChannelID OriginalChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
-                bool found = false;
-                //int i = 0;
-                cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
-                if (!OriginalChannel) {
-                  LogI(2, prep("Warning, not found EPG channel \'%s\' in channels.conf. Equivalence is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID);
-                  continue;
-                }
-                if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
-                  if (sscanf (equiChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid)
-                    != 5) {
-                    rid = 0;
-                  }
-                  tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
-                  cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false);
-                  if (EquivChannel) {
-                    ret = equiChanMap.equal_range(*OriginalChID.ToString());
-                    for (it=ret.first; it!=ret.second; ++it)
-                      if ((*it).second ==  *OriginalChID.ToString()) {
-                        found = true;
-                        break;
-                      }
+      //skip empty and commented lines
+      if (isempty (Line) || Line[0] == '#' || Line[0] == ';') continue;
+      //skip invalid line
+      if (sscanf (Line, "%[^ ] %[^ ] %[^\n]\n", origChanID, equiChanID, source) != 3) continue;
 
-                    if (!found) {
-                      string origCh(*OriginalChID.ToString());
-                      string equiCh(*EquivChID.ToString());
-                      equiChanMap.insert(pair<string,string>(origCh.c_str(),equiCh.c_str()));
-                      LogD(4, prep("Found %s equivalent to %s. origCh %s"), *EquivChID.ToString(), *OriginalChID.ToString(), origCh.c_str());
-                      for ( it2=equiChanMap.begin() ; it2 != equiChanMap.end(); it2++ )
-                        LogD(3, prep("Original ID %s <-> Equivalent ID %s"), (*it2).first.c_str(), it2->second.c_str());
-                    }
-                  } else
-                    LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
-                }
-              }   //if scanf string1
-          }   //if string1
-        }     //if scanf
-      }    //if isempty
+      nid = 0;
+      tid = 0;
+      sid = 0;
+      rid = 0;
+      //skip invalid id formats
+      if ((sscanf (origChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) != 4)
+        && (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) != 4))
+        continue;
+
+      if (sscanf (origChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid) != 5) {
+        rid = 0;
+      }
+      tChannelID OriginalChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
+      bool found = false;
+      //int i = 0;
+      cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
+      if (!OriginalChannel) {
+        LogI(2, prep("Warning, not found EPG channel \'%s\' in channels.conf. Equivalence is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID);
+        continue;
+      }
+      if (sscanf (equiChanID, "%[^-]-%i -%i -%i ", source, &nid, &tid, &sid) == 4) {
+
+        if (sscanf (equiChanID, "%[^-]-%i -%i -%i -%i ", source, &nid, &tid, &sid, &rid)
+          != 5) {
+          rid = 0;
+        }
+        tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
+        cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false);
+        if (!EquivChannel) {
+          LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
+          continue;
+        }
+
+        //check if channel is already added
+        ret = equiChanMap.equal_range(*OriginalChID.ToString());
+        for (it=ret.first; it!=ret.second; ++it)
+          if ((*it).second ==  *OriginalChID.ToString()) {
+            found = true;
+            break;
+          }
+        if (found)  continue;
+
+        string origCh(*OriginalChID.ToString());
+        string equiCh(*EquivChID.ToString());
+        equiChanMap.insert(pair<string,string>(origCh.c_str(),equiCh.c_str()));
+        LogD(4, prep("Found %s equivalent to %s. origCh %s"), *EquivChID.ToString(), *OriginalChID.ToString(), origCh.c_str());
+        for ( it2=equiChanMap.begin() ; it2 != equiChanMap.end(); it2++ )
+          LogD(3, prep("Original ID %s <-> Equivalent ID %s"), (*it2).first.c_str(), it2->second.c_str());
+      }
     }      //while
     fclose (File);
     equiChanFileTime = st.st_mtim.tv_nsec;
