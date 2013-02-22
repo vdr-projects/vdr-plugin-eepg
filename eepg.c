@@ -49,7 +49,9 @@
 
 #include <map>
 #include <string>
+#include <limits>
 #include <stdarg.h>
+#include <dirent.h>
 
 
 #if defined(APIVERSNUM) && APIVERSNUM < 10401
@@ -416,7 +418,7 @@ static bool load_freesat_file (int tableid, const char *filename)
   return true;
 }
 
-/** \brief Load an individual freesat data file
+/** \brief Load an individual sky data file
  *
  *  \param filename  - Filename to load
  *  \return Success of operation
@@ -548,6 +550,75 @@ static bool load_sky_file (const char *filename)
     fclose (FileDict);
   }
   return true;
+}
+
+#define THEME_TR ".tr"
+
+void load_theme_dictionaries (void)
+{
+  char Buffer[1024];
+  char *Line;
+  FILE *File;
+
+  DIR *dp = opendir(cSetupEEPG::getInstance()->getConfDir());
+  struct dirent *dirp;
+  if(!dp) {
+    LogE (0, prep("Can't read configuration folder '%s'"), cSetupEEPG::getInstance()->getConfDir());
+    return ;
+  }
+
+  if (tableDict.size() > 0)
+    tableDict.clear();
+
+
+  while ((dirp = readdir(dp)) != NULL) {
+
+    string fname = dirp->d_name;      // filename
+    if (dirp->d_type == DT_DIR ||  // if entry is a directory
+        fname.find(THEME_TR, (fname.length() - strlen(THEME_TR))) == string::npos){
+      continue;
+    }
+
+    fname = string(cSetupEEPG::getInstance()->getConfDir()) + "/" + fname;
+
+    //Test if file is changed and reload
+    struct stat st;
+    if (stat(fname.c_str(), &st)) {
+        LogE(0, prep("Error obtaining stats for '%s' "), fname.c_str());
+        continue;
+    }
+
+    File = fopen (fname.c_str(), "r");
+    if (!File) continue;
+
+    memset (Buffer, 0, sizeof (Buffer));
+    char origThemeName[256];
+    char transThemeName[256];
+    while ((Line = fgets (Buffer, sizeof (Buffer), File)) != NULL) {
+      Line = compactspace (skipspace (stripspace (Line)));
+      //Skip empty and commented lines
+      if (isempty (Line) || Line[0] == '#' || Line[0] == ';') continue;
+      if (sscanf (Line, "%[^=]=%[^\n]\n", origThemeName, transThemeName) == 2) {
+
+        string origTh(compactspace (skipspace (stripspace (origThemeName))));
+        string transTh(compactspace (skipspace (stripspace (transThemeName))));
+        if (!tableDict.count(origTh) && !transTh.empty()) {
+          tableDict.insert(pair<string,string>(string(origThemeName),string(transThemeName)));
+          LogD(4, prep("Original '%s' translation to '%s'."), origTh.c_str(), transTh.c_str());
+        }
+      }     //if scanf
+    }      //while
+    fclose (File);
+    LogD(3, prep("Loaded %i translations from %s."), tableDict.size(), fname.c_str());
+  }
+  closedir(dp);
+
+  LogD(2, prep("Loaded %i translations."), tableDict.size());
+  LogD(2, prep("Original <-> Translation"));
+  map<string,string>::iterator it;
+  for ( it=tableDict.begin() ; it != tableDict.end(); it++ )
+    LogD(2, prep("%s <-> %s"), (*it).first.c_str(), it->second.c_str());
+
 }
 
 /** \brief Decode an EPG string as necessary
@@ -796,8 +867,8 @@ bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB 
         LogE (0, prep("Error re-creating file '%s', %s"), FileName.c_str(), strerror (errno));
       } else {
         for (int i = 0; i < 256; i++) {
-          if (Themes[nThemes]) {
-            fprintf (FileThemes, "0x%02x=%s\n", i, (char *) Themes[nThemes]);
+          if (Themes[i]) {
+            fprintf (FileThemes, "0x%02x=%s\n", i, (char *) Themes[i]);
           }
           else {
             fprintf (FileThemes, "0x%02x=\n", i);
@@ -899,6 +970,7 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length)
       LogI(1, "|------|-%-26.26s-|-%-22.22s-|-----|-%-8.8s-|\n", "------------------------------",
            "-----------------------------", "--------------------");
       int pName = ((nChannels * 8) + 121); //TODO double ...
+      LogD(1, prep("Length:%d pName:%d diff:%d"), Length, pName, Length - pName);
       for (int i = 0; i < nChannels; i++) {
         Channel = (sChannelMHW1 *) (Data + Off);
         sChannel *C = &sChannels[i];
@@ -983,6 +1055,7 @@ int cFilterEEPG::GetThemesMHW1 (const u_char * Data, int Length)
           theme = strreplace(theme,"DOC","DOCUMENTAIRE");
           theme = strreplace(theme,"DOCUMENTAIRE.","DOCUMENTAIRE");
           theme = strreplace(theme,"MAG","MAGAZINE");
+          theme = strreplace(theme,"INFO-METEO","INFO/METEO");
           //Remove category from genre. TODO Maybe they should be separated in the future
           theme = strreplace(theme,cat,"");
           theme = skipspace(theme);
@@ -1282,23 +1355,28 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
     if (SummText && ShTxtLen) {
     
       shText.assign(SummText,ShTxtLen);
-
+      //LogD(0, prep("DEBUG: Title '%s', Subtitle '%s'"), Text, shText.c_str());
       string tmpTitle(Text);
       if (Format == MHW2 && !shText.empty()) {
         size_t found = tmpTitle.find(" (HD)");
         if (found != string::npos)
           tmpTitle.erase(found, 5);
-        found = shText.compare(0, tmpTitle.size() + 2, string(tmpTitle + ": "));
+        //found = shText.compare(0, tmpTitle.size() + 2, string(tmpTitle + ": "));
         if (shText.compare(0, tmpTitle.size() + 2, string(tmpTitle + ": "))==0)
           shText.erase(0, tmpTitle.size() + 2);
+
+        //Remove Subtitle from title it is not pretty.
+        //int sumLen = strlen(SummText);
+        //if (sumLen > ShTxtLen)
+        //  memmove(SummText,SummText + ShTxtLen + 1, sumLen - ShTxtLen);
       }
 
       //Do not use Subtitle if it is substring of Title
       if (tmpTitle.compare(0, shText.size(), shText) == 0)
         shText.clear();
 
-      //The subtitle is wrong if contains '.'
-      if (Format == SKY_UK && !shText.empty() && shText.find('.') != string::npos) {
+      //The subtitle is wrong if contains '.' after possible initial '...'
+      if (Format == SKY_UK && !shText.empty() && shText.find('.',3) != string::npos) {
         shText.clear();
       }
 
@@ -1308,7 +1386,7 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
       // the Description totally empty. So if the ShortText length exceeds
       // MAX_USEFUL_EPISODE_LENGTH, let's put this into the Description
       // instead:
-      if (!shText.empty() && shText.size() > MAX_USEFUL_EPISODE_LENGTH)
+      if (Format != SKY_IT && Format != MHW2 && !shText.empty() && shText.size() > MAX_USEFUL_EPISODE_LENGTH)
         shText.clear();
 
     }
@@ -1353,10 +1431,11 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
         }
 
         string desc = SummText;
-//        if (stripspace(category)) desc.append("\n").append(CATEGORY).append(tr(category));
-//        if (stripspace(genre)) desc += '\n' + string(GENRE) + tr(genre);
-        if (stripspace(category)) desc.append("\n").append(CATEGORY).append(category);
-        if (stripspace(genre)) desc += '\n' + string(GENRE) + genre;
+        if (Format == MHW2 && ShTxtLen) {
+          desc.erase(0, ShTxtLen + 1);
+        }
+        if (stripspace(category)) desc.append("\n").append(CATEGORY).append(findThemeTr(category));
+        if (stripspace(genre)) desc += '\n' + string(GENRE) + findThemeTr(genre);
         Event->SetDescription (desc.c_str());
 
         free(theme);
@@ -1367,7 +1446,7 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
         if (ThemeId) {
           char *theme;
           Asprintf (&theme, "0x%x", ThemeId);
-          LogD(0, prep("DEBUG: missing theme ID 0x%x"), ThemeId);
+          LogD(0, prep("DEBUG: missing theme ID 0x%x title:'%s'"), ThemeId, Event->Title());
           desc += '\n' + string(GENRE) + theme;
           free(theme);
         }
@@ -2428,7 +2507,11 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
           S->Text[Len2] = '\0'; //end string with NULL character
           CleanString (S->Text);
           char * delim = strstr ( (char *)S->Text, STxtDelim );
-          S->ShortTextLength = delim == NULL ? 0 : delim - (char *)S->Text;
+          //S->ShortTextLength = delim == NULL ? 0 : delim - (char *)S->Text;
+          if (Format == SKY_UK && !delim && strncmp((char *)S->Text,"...",3) == 0)
+            delim = strstr ( (char *)(S->Text+3), "." );
+          int shLen = delim - (char *)S->Text;
+          S->ShortTextLength = delim == NULL || shLen > numeric_limits<u_char>::max() ? 0 : shLen;
           LogI(4, prep("EventId %08x Summnr %d:%.30s."), S->EventId, nSummaries, S->Text);
           p += Len1;
           nSummaries++;
@@ -2624,7 +2707,8 @@ void cFilterEEPG::LoadIntoSchedule (void)
           i++; //move to next title, for this one no summary can be found
         }
 
-        if (SummIndex != -1 && isOTV){
+        //Do not loop through summaries for OTV when sumaries and titles are in sync
+        if (SummIndex != -1 && isOTV && nSummaries <= nTitles){
           j--;
         }
 
@@ -3566,6 +3650,7 @@ bool cPluginEEPG::Start (void)
   CheckCreateFile("sky_uk.themes", SkyUkThemes);
   CheckCreateFile("freesat.t1", FreesatT1);
   CheckCreateFile("freesat.t2", FreesatT2);
+  load_theme_dictionaries();
 
   sky_tables[0] = NULL;
   sky_tables[1] = NULL;

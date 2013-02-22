@@ -26,6 +26,7 @@ int YesterdayEpochUTC;
 
 struct hufftab *tables[2][128];
 int table_size[2][128];
+map<string,string> tableDict;
 
 EFormat Format;
 cEquivHandler* EquivHandler;
@@ -207,11 +208,17 @@ void cAddEventThread::Action(void)
 
            (*it).second->Del(event, false);
 
-           cEvent *ev = (cEvent *) schedule->GetEventAround(event->StartTime());
-           if (ev && (ev->EventID() == event->EventID() || (event->Title() && strcasecmp(ev->Title(), event->Title()) == 0))
-               && event->StartTime() <= ev->StartTime() && event->EndTime() > ev->StartTime()){
-             MergeEquivalents(event, ev);
-             schedule->DelEvent(ev);
+           for (cEvent *ev = schedule->Events()->First(); ev; ev = schedule->Events()->Next(ev)) {
+             if (ev->StartTime() > event->EndTime()) {
+                   break;
+             }
+             if (ev && (ev->EventID() == event->EventID() || (event->Title() && strcasecmp(ev->Title(), event->Title()) == 0))
+                 && ((event->StartTime() >= ev->StartTime() && event->StartTime() < ev->EndTime())
+                 || (ev->StartTime() >= event->StartTime() && ev->StartTime() < event->EndTime()))){
+               MergeEquivalents(event, ev);
+               schedule->DelEvent(ev);
+               break;
+             }
            }
 
            event = schedule->AddEvent(event);
@@ -262,18 +269,18 @@ string ExtractAttributes(string text) {
 
 }
 
-
 inline void cAddEventThread::MergeEquivalents(cEvent* dest, cEvent* src)
 {
   if (!dest->ShortText() || !strcmp(dest->ShortText(),""))
     dest->SetShortText(src->ShortText());
 
   //Handle the Category and Genre, and optionally future tags
-  if ((dest->Description() || strcmp(src->Description(),"")) &&
-      (!dest->Description() ||
-          (dest->Description() && strstr(src->Description(),dest->Description())) != 0 )) {
+  if (!src->Description() || !strcmp(src->Description(),""))
+      return;
+
+  if ((!dest->Description() || strstr(src->Description(),dest->Description()))) {
     dest->SetDescription(src->Description());
-  } else if (src->Description() && !strcmp(src->Description(),"") && dest->Description()) {
+  } else if (dest->Description()) {
 
     string desc = dest->Description() ? dest->Description() : "";
     desc += ExtractAttributes(desc);
@@ -282,7 +289,6 @@ inline void cAddEventThread::MergeEquivalents(cEvent* dest, cEvent* src)
   }
 
 }
-
 
 static cAddEventThread AddEventThread;
 
@@ -507,6 +513,16 @@ void cCharsetFixer::InitCharsets(const cChannel* Channel)
     initialCharset = chrs;
   }
 
+}
+
+string findThemeTr(const char* text)
+{
+  map<string,string>::iterator it;
+  string trans = text;
+  if ((it = tableDict.find(trans)) != tableDict.end())
+    trans = it->second;
+  LogD(4, prep("original:%s translated:%s map size:%d"), text, trans.c_str(), tableDict.size());
+  return trans;
 }
 
 }

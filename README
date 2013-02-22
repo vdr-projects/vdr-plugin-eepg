@@ -109,6 +109,11 @@ This is a workaround fix which does double conversion and depends on
 already know data for providers that send incorrect charset.
 The real solution is for Providers to follow the standards and not to do this in the first place.
 
+The themes of the EPG events can be translated. For MHW a translation file is used, and for OTV the 
+theme file should be translated.
+See example english translation files in: extra/en-themes/*.*
+This files should be placed in eepg plugin config directory.
+
 THANKS
 This code is based on:
 * Premiere plugin (C) 2005-2007 Stefan Huelswitt <s.huelswitt@gmx.de>

@@ -23,6 +23,7 @@ cEEpgHandler::cEEpgHandler() {
   modified = false;
   charsetFixer = new cCharsetFixer();
   schedule = NULL;
+  searchDuplicates = true;
 
 }
 
@@ -61,6 +62,21 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   }
 
   modified = false;
+  //VDR creates new event if the EitEvent StartTime is different than EEPG time so
+  //the EPG event has to be deleted but the data should be kept
+  const cEvent* ev = schedule->GetEvent(EitEvent->getEventId(),EitEvent->getStartTime());
+  searchDuplicates = !ev; //if the event exist with a same start time, it is handled by SetShortText/SetDescription
+  if (!ev){
+      ev = schedule->GetEvent(EitEvent->getEventId());
+      // remove shifted duplicates with same ID
+      if (ev && ((ev->StartTime()>EitEvent->getStartTime() && ev->StartTime() < EitEvent->getStartTime()+EitEvent->getDuration())
+          || (EitEvent->getStartTime() > ev->StartTime() && EitEvent->getStartTime() < ev->EndTime()))) {
+        LogD(0, prep("!!!Deleting Event id:%d title:%s start_time:%d new_start_time:%d duration:%d new_duration:%d"), 
+            ev->EventID(), ev->Title(), ev->StartTime(), EitEvent->getStartTime(), ev->Duration(), EitEvent->getDuration());
+        RemoveEvent((cEvent*)ev);
+        searchDuplicates = false;
+      }
+  }
 
   return false;
   //	return true;
@@ -71,31 +87,36 @@ bool cEEpgHandler::SetEventID(cEvent* Event, tEventID EventID) {
   return true;
 }
 
-//VDR creates new event if the EitEvent StartTime is different than EEPG time so
-//the EPG event has to be deleted but the data should be kept
+void cEEpgHandler::RemoveEvent(cEvent* ev)
+{
+  if (ev->Description() && strcmp(ev->Description(), "") != 0)
+    origDescription = ev->Description();
+
+  if (ev->ShortText() && strcmp(ev->ShortText(), "") != 0)
+    origShortText = ev->ShortText();
+
+  LogD(4, prep("!!!Deleting Event id:%d title:%s start_time:%d duration:%d"),
+      ev->EventID(), ev->Title(), ev->StartTime(), ev->Duration());
+  schedule->DelEvent((ev)); //The equivalents should be handled on adding equivalent event.
+}
+
+//Find duplicate events by title / time
+//Sometimes same events overlap and have different EventID
 void cEEpgHandler::FindDuplicate(cEvent* Event, const char* newTitle)
 {
-  //Sometimes same events overlap and have different EventID
-  if (origDescription.empty() && origShortText.empty()) {
-    cEvent* eqEvent = NULL;
-    cEvent* ev = (cEvent*) Event->Next();
-    if (ev && (ev->EventID() == Event->EventID() || (newTitle && strcasecmp(ev->Title(), newTitle) == 0))
-        && Event->StartTime() <= ev->StartTime() && Event->EndTime() > ev->StartTime())
-      eqEvent = ev;
-    if (!eqEvent && (ev = (cEvent*) Event->Prev()) != NULL
-        && (ev->EventID() == Event->EventID() || (newTitle && strcasecmp(ev->Title(), newTitle) == 0))
-        && ev->StartTime() <= Event->StartTime() && ev->EndTime() > Event->StartTime())
-      eqEvent = ev;
-    if (eqEvent) {
-      if (ev->Description() && strcmp(ev->Description(), "") != 0)
-        origDescription = ev->Description();
-      if (ev->ShortText() && strcmp(ev->ShortText(), "") != 0)
-        origShortText = ev->ShortText();
+  if (!newTitle || !searchDuplicates) return;
+
+  for (cEvent *ev = schedule->Events()->First(); ev; ev = schedule->Events()->Next(ev)) {
+    //assume that events are already sorted.
+    if (ev->StartTime() > Event->EndTime()) break;
+    if (ev->Title() && strcasecmp(ev->Title(), newTitle) == 0
+        && ((Event->StartTime() > ev->StartTime() && Event->StartTime() < ev->EndTime())
+        || (ev->StartTime() > Event->StartTime() && ev->StartTime() < Event->EndTime()))){
 
       LogD(0, prep("!!!Deleting Event id o:%d n:%d; title o:%s n:%s; start_time o:%d n:%d; duration o:%d n:%d"),
           ev->EventID(), Event->EventID(), ev->Title(), newTitle, ev->StartTime(), Event->StartTime(), ev->Duration(), Event->Duration());
-
-      schedule->DelEvent((cEvent*) eqEvent);//The equivalents should be handled on adding equivalent event.
+      RemoveEvent(ev);
+      break;
     }
   }
 }
@@ -106,6 +127,7 @@ bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
   const char* title = charsetFixer->FixCharset(Title);
 
   //Sometimes same events overlap and have different EventID
+  //Find/Remove duplicates with same title/time
   FindDuplicate(Event, title);
 
   if (!Event->Title() || (title && (!strcmp(Event->Title(),"") || (strcmp(Title,"") && strcmp(Event->Title(),title))))) {
@@ -242,7 +264,7 @@ bool cEEpgHandler::SortSchedule(cSchedule* Schedule) {
 
 bool cEEpgHandler::FixEpgBugs(cEvent* Event)
 {
-  //TODO to see which channels have bugs - disable fixing with true
+  //to see which channels have bugs - disable fixing with true
   return false;
 }
 

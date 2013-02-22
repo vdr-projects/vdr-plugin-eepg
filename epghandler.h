@@ -41,6 +41,10 @@ public:
 private:
     std::string  ExtractAttribute(const char* attr);
     void  FindDuplicate(cEvent* Event, const char* newTitle);
+    /*
+     * Extract the date from duplicate event and remove it
+     */
+    void  RemoveEvent(cEvent* ev);
 
 private:
     std::string origShortText;
@@ -50,7 +54,7 @@ private:
     cSchedule* schedule;
     static const int _LONG_EVENT_HOURS = 10;
     bool modified;
-
+  bool searchDuplicates;
 };
 
 #endif /*APIVERSNUM > 10725*/

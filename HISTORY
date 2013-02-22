@@ -39,6 +39,7 @@ Release 0.0.6pre:
 - Changed the logic of summary handling for SKY so that no SummaryAvailable bit is required, since it can not be located from the stream
 - Reformatted MHW1 themes
 - Added some new/missing SKY themes
+- Added ability to translate themes. See README/Examples
 
 - Additional fixes logged at http://projects.vdr-developer.org/git/vdr-plugin-eepg.git/
 

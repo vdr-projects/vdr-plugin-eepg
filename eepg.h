@@ -1239,10 +1239,10 @@ static const char *SkyItThemes[] = {
   "Sport - Golf", // 010 01111
   "Sport - Nuoto", // 010 10000
   "Sport - Wrestling", // 010 10001
-  NULL, // 010 10010
+  "Sport - Pallamano", // 010 10010
   "Sport - Volley", // 010 10011
   "Sport - Poker", // 010 10100
-  NULL, // 010 10101
+  "Sport - Vela", // 010 10101
   "Sport - Sport Invernali", // 010 10110
   NULL, // 010 10111
   NULL, // 010 11000
@@ -1360,13 +1360,13 @@ static const char *SkyItThemes[] = {
   "Ragazzi e Musica - Magazine", // 110 01000
   "Ragazzi e Musica - Giochi", // 110 01001
   NULL, // 110 01010
-  NULL, // 110 01011
+  "Ragazzi e Musica - Musica da Camera", // 110 01011
   NULL, // 110 01100
   NULL, // 110 01101
   NULL, // 110 01110
   NULL, // 110 01111
   NULL, // 110 10000
-  NULL, // 110 10001
+  "Ragazzi e Musica - Concerto", // 110 10001
   NULL, // 110 10010
   NULL, // 110 10011
   "Ragazzi e Musica - Danza", // 110 10100
@@ -1385,7 +1385,7 @@ static const char *SkyItThemes[] = {
   "Altri Programmi - Educational", // 111 00001
   "Altri Programmi - Regionale", // 111 00010
   "Altri Programmi - Shopping", // 111 00011
-  NULL, // 111 00100
+  "Altri Programmi - Altri", // 111 00100
   "Altri Programmi - Inizio e Fine Trasmissioni", // 111 00101
   "Altri Programmi - Eventi Speciali", // 111 00110
   "Altri Programmi - Film per Adulti", // 111 00111

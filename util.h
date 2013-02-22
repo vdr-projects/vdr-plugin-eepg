@@ -10,6 +10,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string>
+#include <map>
 
 class cChannel;
 struct tChannelID;
@@ -68,6 +69,12 @@ void CleanString(unsigned char *String);
 void decodeText2(const unsigned char *from, int len, char *buffer, int buffsize);
 char *freesat_huffman_decode(const unsigned char *src, size_t size);
 void sortSchedules(cSchedules * Schedules, tChannelID channelID);
+/**
+ * Locate the translation of a given Theme (Category, Genre) string in the translation map
+ * @param the text to search
+ * @return found translation or the source text if not found.
+ */
+std::string findThemeTr(const char*);
 
 //struct sNode
 //{
@@ -95,6 +102,8 @@ struct hufftab
 extern struct hufftab *tables[2][128];
 extern int table_size[2][128];
 //static sNodeH* sky_tables[2];
+extern std::map<std::string,std::string> tableDict;
+
 
 class cCharsetFixer
 {
