@@ -3420,7 +3420,7 @@ private:
   struct {
     cFilterEEPG *filter;
     cDevice *device;
-  } epg[MAXDVBDEVICES];
+  } epg[MAXDEVICES];
 
   void CheckCreateFile(const char* Name, const char *fileContent[]);
 
@@ -3485,7 +3485,7 @@ bool cPluginEEPG::Start (void)
 #if APIVERSNUM < 10507
   RegisterI18n (Phrases);
 #endif
-  for (int i = 0; i < MAXDVBDEVICES; i++) {
+  for (int i = 0; i < MAXDEVICES; i++) {
     cDevice *dev = cDevice::GetDevice (i);
     if (dev) {
       epg[i].device = dev;
@@ -3551,7 +3551,7 @@ bool cPluginEEPG::Start (void)
 
 void cPluginEEPG::Stop (void)
 {
-  for (int i = 0; i < MAXDVBDEVICES; i++) {
+  for (int i = 0; i < MAXDEVICES; i++) {
     cDevice *dev = epg[i].device;
     if (dev)
       dev->Detach (epg[i].filter);
