@@ -1209,7 +1209,7 @@ static const char *SkyItThemes[] = {
   "Intrattenimento - Festival", // 001 10001
   "Intrattenimento - Teatro", // 001 10010
   "Intrattenimento - Gioco", // 001 10011
-  NULL, // 001 10100
+  "Intrattenimento - Manga", // 001 10100
   NULL, // 001 10101
   NULL, // 001 10110
   NULL, // 001 10111
