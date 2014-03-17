@@ -2508,8 +2508,13 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
           CleanString (S->Text);
           char * delim = strstr ( (char *)S->Text, STxtDelim );
           //S->ShortTextLength = delim == NULL ? 0 : delim - (char *)S->Text;
-          if (Format == SKY_UK && !delim && strncmp((char *)S->Text,"...",3) == 0)
-            delim = strstr ( (char *)(S->Text+3), "." );
+          if (Format == SKY_UK && !delim && strncmp((char *)S->Text,"..",2) == 0) {
+            char * tdlm = strpbrk ( (char *)(S->Text+3), ".?!" );
+            if (tdlm && tdlm[0] != '.')
+              tdlm++;
+            if (tdlm)
+              delim = tdlm;
+	  }
           int shLen = delim - (char *)S->Text;
           S->ShortTextLength = delim == NULL || shLen > numeric_limits<u_char>::max() ? 0 : shLen;
           LogI(4, prep("EventId %08x Summnr %d:%.30s."), S->EventId, nSummaries, S->Text);

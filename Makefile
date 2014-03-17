@@ -52,6 +52,28 @@ export CXXFLAGS = $(call PKGCFG,cxxflags)
 
 APIVERSION = $(call PKGCFG,apiversion)
 
+# backward compatibility with VDR version < 1.7.34
+API1733 := $(shell if [ "$(APIVERSION)" \< "1.7.34" ]; then echo true; fi; )
+
+ifdef API1733
+
+VDRSRC = $(VDRDIR)
+ifeq ($(strip $(VDRSRC)),)
+VDRSRC := ../../..
+endif
+LIBDIR = $(VDRSRC)/PLUGINS/lib
+
+ifndef NOCONFIG
+CXXFLAGS = $(call PKGCFG,cflags)
+CXXFLAGS += -fPIC
+else
+-include $(VDRSRC)/Make.global
+-include $(VDRSRC)/Make.config
+endif
+
+export CXXFLAGS
+endif
+
 ### Allow user defined options to overwrite defaults:
 
 -include $(PLGCFG)
@@ -68,8 +90,9 @@ SOFILE = libvdr-$(PLUGIN).so
 
 ### Includes and Defines (add further entries here):
 
-#INCLUDES += -I$(VDRDIR)/include
-INCLUDES +=
+ifdef API1733
+INCLUDES += -I$(VDRDIR)/include
+endif
 
 DEFINES += -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
 
@@ -79,7 +102,11 @@ OBJS = $(PLUGIN).o dish.o epghandler.o setupeepg.o equivhandler.o util.o eit2.o
 
 ### The main target:
 
+ifdef API1733
+all: libvdr-$(PLUGIN).so i18n
+else
 all: $(SOFILE) i18n
+endif
 
 ### Implicit rules:
 
