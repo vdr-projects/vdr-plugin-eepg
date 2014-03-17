@@ -492,7 +492,8 @@ void cCharsetFixer::InitCharsets(const cChannel* Channel)
 
 
   if (!fixedCharset.empty()) {
-    delete conv_to;
+    if (conv_to)
+       delete conv_to;
     conv_to = new cCharSetConv(fixedCharset.c_str());
 
 
