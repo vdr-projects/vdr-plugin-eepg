@@ -124,7 +124,9 @@ void cEEpgHandler::FindDuplicate(cEvent* Event, const char* newTitle)
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
   LogD(3, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
 
-  const char* title = charsetFixer->FixCharset(Title);
+  char buffer[Utf8BufSize(256)];
+  decodeText2((uchar*)Title, strlen(Title), buffer, sizeof(buffer));
+  const char* title = charsetFixer->FixCharset(buffer);
 
   //Sometimes same events overlap and have different EventID
   //Find/Remove duplicates with same title/time
@@ -148,7 +150,10 @@ bool cEEpgHandler::SetShortText(cEvent* Event, const char* ShortText) {
     origShortText.clear();
   }
 
-  const char*  shText = charsetFixer->FixCharset(ShortText);
+  char buffer[Utf8BufSize(256)];
+  decodeText2((uchar*)ShortText, strlen(ShortText), buffer, sizeof(buffer));
+
+  const char*  shText = charsetFixer->FixCharset(buffer);
 
   //if (!Event->ShortText() || ShortText && (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText))))
   Event->SetShortText(shText);
