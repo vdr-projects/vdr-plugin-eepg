@@ -39,14 +39,18 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   //LogD(1, prep("HandleEitEvent"));
   //DISH NID 0x1001 to 0x100B BEV 0x100 and 0x101
   int nid = schedule->ChannelID().Nid();
-  if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100) {
+  if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100 || nid == 0x233A) {
     //Set the Format for Eit events so that the new lines are not erased with FixEpgBugs
-    if (Format != DISH_BEV) Format = DISH_BEV;
+    if (nid == 0x233A) Format = FREEVIEW;
+    else if (Format != DISH_BEV) Format = DISH_BEV;
 
     SI::cEIT2 eit2(Schedule);
     eit2.ProcessEitEvent(Schedule, EitEvent, TableID, Version);
     return true;
-  }
+  } 
+  /*else if (nid == 0x233A) {
+    Format = FREEVIEW;
+  } */
 
   //TODO Should it be added in setup?
   if (EitEvent->getDurationHour() > _LONG_EVENT_HOURS) {
@@ -124,9 +128,9 @@ void cEEpgHandler::FindDuplicate(cEvent* Event, const char* newTitle)
 bool cEEpgHandler::SetTitle(cEvent* Event, const char* Title) {
   LogD(3, prep("Event id:%d title:%s new title:%s"), Event->EventID(), Event->Title(), Title);
 
-  char buffer[Utf8BufSize(256)];
-  decodeText2((uchar*)Title, strlen(Title), buffer, sizeof(buffer));
-  const char* title = charsetFixer->FixCharset(buffer);
+  //char buffer[Utf8BufSize(256)];
+  //decodeText2((uchar*)Title, strlen(Title), buffer, sizeof(buffer));
+  const char* title = charsetFixer->FixCharset(Title);
 
   //Sometimes same events overlap and have different EventID
   //Find/Remove duplicates with same title/time
@@ -150,10 +154,13 @@ bool cEEpgHandler::SetShortText(cEvent* Event, const char* ShortText) {
     origShortText.clear();
   }
 
+  const char*  shText;
   char buffer[Utf8BufSize(256)];
-  decodeText2((uchar*)ShortText, strlen(ShortText), buffer, sizeof(buffer));
-
-  const char*  shText = charsetFixer->FixCharset(buffer);
+/*  if (ShortText && Format == FREEVIEW) {
+    decodeText2((uchar*)ShortText, strlen(ShortText), buffer, sizeof(buffer));
+    shText = charsetFixer->FixCharset(buffer);
+  } else */
+    shText = charsetFixer->FixCharset(ShortText);
 
   //if (!Event->ShortText() || ShortText && (!strcmp(Event->ShortText(),"") || (strcmp(ShortText,"") && strcmp(Event->ShortText(),ShortText))))
   Event->SetShortText(shText);
