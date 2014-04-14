@@ -28,7 +28,6 @@ struct hufftab *tables[2][128];
 int table_size[2][128];
 map<string,string> tableDict;
 
-EFormat Format;
 cEquivHandler* EquivHandler;
 
 cChannel *GetChannelByID(tChannelID & channelID, bool searchOtherPos)
