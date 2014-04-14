@@ -102,15 +102,11 @@ OBJS = $(PLUGIN).o dish.o epghandler.o setupeepg.o equivhandler.o util.o eit2.o
 
 ### The main target:
 
-<<<<<<< HEAD
 ifdef API1733
 all: libvdr-$(PLUGIN).so i18n
 else
 all: $(SOFILE) i18n
 endif
-=======
-all: $(SOFILE)
->>>>>>> master
 
 ### Implicit rules:
 
