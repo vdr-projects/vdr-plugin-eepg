@@ -9,7 +9,6 @@
 #include <string>
 #include <vdr/config.h>
 #include "log.h"
-#include "util.h"
 #include "dish.h"
 #include "equivhandler.h"
 
@@ -435,10 +434,11 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
     channel->SetLinkChannels (LinkChannels);
 }
 
-cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid, bool OnlyRunningStatus)
+cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid, bool OnlyRunningStatus)
 :  SI::EIT (Data, false)
 , OnlyRunningStatus(OnlyRunningStatus)
 , Schedules(Schedules)
+, Format(format)
 {
 
   //LogD(2, prep("cEIT2::cEIT2"));
@@ -563,13 +563,14 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
 }
 //end of cEIT2
 
-cEIT2::cEIT2 (cSchedule * Schedule)
+cEIT2::cEIT2 (cSchedule * Schedule, EFormat format)
 : Empty(true)
 , Modified(false)
 , OnlyRunningStatus(false)
 , SegmentStart(0)
 , SegmentEnd(0)
 , Schedules(NULL)
+, Format(format)
 {
   //LogD(2, prep("cEIT2::cEIT2"));
   //    if (Tid > 0 && (Format == DISH_BEV || (SetupPE->ProcessEIT && isEITPid))) Tid--;

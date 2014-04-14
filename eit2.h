@@ -4,7 +4,9 @@
 #include <libsi/descriptor.h>
 #include <libsi/si.h>
 #include <vdr/epg.h>
+#include "util.h"
 
+using namespace util;
 namespace SI
 {
 enum DescriptorTagExt {
@@ -22,9 +24,10 @@ extern bool SystemCharacterTableIsSingleByte;*/
 class cEIT2:public SI::EIT
 {
 public:
-  cEIT2(cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, bool isEITPid = false,
+  cEIT2(cSchedules * Schedules, int Source, u_char Tid, const u_char * Data,
+        EFormat format, bool isEITPid = false,
         bool OnlyRunningStatus = false);
-  cEIT2 (cSchedule * Schedule);
+  cEIT2 (cSchedule * Schedule, EFormat format);
   //protected:
   //  void updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent);
   cEvent* ProcessEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
@@ -42,6 +45,7 @@ private:
   time_t SegmentStart;
   time_t SegmentEnd;
   cSchedules* Schedules;
+  EFormat Format;
   cChannel* channel;
 
 };

@@ -26,7 +26,6 @@ int YesterdayEpochUTC;
 struct hufftab *tables[2][128];
 int table_size[2][128];
 
-EFormat Format;
 cEquivHandler* EquivHandler;
 
 cChannel *GetChannelByID(tChannelID & channelID, bool searchOtherPos)

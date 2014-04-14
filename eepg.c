@@ -175,7 +175,7 @@ private:
   bool EndChannels, EndThemes; //only used for ??
   int MHWStartTime; //only used for MHW1
   bool ChannelsOk;
-  //int Format; //the format that this filter currently is processing
+  EFormat Format; //the format that this filter currently is processing
   std::map < int, int >ChannelSeq; // ChannelSeq[ChannelId] returns the recordnumber of the channel
 
   Summary_t *Summaries[MAX_TITLES];
@@ -194,6 +194,8 @@ private:
 
   void NextPmt (void);
   void ProccessContinuous(u_short Pid, u_char Tid, int Length, const u_char *Data);
+  bool load_sky_file (const char *filename);
+  int sky_huffman_decode (const u_char * Data, int Length, unsigned char *DecodeText);
 protected:
   virtual void Process (u_short Pid, u_char Tid, const u_char * Data, int Length);
   virtual void AddFilter (u_short Pid, u_char Tid);
@@ -258,7 +260,7 @@ void cFilterEEPG::SetStatus (bool On)
   if (!On) {
     FreeSummaries ();
     FreeTitles ();
-    //Format = 0;
+    Format = MHW1;
     ChannelsOk = false;
     NumberOfTables = 0;
   } else {
@@ -422,7 +424,7 @@ static bool load_freesat_file (int tableid, const char *filename)
  *  \param filename  - Filename to load
  *  \return Success of operation
  */
-static bool load_sky_file (const char *filename)
+bool cFilterEEPG::load_sky_file (const char *filename)
 {
   FILE *FileDict;
   char *Line;
@@ -646,7 +648,7 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
   return NULL;
 }
 
-int sky_huffman_decode (const u_char * Data, int Length, unsigned char *DecodeText)
+int cFilterEEPG::sky_huffman_decode (const u_char * Data, int Length, unsigned char *DecodeText)
 {
   sNodeH *nH, H=(Format==SKY_IT)?*sky_tables[0]:*sky_tables[1];
   int i;
@@ -793,8 +795,13 @@ bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB 
  * \brief Initialize the Huffman dictionaries if they are not already initialized.
  *
  */
+static cMutex InitDictionary_mutex;
+
 bool cFilterEEPG::InitDictionary (void)
 {
+  // This function must be serialised because it updates sky_tables and tables
+  // which are both globals.
+  cMutexLock MutexLock(&InitDictionary_mutex);
   string FileName = cSetupEEPG::getInstance()->getConfDir();
   switch (Format) {
   case SKY_IT:
@@ -2729,7 +2736,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
   cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
   //Look for other satelite positions only if Dish/Bell ExpressVU for the moment hardcoded pid check
   if(Schedules)
-    SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Pid == EIT_PID);
+    SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Format, Pid == EIT_PID);
 
   else//cEIT EIT (Schedules, Source (), Tid, Data);
   {
@@ -2740,7 +2747,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
     cSchedulesLock SchedulesLock;
     cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
     if(Schedules)
-      SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Pid == EIT_PID, true);
+      SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Format, Pid == EIT_PID, true);
 
     //cEIT EIT (Schedules, Source (), Tid, Data, true);
   }

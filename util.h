@@ -32,7 +32,7 @@ extern int Yesterday;
 extern int YesterdayEpoch;
 extern int YesterdayEpochUTC;
 
-extern enum EFormat
+enum EFormat
 {
 //First all batchmode, load ONCE protocols:
   MHW1 = 0,
@@ -47,7 +47,7 @@ extern enum EFormat
   EIT,
 //the highest number of EPG-formats that is supported by this plugin
   HIGHEST_FORMAT = EIT
-} Format;
+};
 
 extern cEquivHandler* EquivHandler;
 

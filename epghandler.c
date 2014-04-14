@@ -34,9 +34,9 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   int nid = Schedule->ChannelID().Nid();
   if ((nid >= 0x1001 && nid <= 0x100B) || nid == 0x101 || nid == 0x100) {
     //Set the Format for Eit events so that the new lines are not erased with FixEpgBugs
-    if (Format != DISH_BEV) Format = DISH_BEV;
+    EFormat Format = DISH_BEV;
 
-    SI::cEIT2 eit2(Schedule);
+    SI::cEIT2 eit2(Schedule, Format);
     eit2.ProcessEitEvent(Schedule, EitEvent, TableID, Version);
     return true;
   }
