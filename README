@@ -32,6 +32,7 @@ Currently the following EEPG formats are supported:
 * Sky Italy
 * Sky UK
 * Freesat
+* Freeview
 * Premiere
 * NagraGuide (CanaalDigitaalNL, only in test)
 * NA Dish and BEV
@@ -125,6 +126,7 @@ This code is based on:
 Thanks to mrgandalf, and the others who helped map NA eit.
 Thanks to VDR User for testing and providing makequiv.sh script for S72.7W channels.
 Thanks to cheesemonster for providing a patch to fix multipe device problems
+Thanks to Tony Houghton and Stuart Morris for testing Freeview HD
 
 We wish to thank all authors for the great work they have been doing, decoding
 this EEPG data; this plugin tries to combine the best of all worlds.
