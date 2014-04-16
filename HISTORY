@@ -40,6 +40,7 @@ Release 0.0.6pre:
 - Reformatted MHW1 themes
 - Added some new/missing SKY themes
 - Added ability to translate themes. See README/Examples
+- Added support for Freeview HD (DVB-T)
 
 - Additional fixes logged at http://projects.vdr-developer.org/git/vdr-plugin-eepg.git/
 
