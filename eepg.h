@@ -1363,7 +1363,7 @@ static const char *SkyItThemes[] = {
   "Ragazzi e Musica - Musica da Camera", // 110 01011
   NULL, // 110 01100
   NULL, // 110 01101
-  NULL, // 110 01110
+  "Ragazzi e Musica - Classica", // 110 01110
   NULL, // 110 01111
   NULL, // 110 10000
   "Ragazzi e Musica - Concerto", // 110 10001
