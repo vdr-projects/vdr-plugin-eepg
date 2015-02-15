@@ -133,8 +133,12 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
         UseExtendedEventDescriptor = true;
       }
       if (UseExtendedEventDescriptor) {
+#if APIVERSNUM < 20109
         ExtendedEventDescriptors->Add(eed);
-        d = NULL; // so that it is not deleted
+#else
+        if (ExtendedEventDescriptors->Add(eed))
+#endif
+          d = NULL; // so that it is not deleted
       }
       if (eed->getDescriptorNumber() == eed->getLastDescriptorNumber())
         UseExtendedEventDescriptor = false;
