@@ -77,7 +77,12 @@ void cEquivHandler::loadEquivalentChannelMap (void)
       tChannelID OriginalChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
       bool found = false;
       //int i = 0;
+#if APIVERSNUM >= 20300
+      LOCK_CHANNELS_READ;
+      const cChannel *OriginalChannel = Channels->GetByChannelID(OriginalChID, false);
+#else
       cChannel *OriginalChannel = Channels.GetByChannelID (OriginalChID, false);
+#endif
       if (!OriginalChannel) {
         LogI(2, prep("Warning, not found EPG channel \'%s\' in channels.conf. Equivalence is assumed to be valid, but perhaps you should check the entry in the equivalents file"), origChanID);
         continue;
@@ -89,7 +94,11 @@ void cEquivHandler::loadEquivalentChannelMap (void)
           rid = 0;
         }
         tChannelID EquivChID = tChannelID (cSource::FromString (source), nid, tid, sid, rid);
+#if APIVERSNUM >= 20300
+        const cChannel *EquivChannel = Channels->GetByChannelID(EquivChID, false);
+#else
         cChannel *EquivChannel = Channels.GetByChannelID (EquivChID, false);
+#endif
         if (!EquivChannel) {
           LogI(0, prep("Warning, not found equivalent channel \'%s\' in channels.conf"), equiChanID);
           continue;
@@ -130,7 +139,7 @@ void cEquivHandler::updateEquivalent(cSchedules * Schedules, tChannelID channelI
   for (it=ret.first; it!=ret.second; ++it) {
     LogD(2, prep("equivalent channel exists"));
     tChannelID equChannelID (tChannelID::FromString((*it).second.c_str()));
-    cChannel *equChannel = GetChannelByID (equChannelID, false);
+    const cChannel *equChannel = GetChannelByID (equChannelID, false);
     if (equChannel) {
       LogD(2, prep("found Equivalent channel %s"), *equChannelID.ToString());
       cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (equChannel, true);
@@ -192,14 +201,18 @@ void cEquivHandler::sortEquivalents(tChannelID channelID, cSchedules* Schedules)
   {
     LogD(3, prep("equivalent channel exists"));
     tChannelID equChannelID(tChannelID::FromString((*it).second.c_str()));
-    cChannel* pChannel = GetChannelByID(equChannelID, false);
+    const cChannel* pChannel = GetChannelByID(equChannelID, false);
     if (pChannel)
     {
       LogD(2, prep("found Equivalent channel %s"), *equChannelID.ToString());
       cSchedule* pSchedule = (cSchedule *) Schedules->GetSchedule(pChannel, true);
 
       pSchedule->Sort();
+#if APIVERSNUM >= 20300
+      pSchedule->SetModified();
+#else
       Schedules->SetModified(pSchedule);
+#endif
     }
   }
 }

@@ -30,14 +30,23 @@ map<string,string> tableDict;
 
 cEquivHandler* EquivHandler;
 
-cChannel *GetChannelByID(tChannelID & channelID, bool searchOtherPos)
+const cChannel *GetChannelByID(const tChannelID & channelID, bool searchOtherPos)
 {
-  cChannel *VC = Channels.GetByChannelID(channelID, true);
+#if APIVERSNUM >= 20300
+  LOCK_CHANNELS_READ;
+  const cChannel *VC = Channels->GetByChannelID(channelID, true);
+#else
+  const cChannel *VC = Channels.GetByChannelID(channelID, true);
+#endif
   if(!VC && searchOtherPos){
     //look on other satpositions
     for(int i = 0;i < NumberOfAvailableSources;i++){
-      channelID = tChannelID(AvailableSources[i], channelID.Nid(), channelID.Tid(), channelID.Sid());
-      VC = Channels.GetByChannelID(channelID, true);
+      tChannelID chID = tChannelID(AvailableSources[i], channelID.Nid(), channelID.Tid(), channelID.Sid());
+#if APIVERSNUM >= 20300
+      VC = Channels->GetByChannelID(chID, true);
+#else
+      VC = Channels.GetByChannelID(chID, true);
+#endif
       if(VC){
         //found this actually on satellite nextdoor...
         break;
@@ -159,7 +168,7 @@ private:
   cTimeMs LastHandleEvent;
   std::map<tChannelID,cList<cEvent>*,tChannelIDCompare> *map_list;
 //  enum { INSERT_TIMEOUT_IN_MS = 10000 };
-  void MergeEquivalents(cEvent* dest, cEvent* src);
+  void MergeEquivalents(cEvent* dest, const cEvent* src);
 protected:
   virtual void Action(void);
 public:
@@ -189,14 +198,19 @@ void cAddEventThread::Action(void)
   while (Running() && !LastHandleEvent.TimedOut()) {
     std::map<tChannelID, cList<cEvent>*, tChannelIDCompare>::iterator it;
 
+#if APIVERSNUM >= 20300
+    LOCK_SCHEDULES_WRITE;
+    cSchedules *schedules = Schedules;
+#else
     cSchedulesLock SchedulesLock(true, 10);
-    cSchedules *schedules = (cSchedules *) cSchedules::Schedules(SchedulesLock);
-    Lock();
+    cSchedules *schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
+#endif
+   Lock();
 
     it = map_list->begin();
     while (schedules && it != map_list->end()) {
       cSchedule *schedule = (cSchedule *) schedules->GetSchedule(
-        Channels.GetByChannelID((*it).first), true);
+        GetChannelByID((*it).first, false), true);
       while (((*it).second->First()) != NULL) {
         cEvent* event = (*it).second->First();
 
@@ -207,7 +221,7 @@ void cAddEventThread::Action(void)
 
            (*it).second->Del(event, false);
 
-           for (cEvent *ev = schedule->Events()->First(); ev; ev = schedule->Events()->Next(ev)) {
+           for (const cEvent *ev = schedule->Events()->First(); ev; ev = schedule->Events()->Next(ev)) {
              if (ev->StartTime() > event->EndTime()) {
                    break;
              }
@@ -215,7 +229,7 @@ void cAddEventThread::Action(void)
                  && ((event->StartTime() >= ev->StartTime() && event->StartTime() < ev->EndTime())
                  || (ev->StartTime() >= event->StartTime() && ev->StartTime() < event->EndTime()))){
                MergeEquivalents(event, ev);
-               schedule->DelEvent(ev);
+               schedule->DelEvent((cEvent*)ev);
                break;
              }
            }
@@ -268,7 +282,7 @@ string ExtractAttributes(string text) {
 
 }
 
-inline void cAddEventThread::MergeEquivalents(cEvent* dest, cEvent* src)
+inline void cAddEventThread::MergeEquivalents(cEvent* dest, const cEvent* src)
 {
   if (!dest->ShortText() || !strcmp(dest->ShortText(),""))
     dest->SetShortText(src->ShortText());
@@ -427,12 +441,16 @@ void sortSchedules(cSchedules * Schedules, tChannelID channelID){
 
   LogD(3, prep("Start sortEquivalent %s"), *channelID.ToString());
 
-  cChannel *pChannel = GetChannelByID (channelID, false);
+  const cChannel *pChannel = GetChannelByID (channelID, false);
   cSchedule *pSchedule;
   if (pChannel) {
     pSchedule = (cSchedule *) (Schedules->GetSchedule(pChannel, true));
       pSchedule->Sort();
+#if APIVERSNUM >= 20300
+      pSchedule->SetModified();
+#else
       Schedules->SetModified(pSchedule);
+#endif
     }
   if (EquivHandler->getEquiChanMap().count(*channelID.ToString()) > 0)
     EquivHandler->sortEquivalents(channelID, Schedules);

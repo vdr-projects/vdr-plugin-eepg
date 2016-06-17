@@ -1001,7 +1001,7 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length)
         C->Tid = HILO16 (Channel->TransportId);
         C->Sid = HILO16 (Channel->ServiceId);
         tChannelID channelID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
-        cChannel *VC = GetChannelByID(channelID, true);
+        const cChannel *VC = GetChannelByID(channelID, true);
         bool IsFound = (VC);
         if(IsFound) {
           C->Src = VC->Source();
@@ -1515,8 +1515,12 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
   unsigned short int CurrentYear = tmCurrent->tm_year;
   unsigned short int CurrentMonth = tmCurrent->tm_mon;
   //esyslog("EEPGDEBUG: CurrentMonthday=%i, TableIdExtension:%04x, MonthdayTitles=%i.",CurrentMonthday,TableIdExtension, MonthdayTitles);
+#if APIVERSNUM >= 20300
+  LOCK_SCHEDULES_WRITE;
+#else
   cSchedulesLock SchedulesLock (true);
-  cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
+  cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
+#endif
   do { //process each block of titles
     sTitleBlockNagraGuide *TB = (sTitleBlockNagraGuide *) p;
     int ChannelId = HILO16 (TB->ChannelId);
@@ -1535,7 +1539,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
 
     sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
     //cSchedule *ps = NULL;//[MAX_EQUIVALENCES];
-    //PrepareToWriteToSchedule (C, s, ps);
+    //PrepareToWriteToSchedule (C, Schedules, ps);
 
     for (int i = 0; i < NumberOfTitles; i++) { //process each title within block
       sTitleNagraGuide *Title = (sTitleNagraGuide *) p;
@@ -1586,7 +1590,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
         if (Themes[Title->ThemeId][0] == 0x00) //if detailed themeid is not known, get global themeid
           Title->ThemeId &= 0xf0;
 
-        WriteToSchedule (tChannelID (C->Src, C->Nid, C->Tid, C->Sid), s, EventId, StartTime, Title->Duration, Text, SummText,
+        WriteToSchedule (tChannelID (C->Src, C->Nid, C->Tid, C->Sid), Schedules, EventId, StartTime, Title->Duration, Text, SummText,
                          Title->ThemeId, NAGRA_TABLE_ID, Version);
 
         if (Text != NULL)
@@ -1625,7 +1629,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
     } //end for titles
 
     //FinishWriteToSchedule (C, s, ps);
-    sortSchedules(s, tChannelID (C->Src, C->Nid, C->Tid, C->Sid));
+    sortSchedules(Schedules, tChannelID (C->Src, C->Nid, C->Tid, C->Sid));
     p = next_p;
   } while (p < DataEnd); //end of TitleBlock
 }
@@ -1748,7 +1752,7 @@ int cFilterEEPG::GetChannelsNagra (const u_char * Data, int Length)
     C->Tid = HILO16 (Channel->TransportId);
     C->Sid = HILO16 (Channel->ServiceId);
     tChannelID channelID = tChannelID(C->Src, C->Nid, C->Tid, C->Sid);
-    cChannel *VC = GetChannelByID(channelID, true);
+    const cChannel *VC = GetChannelByID(channelID, true);
     bool IsFound = (VC);
     if(IsFound) {
       strncpy((char*)(C->Name), VC->Name (), 64);
@@ -2318,7 +2322,7 @@ int cFilterEEPG::GetChannelsSKYBOX (const u_char * Data, int Length)
                 C->Sid = Sid;
                 C->SkyNumber = SkyNumber;
                 tChannelID channelID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
-                cChannel *VC = Channels.GetByChannelID (channelID, true);
+                const cChannel *VC = GetChannelByID (channelID, false);
                 bool IsFound = (VC);
                 if (IsFound)
                   strncpy ((char *) C->Name, VC->Name (), 64);
@@ -2592,9 +2596,13 @@ void cFilterEEPG::LoadIntoSchedule (void)
   bool isOTV = Format == SKY_IT || Format == SKY_UK;
 
   {
+#if APIVERSNUM >= 20300
+  LOCK_SCHEDULES_WRITE;
+#else
   cSchedulesLock SchedulesLock (true);
-  cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
-  if (s) {
+  cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
+#endif
+  if (Schedules) {
 
     while (i < nTitles) {
       S = Summaries[j];
@@ -2646,7 +2654,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
           //channelids are sequentially numbered and sent in MHW1 and MHW2, but not in SKY, so we need to lookup the table index
           sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
           //cSchedule *p;//[MAX_EQUIVALENCES];
-          //PrepareToWriteToSchedule (C, s, p);
+          //PrepareToWriteToSchedule (C, Schedules, p);
           tChannelID chanID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
 
           char rating = 0x00;
@@ -2661,12 +2669,12 @@ void cFilterEEPG::LoadIntoSchedule (void)
 //          LogD (0, prep("EventId %08x Titlenr:%d,SummNr:%d,SummAv:%x,Un1:%x,Un2:%x,Un3:%x,Name:%s,STxtLn:%d,Summary:%s."),
 //                      T->EventId, i, j, T->SummaryAvailable, T->Unknown1, T->Unknown2, T->Unknown3, T->Text, S->ShortTextLength, S->Text);
 
-          WriteToSchedule (chanID, s, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
+          WriteToSchedule (chanID, Schedules, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
                            (char *) S->Text, T->ThemeId, TableId, 0, rating, S->ShortTextLength);
-          sortSchedules(s, chanID);
+          sortSchedules(Schedules, chanID);
           //if (shortText != NULL) delete [] shortText;
 
-          //FinishWriteToSchedule (C, s, p);
+          //FinishWriteToSchedule (C, Schedules, p);
           //Replays--;
           //if ((S->NumReplays != 0) && (Replays > 0)) { //when replays are used, all summaries of the replays are stored consecutively; currently only CSAT
           //j++;  //move to next summary
@@ -2704,15 +2712,15 @@ void cFilterEEPG::LoadIntoSchedule (void)
             sChannel *C = &sChannels[ChannelSeq[T->ChannelId]]; //find channel
             //cSchedule *p;//[MAX_EQUIVALENCES];
             tChannelID chanID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
-            //PrepareToWriteToSchedule (C, s, p);
+            //PrepareToWriteToSchedule (C, Schedules, p);
             char rating = 0x00;
             if (!isOTV &&  T->Rating) { //TODO only works on OTV for now
               rating = T->Rating;
             }
-            WriteToSchedule (chanID, s, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
+            WriteToSchedule (chanID, Schedules, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
                              NULL, T->ThemeId, DEFAULT_TABLE_ID, 0, rating, S->ShortTextLength);
-            //FinishWriteToSchedule (C, s, p);
-            sortSchedules(s, chanID);
+            //FinishWriteToSchedule (C, Schedules, p);
+            sortSchedules(Schedules, chanID);
 
             SummariesNotFound++;
           }
@@ -2909,12 +2917,19 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
 {
   //0x39 Viasat, 0x0300 Dish Network EEPG, 0x0441 Bell ExpressVU EEPG
   LogD(4, prep("Pid: 0x%02x Tid: %d Length: %d"), Pid, Tid, Length);
+#if APIVERSNUM >= 20300
+  LOCK_SCHEDULES_WRITE;
+//  cStateKey SchedulesStateKey;
+//  cSchedules *Schedules = cSchedules::GetSchedulesWrite(SchedulesStateKey, 10);
+#else
   cSchedulesLock SchedulesLock(true, 10);
   cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
+#endif
   //Look for other satelite positions only if Dish/Bell ExpressVU for the moment hardcoded pid check
   if(Schedules)
     SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Format, Pid == EIT_PID);
 
+#if APIVERSNUM < 20300
   else//cEIT EIT (Schedules, Source (), Tid, Data);
   {
     // If we don't get a write lock, let's at least get a read lock, so
@@ -2928,6 +2943,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
 
     //cEIT EIT (Schedules, Source (), Tid, Data, true);
   }
+#endif
 }
 
 void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Length)
@@ -3295,8 +3311,12 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
   SI::PremiereCIT cit(Data, false);
 
   if (cit.CheckCRCAndParse ()) {
+#if APIVERSNUM >= 20300
+    LOCK_SCHEDULES_WRITE;
+#else
     cSchedulesLock SchedulesLock (true, 10);
     cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
+#endif
     if (Schedules) {
       int now = time (0);
       int nCount = 0;
@@ -3438,7 +3458,12 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
             }
           }
           tChannelID channelID (Source (), nid, tid, sid);
+#if APIVERSNUM >= 20300
+	  LOCK_CHANNELS_READ;
+          const cChannel *channel = Channels->GetByChannelID (channelID, true);
+#else
           cChannel *channel = Channels.GetByChannelID (channelID, true);
+#endif
 
           if (!channel)
             continue;
@@ -3543,7 +3568,11 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
           }
           if (Modified) {
             pSchedule->Sort ();
+#if APIVERSNUM >= 20300
+            pSchedule->SetModified();
+#else
             Schedules->SetModified (pSchedule);
+#endif
           }
           delete pct;
         }
@@ -3669,7 +3698,12 @@ bool cPluginEEPG::Start (void)
   tables[0][0] = NULL;
   //store all available sources, so when a channel is not found on current satellite, we can look for alternate sat positions.
   //perhaps this can be done smarter through existing VDR function???
-  for (cChannel * Channel = Channels.First (); Channel; Channel = Channels.Next (Channel)) {
+#if APIVERSNUM >= 20300
+  LOCK_CHANNELS_READ;
+  for (const cChannel * Channel = Channels->First(); Channel; Channel = Channels->Next(Channel)) {
+#else
+  for (const cChannel * Channel = Channels.First (); Channel; Channel = Channels.Next (Channel)) {
+#endif
     if (!Channel->GroupSep ()) {
       bool found = false;
       for (int i = 0; (i < NumberOfAvailableSources) && (!found); i++)

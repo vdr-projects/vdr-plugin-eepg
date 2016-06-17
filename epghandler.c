@@ -108,7 +108,7 @@ void cEEpgHandler::FindDuplicate(cEvent* Event, const char* newTitle)
 {
   if (!newTitle || !searchDuplicates) return;
 
-  for (cEvent *ev = schedule->Events()->First(); ev; ev = schedule->Events()->Next(ev)) {
+  for (const cEvent *ev = schedule->Events()->First(); ev; ev = schedule->Events()->Next(ev)) {
     //assume that events are already sorted.
     if (ev->StartTime() > Event->EndTime()) break;
     if (ev->Title() && strcasecmp(ev->Title(), newTitle) == 0
@@ -117,7 +117,7 @@ void cEEpgHandler::FindDuplicate(cEvent* Event, const char* newTitle)
 
       LogD(0, prep("!!!Deleting Event id o:%d n:%d; title o:%s n:%s; start_time o:%d n:%d; duration o:%d n:%d"),
           ev->EventID(), Event->EventID(), ev->Title(), newTitle, ev->StartTime(), Event->StartTime(), ev->Duration(), Event->Duration());
-      RemoveEvent(ev);
+      RemoveEvent((cEvent*)ev);
       break;
     }
   }

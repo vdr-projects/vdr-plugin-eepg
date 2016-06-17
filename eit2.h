@@ -62,7 +62,7 @@ public:
 private:
   void ProcessEventDescriptors(bool ExternalData, int Source, u_char Tid,
                                const SI::EIT::Event* SiEitEvent, cEvent* pEvent,
-                               cSchedules* Schedules, cChannel* channel);
+                               cSchedules* Schedules, const tChannelID& channelID);
 
 private:
   bool Empty;
@@ -73,8 +73,7 @@ private:
   time_t SegmentEnd;
   cSchedules* Schedules;
   EFormat Format;
-  cChannel* channel;
-
+  const cChannel* channel;
 };
 } //end namespace SI
 
