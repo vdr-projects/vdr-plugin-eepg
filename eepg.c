@@ -2645,7 +2645,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
           }
 
           index++;
-          if ((StartTime + T->Duration) < too_old) {
+          if ((StartTime + (int)T->Duration) < too_old) {
             LogD(3, prep("Skipping old event '%s', start time:%s"), T->Text, ctime (&StartTime));
             OldEvents++;
             continue;
@@ -2699,7 +2699,7 @@ void cFilterEEPG::LoadIntoSchedule (void)
 //      esyslog("EEPG Error: lost sync at title %d, summary %d.",i,j);
         } else if (j == (remembersummary - 1) || SummIndex !=-1) { //the last summary to be checked has failed also
           //esyslog ("EEPG Error: could not find summary for summary-available Title %d.", i);
-          if ((T->StartTime + T->Duration) < too_old) {
+          if ((T->StartTime + T->Duration) < (uint)too_old) {
             LogD(3, prep("Skipping old event '%s' without summary, start time:%s"), T->Text, ctime ((time_t*)&T->StartTime));
             OldEvents++;
           } else {
