@@ -127,6 +127,7 @@ Thanks to mrgandalf, and the others who helped map NA eit.
 Thanks to VDR User for testing and providing makequiv.sh script for S72.7W channels.
 Thanks to cheesemonster for providing a patch to fix multipe device problems
 Thanks to Tony Houghton and Stuart Morris for testing Freeview HD
+Thanks to Matthias Feistel for the wrong lock sequence fix
 
 We wish to thank all authors for the great work they have been doing, decoding
 this EEPG data; this plugin tries to combine the best of all worlds.

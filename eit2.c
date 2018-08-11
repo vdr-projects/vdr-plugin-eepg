@@ -118,8 +118,6 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
   cComponents *Components = NULL;
 
 #if APIVERSNUM >= 20300
-  LOCK_CHANNELS_WRITE;
-  if (!Channels) return;
   cChannel *channel = Channels->GetByChannelID(channelId);
 #else
   cChannel *channel = Channels.GetByChannelID(channelId);
@@ -461,9 +459,10 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
     channel->SetLinkChannels (LinkChannels);
 }
 
-cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid, bool OnlyRunningStatus)
+cEIT2::cEIT2 (cChannels* Channels, cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid, bool OnlyRunningStatus)
 :  SI::EIT (Data, false)
 , OnlyRunningStatus(OnlyRunningStatus)
+, Channels(Channels)
 , Schedules(Schedules)
 , Format(format)
 {
@@ -575,7 +574,6 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
   // ETR 211: an empty entry in section 0 of table 0x4E means there is currently no event running
   {
 #if APIVERSNUM >= 20300
-      LOCK_CHANNELS_WRITE;
       cChannel *chan = Channels->GetByChannelID(channel->GetChannelID());
 #else
       cChannel *chan = Channels.GetByChannelID(channel->GetChannelID());
