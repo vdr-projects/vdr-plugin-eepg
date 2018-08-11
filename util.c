@@ -7,6 +7,7 @@
 #include "util.h"
 #include "log.h"
 #include "equivhandler.h"
+#include "setupeepg.h"
 #include <vdr/channels.h>
 #include <vdr/thread.h>
 #include <vdr/epg.h>
@@ -25,17 +26,27 @@ int YesterdayEpochUTC;
 
 struct hufftab *tables[2][128];
 int table_size[2][128];
+map<string,string> tableDict;
 
 cEquivHandler* EquivHandler;
 
-cChannel *GetChannelByID(tChannelID & channelID, bool searchOtherPos)
+const cChannel *GetChannelByID(const tChannelID & channelID, bool searchOtherPos)
 {
-  cChannel *VC = Channels.GetByChannelID(channelID, true);
+#if APIVERSNUM >= 20300
+  LOCK_CHANNELS_READ;
+  const cChannel *VC = Channels->GetByChannelID(channelID, true);
+#else
+  const cChannel *VC = Channels.GetByChannelID(channelID, true);
+#endif
   if(!VC && searchOtherPos){
     //look on other satpositions
     for(int i = 0;i < NumberOfAvailableSources;i++){
-      channelID = tChannelID(AvailableSources[i], channelID.Nid(), channelID.Tid(), channelID.Sid());
-      VC = Channels.GetByChannelID(channelID, true);
+      tChannelID chID = tChannelID(AvailableSources[i], channelID.Nid(), channelID.Tid(), channelID.Sid());
+#if APIVERSNUM >= 20300
+      VC = Channels->GetByChannelID(chID, true);
+#else
+      VC = Channels.GetByChannelID(chID, true);
+#endif
       if(VC){
         //found this actually on satellite nextdoor...
         break;
@@ -149,7 +160,7 @@ struct tChannelIDCompare
 };
 
 cTimeMs LastAddEventThread;
-enum { INSERT_TIMEOUT_IN_MS = 10000 };
+enum { INSERT_TIMEOUT_IN_MS = 5000 };
 
 class cAddEventThread : public cThread
 {
@@ -157,6 +168,7 @@ private:
   cTimeMs LastHandleEvent;
   std::map<tChannelID,cList<cEvent>*,tChannelIDCompare> *map_list;
 //  enum { INSERT_TIMEOUT_IN_MS = 10000 };
+  void MergeEquivalents(cEvent* dest, const cEvent* src);
 protected:
   virtual void Action(void);
 public:
@@ -182,38 +194,55 @@ cAddEventThread::~cAddEventThread(void)
 
 void cAddEventThread::Action(void)
 {
-  //LogD (0, prep("Action"));
   SetPriority(19);
   while (Running() && !LastHandleEvent.TimedOut()) {
     std::map<tChannelID, cList<cEvent>*, tChannelIDCompare>::iterator it;
 
+#if APIVERSNUM >= 20300
+    LOCK_SCHEDULES_WRITE;
+    cSchedules *schedules = Schedules;
+#else
     cSchedulesLock SchedulesLock(true, 10);
-    cSchedules *schedules = (cSchedules *) cSchedules::Schedules(SchedulesLock);
-    Lock();
+    cSchedules *schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
+#endif
+   Lock();
 
     it = map_list->begin();
     while (schedules && it != map_list->end()) {
       cSchedule *schedule = (cSchedule *) schedules->GetSchedule(
-        Channels.GetByChannelID((*it).first), true);
+        GetChannelByID((*it).first, false), true);
       while (((*it).second->First()) != NULL) {
         cEvent* event = (*it).second->First();
 
-         cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
-         if (pEqvEvent){
-//	   LogD (0, prep("schedule->DelEvent(event) size:%d"), (*it).second->Count());
-    	   (*it).second->Del(event);
-//           schedule->DelEvent(pEqvEvent);
-         } else {
+        cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
+        if (pEqvEvent){
+          (*it).second->Del(event);
+        } else {
 
-          (*it).second->Del(event, false);
-          EpgHandlers.DropOutdated(schedule, event->StartTime(), event->EndTime(), event->TableID(),
-            event->Version());
-          schedule->AddEvent(event);
+           (*it).second->Del(event, false);
+
+           for (const cEvent *ev = schedule->Events()->First(); ev; ev = schedule->Events()->Next(ev)) {
+             if (ev->StartTime() > event->EndTime()) {
+                   break;
+             }
+             if (ev && (ev->EventID() == event->EventID() || (event->Title() && strcasecmp(ev->Title(), event->Title()) == 0))
+                 && ((event->StartTime() >= ev->StartTime() && event->StartTime() < ev->EndTime())
+                 || (ev->StartTime() >= event->StartTime() && ev->StartTime() < event->EndTime()))){
+               MergeEquivalents(event, ev);
+               schedule->DelEvent((cEvent*)ev);
+               break;
+             }
+           }
+
+           event = schedule->AddEvent(event);
+           EpgHandlers.DropOutdated(schedule, event->StartTime(), event->EndTime(), event->TableID(),
+             event->Version());
+
         }
       }
       EpgHandlers.SortSchedule(schedule);
-       //sortSchedules(schedules, (*it).first);
-       //schedule->Sort();
+      //sortSchedules(schedules, (*it).first);
+      //schedule->Sort();
       delete (*it).second;
       map_list->erase(it);
       it = map_list->begin();
@@ -238,6 +267,42 @@ void cAddEventThread::AddEvent(cEvent *Event, tChannelID ChannelID)
   LastHandleEvent.Set(INSERT_TIMEOUT_IN_MS);
 }
 
+string ExtractAttributes(string text) {
+  string attribute;
+  size_t apos = 0;
+  while ((apos = text.find('\n',apos)) != string::npos) {
+    size_t npos = text.find('\n', apos);
+    string subs = text.substr(apos, npos - apos);
+    if (subs.find(": ") != string::npos)
+      attribute += subs;
+    apos = npos;
+    //LogD(0, prep("ExtractAttribute attribute:%s, apos:%i, pos:%i"),attribute.c_str(), catpos, pos);
+  }
+  return attribute;
+
+}
+
+inline void cAddEventThread::MergeEquivalents(cEvent* dest, const cEvent* src)
+{
+  if (!dest->ShortText() || !strcmp(dest->ShortText(),""))
+    dest->SetShortText(src->ShortText());
+
+  //Handle the Category and Genre, and optionally future tags
+  if (!src->Description() || !strcmp(src->Description(),""))
+      return;
+
+  if ((!dest->Description() || strstr(src->Description(),dest->Description()))) {
+    dest->SetDescription(src->Description());
+  } else if (dest->Description()) {
+
+    string desc = dest->Description() ? dest->Description() : "";
+    desc += ExtractAttributes(desc);
+    dest->SetDescription (desc.c_str());
+
+  }
+
+}
+
 static cAddEventThread AddEventThread;
 
 // ---
@@ -249,7 +314,7 @@ void AddEvent(cEvent *Event, tChannelID ChannelID)
 //  if (!AddEventThread.Active())
 //     AddEventThread.Start();
   if (!AddEventThread.Active() && LastAddEventThread.TimedOut()){
-    LastAddEventThread.Set(INSERT_TIMEOUT_IN_MS * 2);
+    LastAddEventThread.Set(INSERT_TIMEOUT_IN_MS * 1.5);
     AddEventThread.Start();
   }
 
@@ -376,16 +441,106 @@ void sortSchedules(cSchedules * Schedules, tChannelID channelID){
 
   LogD(3, prep("Start sortEquivalent %s"), *channelID.ToString());
 
-  cChannel *pChannel = GetChannelByID (channelID, false);
+  const cChannel *pChannel = GetChannelByID (channelID, false);
   cSchedule *pSchedule;
   if (pChannel) {
     pSchedule = (cSchedule *) (Schedules->GetSchedule(pChannel, true));
       pSchedule->Sort();
+#if APIVERSNUM >= 20300
+      pSchedule->SetModified();
+#else
       Schedules->SetModified(pSchedule);
+#endif
     }
   if (EquivHandler->getEquiChanMap().count(*channelID.ToString()) > 0)
     EquivHandler->sortEquivalents(channelID, Schedules);
 }
 
+cCharsetFixer::cCharsetFixer()
+{
+  charsetOverride = getenv("VDR_CHARSET_OVERRIDE");
+  if (!charsetOverride) charsetOverride = "ISO6937";
+  initialCharset = charsetOverride;
+  fixedCharset = "";
+  conv_revert = NULL;
+  conv_to = NULL;
+
 }
 
+cCharsetFixer::~cCharsetFixer()
+{
+}
+
+const char* cCharsetFixer::FixCharset(const char* text)
+{
+  if (!text || !conv_revert || !conv_to) return text;
+
+  //LogD(0, prep("FixCharset fixCharset:%s charsetOverride:%s text:%s"), fixCharset.c_str(), CharsetOverride, text);
+  const char* fixed = NULL;
+  if (!fixedCharset.empty()) {
+
+    if (fixedCharset != charsetOverride) {
+      //LogD(0, prep("FixCharset2 fixCharset:%s charsetOverride:%s text:%s"), fixCharset.c_str(), CharsetOverride, text);
+      fixed = conv_revert->Convert(text);
+      //LogD(0, prep("conv 1 fixed:%s"),fixed);
+      fixed = conv_to->Convert(fixed);
+      //LogD(0, prep("Fixed text:%s"), fixed);
+    }
+  }
+  if (!fixed) fixed = text;
+  return fixed;
+
+}
+
+void cCharsetFixer::InitCharsets(const cChannel* Channel)
+{
+  if (!cSetupEEPG::getInstance()->FixCharset) return;
+
+  if (strcasecmp( Channel->Provider(), "Skylink") == 0 || strcasecmp( Channel->Provider(), "UPC Direct") == 0
+      || strcasecmp( Channel->Provider(), "CYFRA +") == 0) {
+    fixedCharset = "ISO6937";
+  } else if (strcasestr( Channel->Provider(), "Polsat") != 0) {
+    fixedCharset = "ISO-8859-2";
+  } else if (Channel->Nid() == 0x01) {
+    fixedCharset = "ISO-8859-9";
+  } else {
+    fixedCharset = "";
+  }
+
+
+  if (!fixedCharset.empty()) {
+    if (conv_to)
+       delete conv_to;
+    conv_to = new cCharSetConv(fixedCharset.c_str());
+
+
+    const char* chrs;
+    if (strcasecmp( Channel->Provider(), "CYFRA +") == 0) {
+      chrs = "ISO-8859-5";
+    }else {
+      chrs = charsetOverride;
+    }
+
+    if (initialCharset != chrs) {
+      delete conv_revert;
+      conv_revert = NULL;
+    }
+    if (!conv_revert || initialCharset != chrs)
+      conv_revert = new cCharSetConv(NULL,chrs);
+
+    initialCharset = chrs;
+  }
+
+}
+
+string findThemeTr(const char* text)
+{
+  map<string,string>::iterator it;
+  string trans = text;
+  if ((it = tableDict.find(trans)) != tableDict.end())
+    trans = it->second;
+  LogD(4, prep("original:%s translated:%s map size:%d"), text, trans.c_str(), tableDict.size());
+  return trans;
+}
+
+}

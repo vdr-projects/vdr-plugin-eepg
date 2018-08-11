@@ -49,7 +49,9 @@
 
 #include <map>
 #include <string>
+#include <limits>
 #include <stdarg.h>
+#include <dirent.h>
 
 
 #if defined(APIVERSNUM) && APIVERSNUM < 10401
@@ -111,7 +113,13 @@ public:
 cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
 {
   data = cSetupEEPG::getInstance();
-  SetSection (tr ("PremiereEPG"));
+  cOsdItem *item = new cOsdItem(tr ("PremiereEPG"));
+
+  if (item) {
+    item->SetSelectable(false);
+    Add(item);
+  }
+//  AddCategory (tr ("PremiereEPG"));
   optDisp[0] = tr ("off");
   for (unsigned int i = 1; i < NUM_PATS; i++) {
     snprintf (buff[i], sizeof (buff[i]), optPats[i], "Event", 1);
@@ -121,7 +129,15 @@ cMenuSetupPremiereEpg::cMenuSetupPremiereEpg (void)
   Add (new cMenuEditBoolItem (tr ("Show order information"), &data->OrderInfo));
   Add (new cMenuEditBoolItem (tr ("Show rating information"), &data->RatingInfo));
   Add (new cMenuEditBoolItem (tr ("Fix EPG data"), &data->FixEpg));
+  item = new cOsdItem(tr ("General"));
+  if (item) {
+    item->SetSelectable(false);
+    Add(item);
+  }
+//  AddCategory (tr ("General"));
   Add (new cMenuEditBoolItem (tr ("Display summary message"), &data->DisplayMessage));
+  Add (new cMenuEditBoolItem (tr ("Replace empty Short Text with Category - Genre"), &data->ReplaceEmptyShText));
+  Add (new cMenuEditBoolItem (tr ("Try to fix CharSet for events"), &data->FixCharset));
 #ifdef DEBUG
   Add (new cMenuEditIntItem (tr ("Level of logging verbosity"), &data->LogLevel, 0, 5));
   Add (new cMenuEditBoolItem (tr ("Process EIT info with EEPG"), &data->ProcessEIT));
@@ -136,6 +152,8 @@ void cMenuSetupPremiereEpg::Store (void)
   SetupStore ("RatingInfo", SetupPE->RatingInfo);
   SetupStore ("FixEpg", SetupPE->FixEpg);
   SetupStore ("DisplayMessage", SetupPE->DisplayMessage);
+  SetupStore ("ReplaceEmptyShText", SetupPE->ReplaceEmptyShText);
+  SetupStore ("FixCharset", SetupPE->FixCharset);
 #ifdef DEBUG
   SetupStore ("LogLevel", SetupPE->LogLevel);
   SetupStore ("ProcessEIT", SetupPE->ProcessEIT);
@@ -205,7 +223,7 @@ protected:
   virtual bool GetThemesSKYBOX (void);
   virtual int GetTitlesSKYBOX (const u_char * Data, int Length);
   virtual int GetSummariesSKYBOX (const u_char * Data, int Length);
-  virtual int GetChannelsMHW (const u_char * Data, int Length, int MHW); //TODO replace MHW by Format?
+  virtual int GetChannelsMHW (const u_char * Data, int Length);
   virtual int GetThemesMHW1 (const u_char * Data, int Length);
   virtual int GetNagra (const u_char * Data, int Length);
   virtual void ProcessNagra (void);
@@ -224,7 +242,7 @@ protected:
   //virtual void FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES]);
   virtual void WriteToSchedule (tChannelID channelID, cSchedules* s, unsigned int EventId, unsigned int StartTime,
                                 unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId,
-                                unsigned short int TableId, unsigned short int Version, char Rating = 0x00);
+                                unsigned short int TableId, unsigned short int Version, char Rating = 0x00, unsigned char ShortTextLenght = 0);
   virtual void LoadIntoSchedule (void);
   //virtual void LoadEquivalentChannels (void);
 
@@ -275,7 +293,7 @@ void cFilterEEPG::SetStatus (bool On)
 
 void cFilterEEPG::NextPmt (void)
 {
-  Del (pmtpid, 0x02);
+  Del (pmtpid, SI::TableIdPMT);
   pmtpid = 0;
   pmtidx++;
   LogE(3, prep("PMT next\n"));
@@ -306,23 +324,6 @@ void syslog_with_tid (int priority, const char *format, ...) __attribute__ ((for
 #define isyslog(a...)  fprintf(stderr,a)
 #endif
 
-
-
-//struct hufftab {
-//  unsigned int value;
-//  short bits;
-//  char next;
-//};
-//
-//#define START   '\0'
-//#define STOP    '\0'
-//#define ESCAPE  '\1'
-
-
-//int freesat_decode_error = 0; /* If set an error has occurred during decoding */
-
-//static struct hufftab *tables[2][128];
-//static int table_size[2][128];
 static sNodeH* sky_tables[2];
 
 /** \brief Convert a textual character description into a value
@@ -419,7 +420,7 @@ static bool load_freesat_file (int tableid, const char *filename)
   return true;
 }
 
-/** \brief Load an individual freesat data file
+/** \brief Load an individual sky data file
  *
  *  \param filename  - Filename to load
  *  \return Success of operation
@@ -551,6 +552,75 @@ bool cFilterEEPG::load_sky_file (const char *filename)
     fclose (FileDict);
   }
   return true;
+}
+
+#define THEME_TR ".tr"
+
+void load_theme_dictionaries (void)
+{
+  char Buffer[1024];
+  char *Line;
+  FILE *File;
+
+  DIR *dp = opendir(cSetupEEPG::getInstance()->getConfDir());
+  struct dirent *dirp;
+  if(!dp) {
+    LogE (0, prep("Can't read configuration folder '%s'"), cSetupEEPG::getInstance()->getConfDir());
+    return ;
+  }
+
+  if (tableDict.size() > 0)
+    tableDict.clear();
+
+
+  while ((dirp = readdir(dp)) != NULL) {
+
+    string fname = dirp->d_name;      // filename
+    if (dirp->d_type == DT_DIR ||  // if entry is a directory
+        fname.find(THEME_TR, (fname.length() - strlen(THEME_TR))) == string::npos){
+      continue;
+    }
+
+    fname = string(cSetupEEPG::getInstance()->getConfDir()) + "/" + fname;
+
+    //Test if file is changed and reload
+    struct stat st;
+    if (stat(fname.c_str(), &st)) {
+        LogE(0, prep("Error obtaining stats for '%s' "), fname.c_str());
+        continue;
+    }
+
+    File = fopen (fname.c_str(), "r");
+    if (!File) continue;
+
+    memset (Buffer, 0, sizeof (Buffer));
+    char origThemeName[256];
+    char transThemeName[256];
+    while ((Line = fgets (Buffer, sizeof (Buffer), File)) != NULL) {
+      Line = compactspace (skipspace (stripspace (Line)));
+      //Skip empty and commented lines
+      if (isempty (Line) || Line[0] == '#' || Line[0] == ';') continue;
+      if (sscanf (Line, "%[^=]=%[^\n]\n", origThemeName, transThemeName) == 2) {
+
+        string origTh(compactspace (skipspace (stripspace (origThemeName))));
+        string transTh(compactspace (skipspace (stripspace (transThemeName))));
+        if (!tableDict.count(origTh) && !transTh.empty()) {
+          tableDict.insert(pair<string,string>(string(origThemeName),string(transThemeName)));
+          LogD(4, prep("Original '%s' translation to '%s'."), origTh.c_str(), transTh.c_str());
+        }
+      }     //if scanf
+    }      //while
+    fclose (File);
+    LogD(3, prep("Loaded %i translations from %s."), tableDict.size(), fname.c_str());
+  }
+  closedir(dp);
+
+  LogD(2, prep("Loaded %i translations."), tableDict.size());
+  LogD(2, prep("Original <-> Translation"));
+  map<string,string>::iterator it;
+  for ( it=tableDict.begin() ; it != tableDict.end(); it++ )
+    LogD(2, prep("%s <-> %s"), (*it).first.c_str(), it->second.c_str());
+
 }
 
 /** \brief Decode an EPG string as necessary
@@ -741,11 +811,6 @@ nextloop1:
   return p;
 }
 
-//here all declarations for global variables over all devices
-
-//char *ConfDir;
-
-//unsigned char DecodeErrorText[4096];  //TODO only used for debugging?
 
 bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB stream?
 {
@@ -753,10 +818,16 @@ bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB 
   FILE *FileThemes;
   char *Line;
   char Buffer[256];
-  if (Format == SKY_IT)
+  const char **SkyThemes;
+  bool updateFile = false;
+  if (Format == SKY_IT) {
     FileName += "/sky_it.themes";
-  else if (Format == SKY_UK)
+    SkyThemes = SkyItThemes;
+  }
+  else if (Format == SKY_UK) {
     FileName += "/sky_uk.themes";
+    SkyThemes = SkyUkThemes;
+  }
   else {
     LogE (0, prep("Error, wrong format detected in GetThemesSKYBOX. Format = %i."), Format);
     return false;
@@ -767,26 +838,49 @@ bool cFilterEEPG::GetThemesSKYBOX (void) //TODO can't we read this from the DVB 
     LogE (0, prep("Error opening file '%s'. %s"), FileName.c_str(), strerror (errno));
     return false;
   } else {
-    //int id = 0;
+    int id = 0;
     nThemes = 0;
-    char string1[256];
-    char string2[256];
-    //sTheme *T;
+    char thId[256];
+    char theme[256];
+
     while ((Line = fgets (Buffer, sizeof (Buffer), FileThemes)) != NULL) {
-      memset (string1, 0, sizeof (string1));
-      memset (string2, 0, sizeof (string2));
+      memset (thId, 0, sizeof (thId));
+      memset (theme, 0, sizeof (theme));
       if (!isempty (Line)) {
-        //T = &Themes[nThemes];
-        if (sscanf (Line, "%[^=] =%[^\n] ", string1, string2) == 2) {
-          snprintf ((char *) Themes[nThemes], 255, "%s", string2);
+        if (sscanf (Line, "%[^=] =%[^\n] ", thId, theme) == 2 && !isempty (theme)) {
+          snprintf ((char *) Themes[id], 255, "%s", theme);
+          nThemes++;
         } else {
-          Themes[nThemes][0] = '\0';
+          if (SkyThemes[id]) {
+            updateFile = true;
+            snprintf ((char *) Themes[id], 255, "%s", SkyThemes[id]);
+            LogD (1, prep("Theme '%s' missing in theme file '%s'"), SkyThemes[id], FileName.c_str());
+          } else
+              Themes[id][0] = '\0';
         }
-        //id ++;
-        nThemes++;
+        id ++;
       }
     }
     fclose (FileThemes);
+
+    if (updateFile) {
+      FileThemes = fopen (FileName.c_str(), "w");
+      if (FileThemes == NULL) {
+        LogE (0, prep("Error re-creating file '%s', %s"), FileName.c_str(), strerror (errno));
+      } else {
+        for (int i = 0; i < 256; i++) {
+          if (Themes[i]) {
+            fprintf (FileThemes, "0x%02x=%s\n", i, (char *) Themes[i]);
+          }
+          else {
+            fprintf (FileThemes, "0x%02x=\n", i);
+          }
+        }
+
+        LogI (0, prep("Success updating file '%s'"), FileName.c_str());
+        fclose (FileThemes);
+      }
+    }
   }
   return true;
 }
@@ -839,24 +933,25 @@ bool cFilterEEPG::InitDictionary (void)
   return true;
 }
 
-
 /**
  * \brief Get MHW channels
  *
  * \return 0 = fatal error, code 1 = success, code 2 = last item processed
  */
-int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
+int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length)
 {
-  if ((MHW == 1) || (nChannels == 0)) { //prevents MHW2 from reading channels twice while waiting for themes on same filter
+  if (Format != MHW1 && Format != MHW2) return 0;
+
+  if ((Format == MHW1) || (nChannels == 0)) { //prevents MHW2 from reading channels twice while waiting for themes on same filter
     sChannelMHW1 *Channel;
     int Size, Off;
     Size = sizeof (sChannelMHW1);
     Off = 4;
-    if (MHW == 1) {
+    if (Format == MHW1) {
       //Channel = (sChannelMHW1 *) (Data + 4);
       nChannels = (Length - Off) / sizeof (sChannelMHW1);
     }
-    if (MHW == 2) {
+    if (Format == MHW2) {
       if (Length > 120)
         nChannels = Data[120];
       else {
@@ -882,13 +977,14 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
       LogI(1, "|------|-%-26.26s-|-%-22.22s-|-----|-%-8.8s-|\n", "------------------------------",
            "-----------------------------", "--------------------");
       int pName = ((nChannels * 8) + 121); //TODO double ...
+      LogD(1, prep("Length:%d pName:%d diff:%d"), Length, pName, Length - pName);
       for (int i = 0; i < nChannels; i++) {
         Channel = (sChannelMHW1 *) (Data + Off);
         sChannel *C = &sChannels[i];
         C->ChannelId = i;
         ChannelSeq[C->ChannelId] = i; //fill lookup table to go from channel-id to sequence nr in table
         C->SkyNumber = 0;
-        if (MHW == 1)
+        if (Format == MHW1)
           memcpy (C->Name, &Channel->Name, 16); //MHW1
         else {   //MHW2
           int lenName = Data[pName] & 0x0f;
@@ -905,7 +1001,7 @@ int cFilterEEPG::GetChannelsMHW (const u_char * Data, int Length, int MHW)
         C->Tid = HILO16 (Channel->TransportId);
         C->Sid = HILO16 (Channel->ServiceId);
         tChannelID channelID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
-        cChannel *VC = GetChannelByID(channelID, true);
+        const cChannel *VC = GetChannelByID(channelID, true);
         bool IsFound = (VC);
         if(IsFound) {
           C->Src = VC->Source();
@@ -949,13 +1045,38 @@ int cFilterEEPG::GetThemesMHW1 (const u_char * Data, int Length)
       const u_char *ThemesIndex = (Data + 3);
       for (int i = 0; i < nThemes; i++) {
         if (ThemesIndex[ThemeId] == i) {
-          Offset = (Offset + 15) & 0xf0; //TODO do not understand this
+          //The index of the Themes in MHW1 is not incremented by 1 but with offset calculated like this
+          Offset = (Offset + 15) & 0xf0; 
           ThemeId++;
         }
         memcpy (&Themes[Offset][0], &Theme->Name, 15);
         Themes[Offset][15] = '\0'; //trailing null
         CleanString (Themes[Offset]);
-        LogI(1, prep("%.15s"), Themes[Offset]);
+
+        //reformat themes
+        if (Offset & 0x0f) {
+          char* theme;
+          char* cat;
+          Asprintf (&theme, "%s", Themes[Offset]);
+          Asprintf (&cat, "%s", Themes[Offset& 0xf0]);
+          theme = strreplace(theme,"DOC","DOCUMENTAIRE");
+          theme = strreplace(theme,"DOCUMENTAIRE.","DOCUMENTAIRE");
+          theme = strreplace(theme,"MAG","MAGAZINE");
+          theme = strreplace(theme,"INFO-METEO","INFO/METEO");
+          //Remove category from genre. TODO Maybe they should be separated in the future
+          theme = strreplace(theme,cat,"");
+          theme = skipspace(theme);
+          if (theme[0] == '-') {
+             memmove(theme, theme+1, strlen(theme));
+             theme = skipspace(theme);
+          }
+          char* buf;
+          Asprintf(&buf,"%s - %s",cat,theme);
+          memcpy(Themes[Offset],buf,strlen(buf)+1);
+        }
+
+        LogI(1, prep("%-33.33s|Offset:0x%02x"), Themes[Offset],Offset);
+
         Offset++;
         Theme++;
       }
@@ -1017,7 +1138,7 @@ int cFilterEEPG::GetThemesMHW2 (const u_char * Data, int Length)
                         //memcpy (&Themes[pThemeId][lenThemeName + 1], &Data[pSubThemeName], lenSubThemeName);
                       }
                   CleanString (Themes[pThemeId]);
-                  LogI(1, prep("%.*s"), lenThemeName + 1 + lenSubThemeName, Themes[pThemeId]);
+                  LogI(1, prep("%.40s|id:%d"), Themes[pThemeId],pThemeId);
                   //isyslog ("%.15s", (lThemes + pThemeId)->Name);
                   nThemes++;
                   if (nThemes > MAX_THEMES) {
@@ -1177,42 +1298,6 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
   return (char *) Text;
 }
 
-/**
- * \brief Prepare to Write to Schedule
- *
- * gets a channel and returns an array of schedules that WriteToSchedule can write to.
- * Call this routine before a batch of titles with the same ChannelId will be WriteToScheduled; batchsize can be 1
- *
- * \param C channel to prepare
- * \param s VDR epg schedules
- * \param ps pointer to the schedules that WriteToSchedule can write to
- */
-//void cFilterEEPG::PrepareToWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps/*[MAX_EQUIVALENCES]*/)
-//{
-//  //for (int eq = 0; eq < C->NumberOfEquivalences; eq++) {
-//    tChannelID channelID = tChannelID (C->Src/*[eq]*/, C->Nid/*[eq]*/, C->Tid/*[eq]*/, C->Sid/*[eq]*/);
-//#ifdef USE_NOEPG
-//    if (allowedEPG (channelID) && (channelID.Valid ()))
-//#else
-//    if (channelID.Valid ()) //only add channels that are known to vdr
-//#endif /* NOEPG */
-//      ps/*[eq]*/ = s->AddSchedule (channelID); //open a a schedule for each equivalent channel
-//    else {
-//      ps/*[eq]*/ = NULL;
-////      LogE(5, prep("ERROR: Title block has invalid (equivalent) channel ID: Equivalence: %i, Source:%x, C->Nid:%x,C->Tid:%x,C->Sid:%x."),
-////           eq, C->Src[eq], C->Nid[eq], C->Tid[eq], C->Sid[eq]);
-//    }
-//  //}
-//}
-
-//void cFilterEEPG::FinishWriteToSchedule (sChannel * C, cSchedules * s, cSchedule * ps[MAX_EQUIVALENCES])
-//{
-//  for (int eq = 0; eq < C->NumberOfEquivalences; eq++)
-//    if (ps[eq]) {
-//      ps[eq]->Sort ();
-//      s->SetModified (ps[eq]);
-//    }
-//}
 
 /**
  * \brief write event to schedule
@@ -1220,7 +1305,11 @@ char *cFilterEEPG::GetSummaryTextNagra (const u_char * DataStart, long int Offse
  * \param Duration the Duration of the event in minutes
  * \param ps points to array of schedules ps[eq], where eq is equivalence number of the channel. If channelId is invalid then ps[eq]=NULL
  */
-void cFilterEEPG::WriteToSchedule (tChannelID channelID, cSchedules* pSchedules, unsigned int EventId, unsigned int StartTime, unsigned int Duration, char *Text, char *SummText, unsigned short int ThemeId, unsigned short int TableId, unsigned short int Version, char Rating)
+void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
+    unsigned int EventId, unsigned int StartTime, unsigned int Duration,
+    char *Text, char *SummText, unsigned short int ThemeId,
+    unsigned short int TableId, unsigned short int Version, char Rating,
+    unsigned char ShTxtLen)
 {
   bool WrittenTitle = false;
   bool WrittenSummary = false;
@@ -1262,21 +1351,77 @@ void cFilterEEPG::WriteToSchedule (tChannelID channelID, cSchedules* pSchedules,
     if (Rating) {
       Event->SetParentalRating(Rating);
     }
-    char *tmp;
     if (Text != 0x00) {
       WrittenTitle = true;
       CleanString ((uchar *) Text);
       Event->SetTitle (Text);
     }
-    Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
-    Event->SetShortText (tmp);
-    free(tmp);
-    //strreplace(t, '|', '\n');
-    if (SummText != 0x00) {
+
+    char* tmp = NULL;
+    string shText;
+    if (SummText && ShTxtLen) {
+    
+      shText.assign(SummText,ShTxtLen);
+      //LogD(0, prep("DEBUG: Title '%s', Subtitle '%s'"), Text, shText.c_str());
+      string tmpTitle(Text);
+      if (Format == MHW2 && !shText.empty()) {
+        size_t found = tmpTitle.find(" (HD)");
+        if (found != string::npos)
+          tmpTitle.erase(found, 5);
+        //found = shText.compare(0, tmpTitle.size() + 2, string(tmpTitle + ": "));
+        if (shText.compare(0, tmpTitle.size() + 2, string(tmpTitle + ": "))==0)
+          shText.erase(0, tmpTitle.size() + 2);
+
+        //Remove Subtitle from title it is not pretty.
+        //int sumLen = strlen(SummText);
+        //if (sumLen > ShTxtLen)
+        //  memmove(SummText,SummText + ShTxtLen + 1, sumLen - ShTxtLen);
+      }
+
+      //Do not use Subtitle if it is substring of Title
+      if (tmpTitle.compare(0, shText.size(), shText) == 0)
+        shText.clear();
+
+      //The subtitle is wrong if contains '.' after possible initial '...'
+      if (Format == SKY_UK && !shText.empty() && shText.find('.',3) != string::npos) {
+        shText.clear();
+      }
+
+#define MAX_USEFUL_EPISODE_LENGTH 40
+      // From VDR FixEPG Bugs
+      // Some channels put a whole lot of information in the ShortText and leave
+      // the Description totally empty. So if the ShortText length exceeds
+      // MAX_USEFUL_EPISODE_LENGTH, let's put this into the Description
+      // instead:
+      if (Format != SKY_IT && Format != MHW2 && !shText.empty() && shText.size() > MAX_USEFUL_EPISODE_LENGTH)
+        shText.clear();
+
+    }
+    if (!shText.empty())
+      Event->SetShortText (shText.c_str());
+    else if (SetupPE->ReplaceEmptyShText) {
+      Asprintf (&tmp, "%s - %d\'", Themes[ThemeId], Duration);
+      Event->SetShortText (tmp);
+      free(tmp);
+    }
+
+    if (SummText) {
       WrittenSummary = true;
       CleanString ((uchar *) SummText);
 
+      //Fix MHW1 formating
+      if (Format == MHW1) {
+        char * pch;
+        pch=strchr(SummText,'s');
+        while (pch!=NULL) {
+          if (*(pch-1) != ' ' && *(pch-1) != '\n')
+            *pch = ' ';
+          pch=strchr(pch+1,'s');
+        }
+      }
+
       //Add themes and categories epgsearch style
+      //TODO DPE move this
       char *theme;
       Asprintf (&theme, "%s", Themes[ThemeId]);
       if (theme && 0 != strcmp(theme,"")) {
@@ -1291,22 +1436,32 @@ void cFilterEEPG::WriteToSchedule (tChannelID channelID, cSchedules* pSchedules,
         }else{
           category = theme;
         }
-        string fmt;
-        fmt = "%s";
-        if (stripspace(category)) {
-          fmt += "\nCategory: %s";
-        }
-        if (genre) {
-          fmt += "\nGenre: %s";
-        }
-        Asprintf (&tmp, fmt.c_str(), SummText, category, stripspace (genre));
 
-        Event->SetDescription (tmp);
-        free(tmp);
+        string desc = SummText;
+        if (Format == MHW2 && ShTxtLen) {
+          desc.erase(0, ShTxtLen + 1);
+        }
+        if (stripspace(category)) desc.append("\n").append(CATEGORY).append(findThemeTr(category));
+        if (stripspace(genre)) desc += '\n' + string(GENRE) + findThemeTr(genre);
+        Event->SetDescription (desc.c_str());
+
         free(theme);
-    }
-    else
-      Event->SetDescription (SummText);
+      }
+      else {
+#ifdef DEBUG
+        string desc = SummText;
+        if (ThemeId) {
+          char *theme;
+          Asprintf (&theme, "0x%x", ThemeId);
+          LogD(0, prep("DEBUG: missing theme ID 0x%x title:'%s'"), ThemeId, Event->Title());
+          desc += '\n' + string(GENRE) + theme;
+          free(theme);
+        }
+        Event->SetDescription (desc.c_str());
+#else
+        Event->SetDescription (SummText);
+#endif
+      }
     }
     if (ps && newEvent)
       ps->AddEvent (newEvent);
@@ -1360,8 +1515,12 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
   unsigned short int CurrentYear = tmCurrent->tm_year;
   unsigned short int CurrentMonth = tmCurrent->tm_mon;
   //esyslog("EEPGDEBUG: CurrentMonthday=%i, TableIdExtension:%04x, MonthdayTitles=%i.",CurrentMonthday,TableIdExtension, MonthdayTitles);
+#if APIVERSNUM >= 20300
+  LOCK_SCHEDULES_WRITE;
+#else
   cSchedulesLock SchedulesLock (true);
-  cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
+  cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
+#endif
   do { //process each block of titles
     sTitleBlockNagraGuide *TB = (sTitleBlockNagraGuide *) p;
     int ChannelId = HILO16 (TB->ChannelId);
@@ -1380,7 +1539,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
 
     sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
     //cSchedule *ps = NULL;//[MAX_EQUIVALENCES];
-    //PrepareToWriteToSchedule (C, s, ps);
+    //PrepareToWriteToSchedule (C, Schedules, ps);
 
     for (int i = 0; i < NumberOfTitles; i++) { //process each title within block
       sTitleNagraGuide *Title = (sTitleNagraGuide *) p;
@@ -1431,7 +1590,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
         if (Themes[Title->ThemeId][0] == 0x00) //if detailed themeid is not known, get global themeid
           Title->ThemeId &= 0xf0;
 
-        WriteToSchedule (tChannelID (C->Src, C->Nid, C->Tid, C->Sid), s, EventId, StartTime, Title->Duration, Text, SummText,
+        WriteToSchedule (tChannelID (C->Src, C->Nid, C->Tid, C->Sid), Schedules, EventId, StartTime, Title->Duration, Text, SummText,
                          Title->ThemeId, NAGRA_TABLE_ID, Version);
 
         if (Text != NULL)
@@ -1470,7 +1629,7 @@ void cFilterEEPG::GetTitlesNagra (const u_char * Data, int Length, unsigned shor
     } //end for titles
 
     //FinishWriteToSchedule (C, s, ps);
-    sortSchedules(s, tChannelID (C->Src, C->Nid, C->Tid, C->Sid));
+    sortSchedules(Schedules, tChannelID (C->Src, C->Nid, C->Tid, C->Sid));
     p = next_p;
   } while (p < DataEnd); //end of TitleBlock
 }
@@ -1593,7 +1752,7 @@ int cFilterEEPG::GetChannelsNagra (const u_char * Data, int Length)
     C->Tid = HILO16 (Channel->TransportId);
     C->Sid = HILO16 (Channel->ServiceId);
     tChannelID channelID = tChannelID(C->Src, C->Nid, C->Tid, C->Sid);
-    cChannel *VC = GetChannelByID(channelID, true);
+    const cChannel *VC = GetChannelByID(channelID, true);
     bool IsFound = (VC);
     if(IsFound) {
       strncpy((char*)(C->Name), VC->Name (), 64);
@@ -1882,29 +2041,7 @@ int cFilterEEPG::GetTitlesMHW2 (const u_char * Data, int Length)
   if (Length > 18) {
     int Pos = 18;
     int Len = 0;
-    /*bool Check = false;
-    while (Pos < Length) {
-      Check = false;
-      Pos += 7;
-      if (Pos < Length) {
-        Pos += 3;
-        if (Pos < Length)
-          if (Data[Pos] > 0xc0) {
-            Pos += (Data[Pos] - 0xc0);
-            Pos += 4;
-            if (Pos < Length) {
-              if (Data[Pos] == 0xff) {
-                Pos += 1;
-                Check = true;
-              }
-            }
-          }
-      }
-      if (Check == false){
-        isyslog ("EEPGDebug: Check==false");
-        return 1; // I assume nonfatal error or success
-        }
-    }*/
+
     if (memcmp (InitialTitle, Data, 16) == 0) { //data is the same as initial title
       return 2; //last item processed
     } else {
@@ -1918,11 +2055,8 @@ int cFilterEEPG::GetTitlesMHW2 (const u_char * Data, int Length)
         T->ChannelId = Data[Pos];
         Pos+=11;//The date time starts here
         //isyslog ("EEPGDebug: ChannelID:%d", T->ChannelId);
-        unsigned int MjdTime = (Data[Pos] << 8) | Data[Pos + 1];
-        T->MjdTime = 0; //not used for matching MHW2
-        T->StartTime = ((MjdTime - 40587) * 86400)
-                       + (((((Data[Pos + 2] & 0xf0) >> 4) * 10) + (Data[Pos + 2] & 0x0f)) * 3600)
-                       + (((((Data[Pos + 3] & 0xf0) >> 4) * 10) + (Data[Pos + 3] & 0x0f)) * 60);
+        T->MjdTime = 0; //(Data[Pos] << 8) | Data[Pos + 1] not used for matching MHW2
+        T->StartTime = MjdToEpochTime(Data[Pos], Data[Pos + 1], Data[Pos + 2], Data[Pos + 3]);
         T->Duration = (((Data[Pos + 5] << 8) | Data[Pos + 6]) >> 4) * 60;
         Len = Data[Pos + 7] & 0x3f;
         //isyslog ("EEPGDebug: Len:%d", Len);
@@ -1979,7 +2113,7 @@ int cFilterEEPG::GetSummariesMHW1 (const u_char * Data, int Length)
               LogE(0, prep("Summaries memory allocation error."));
               return 0;
             }
-            Text[SummaryLength+1] = '\0'; //end string with NULL character
+            //Text[SummaryLength+1] = '\0'; //end string with NULL character
             //memcpy (Text, &Data[SummaryOffset], SummaryLength);
             decodeText2(&Data[SummaryOffset], SummaryLength, (char*)Text, 2*SummaryLength + 1);
 //     CleanString (Text);
@@ -1992,7 +2126,10 @@ int cFilterEEPG::GetSummariesMHW1 (const u_char * Data, int Length)
             Summaries[nSummaries] = S;
             S->NumReplays = Summary->NumReplays;
             S->EventId = HILO32 (Summary->ProgramId);
+//            unsigned short SectionLength = ((Summary->SectionLengthHigh & 0x0f) << 8) | Summary->SectionLengthLow;
+//            Asprintf((char **)&Text, "%s \n\n SecLength:%d SLHigh:%d SLLow:%d", Text, SectionLength, Summary->SectionLengthHigh, Summary->SectionLengthLow);
             S->Text = Text;
+            S->ShortTextLength = 0; //TODO DPE find for MHW1
             int i = 0;
             do {
               S->Replays[i].MjdTime = 0; //only used for SKY
@@ -2013,11 +2150,7 @@ int cFilterEEPG::GetSummariesMHW1 (const u_char * Data, int Length)
                    S->EventId, S->Replays[i].ChannelId,
                    sChannels[ChannelSeq[S->Replays[i].ChannelId]].Name, Hour, Minute, Sec);
 
-              S->Replays[i].StartTime = MjdToEpochTime (Date) + (((((Hour & 0xf0) >> 4) * 10) + (Hour & 0x0f)) * 3600)
-                                        + (((((Minute & 0xf0) >> 4) * 10) + (Minute & 0x0f)) * 60)
-                                        + ((((Sec & 0xf0) >> 4) * 10) + (Sec & 0x0f));
-//       summary -> time[i] = ProviderLocalTime2UTC (summary -> time[i]);
-              S->Replays[i].StartTime = LocalTime2UTC (S->Replays[i].StartTime);
+	      S->Replays[i].StartTime = LocalTime2UTC (MjdToEpochTime (Date_hi, Date_lo, Hour, Minute, Sec));
               //}
               i++;
             } while (i < Summary->NumReplays);
@@ -2111,6 +2244,9 @@ int cFilterEEPG::GetSummariesMHW2 (const u_char * Data, int Length)
         //S->Text[SummaryLength] = '\0'; //end string with NULL character
         decodeText2(tmp,SummaryLength,(char*)S->Text,2 * SummaryLength + 1);
         CleanString (S->Text);
+        char * delim = strchr ( (char *)S->Text, '\n' );
+        S->ShortTextLength = delim == NULL ? 0 : delim - (char *)S->Text;
+
         LogI(3, prep("EventId %08x Summnr %d:%.30s."), S->EventId, nSummaries, S->Text);
         nSummaries++;
       } else {
@@ -2157,66 +2293,63 @@ int cFilterEEPG::GetChannelsSKYBOX (const u_char * Data, int Length)
       while (TransportDescriptorsLength > 0) {
         unsigned char DescriptorTag = Data[p2];
         int DescriptorLength = Data[p2 + 1];
-        int p3 = (p2 + 2);
+        int p3 = (p2 + 4);
         p2 += (DescriptorLength + 2);
         TransportDescriptorsLength -= (DescriptorLength + 2);
-        switch (DescriptorTag) { //TODO switch with only 1 case??? replace this by template
-        case 0xb1:
-          p3 += 2;
-          DescriptorLength -= 2;
-          while (DescriptorLength > 0) {
-            // 0x01 = Video Channel
-            // 0x02 = Audio Channel
-            // 0x05 = Other Channel
-            //if( Data[p3+2] == 0x01 || Data[p3+2] == 0x02 || Data[p3+2] == 0x05 )
-            //{
-            unsigned short int Sid = (Data[p3] << 8) | Data[p3 + 1];
-            unsigned short int ChannelId = (Data[p3 + 3] << 8) | Data[p3 + 4];
-            unsigned short int SkyNumber = (Data[p3 + 5] << 8) | Data[p3 + 6];
-            if (SkyNumber > 100 && SkyNumber < 1000) {
-              if (ChannelId > 0) {
-                sChannel *C;
-                if (ChannelSeq.count (ChannelId) == 0) { //not found
-                  C = &sChannels[nChannels];
-                  C->ChannelId = ChannelId;
-                  //C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
-                  C->Src = Source (); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
-                  C->Nid = Nid;
-                  C->Tid = Tid;
-                  C->Sid = Sid;
-                  C->SkyNumber = SkyNumber;
-                  tChannelID channelID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
-                  cChannel *VC = Channels.GetByChannelID (channelID, true);
-                  bool IsFound = (VC);
-                  if (IsFound)
-                    strncpy ((char *) C->Name, VC->Name (), 64);
-                  else
-                    C->Name[0] = '\0'; //empty string
+        if (DescriptorTag != 0xB1)
+          continue;
 
-                  LogI(1, "|% 5d | %-26.26s | %-22.22s | %-3.3s |  % 6d  |\n", C->ChannelId
-                       , *channelID.ToString(), C->Name, IsFound ? "YES" : "NO", C->SkyNumber);
+        DescriptorLength -= 2;
+        while (DescriptorLength > 0) {
+          // 0x01 = Video Channel
+          // 0x02 = Audio Channel
+          // 0x05 = Other Channel
+          //if( Data[p3+2] == 0x01 || Data[p3+2] == 0x02 || Data[p3+2] == 0x05 )
+          //{
+          unsigned short int Sid = (Data[p3] << 8) | Data[p3 + 1];
+          unsigned short int ChannelId = (Data[p3 + 3] << 8) | Data[p3 + 4];
+          unsigned short int SkyNumber = (Data[p3 + 5] << 8) | Data[p3 + 6];
+          if (SkyNumber > 100 && SkyNumber < 1000) {
+            if (ChannelId > 0) {
+              sChannel *C;
+              if (ChannelSeq.count (ChannelId) == 0) { //not found
+                C = &sChannels[nChannels];
+                C->ChannelId = ChannelId;
+                //C->NumberOfEquivalences = 1; //there is always an original channel. every equivalence adds 1
+                C->Src = Source (); //assume all EPG channels are on same satellite, if not, manage this via equivalents!!!
+                C->Nid = Nid;
+                C->Tid = Tid;
+                C->Sid = Sid;
+                C->SkyNumber = SkyNumber;
+                tChannelID channelID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
+                const cChannel *VC = GetChannelByID (channelID, false);
+                bool IsFound = (VC);
+                if (IsFound)
+                  strncpy ((char *) C->Name, VC->Name (), 64);
+                else
+                  C->Name[0] = '\0'; //empty string
 
-                  ChannelSeq[C->ChannelId] = nChannels; //fill lookup table to go from channel-id to sequence nr in table
-                  nChannels++;
-                  if (nChannels >= MAX_CHANNELS) {
-                    LogE(0, prep("Error, %i channels found more than %i"), nChannels, MAX_CHANNELS);
-                    return 0;
-                  }
+                LogI(1, "|% 5d | %-26.26s | %-22.22s | %-3.3s |  % 6d  |\n", C->ChannelId
+                     , *channelID.ToString(), C->Name, IsFound ? "YES" : "NO", C->SkyNumber);
+
+                ChannelSeq[C->ChannelId] = nChannels; //fill lookup table to go from channel-id to sequence nr in table
+                nChannels++;
+                if (nChannels >= MAX_CHANNELS) {
+                  LogE(0, prep("Error, %i channels found more than %i"), nChannels, MAX_CHANNELS);
+                  return 0;
                 }
               }
             }
-            p3 += 9;
-            DescriptorLength -= 9;
           }
-          break;
-        default:
-          break;
-        } //switch descriptortag
+          p3 += 9;
+          DescriptorLength -= 9;
+        }
       }
     } //while
     return 1;
   } //else part of memcmp
 }
+
 
 /**
  * \brief Get SKYBOX Titles
@@ -2239,7 +2372,7 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)
     if (nTitles == 0)
       memcpy (InitialTitle, Data, 20); //copy data into initial title
     ChannelId = (Data[3] << 8) | Data[4];
-    MjdTime = ((Data[8] << 8) | Data[9]);
+    MjdTime = (Data[8] << 8) | Data[9];
     if (ChannelId > 0) {
       if (MjdTime > 0) {
         p = 10;
@@ -2261,12 +2394,12 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)
           }
           p += 4;
           Len2 = Data[p + 1] - 7;
-          T->StartTime = ((MjdTime - 40587) * 86400) + ((Data[p + 2] << 9) | (Data[p + 3] << 1));
+          T->StartTime = MjdToEpochTime(MjdTime) + ((Data[p + 2] << 9) | (Data[p + 3] << 1));
           T->Duration = ((Data[p + 4] << 9) | (Data[p + 5] << 1));
           T->ThemeId = Data[p + 6];
           T->TableId = DEFAULT_TABLE_ID; //TODO locate the actual table id
           //TODO Data[p + 7] is Quality value add it to description
-          //int quality = Data[p + 7];
+          T->Quality = Data[p + 7];
           switch (Data[p + 8] & 0x0F) {
           case 0x01:
             T->Rating = 0x00; //"U"
@@ -2287,9 +2420,9 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)
             T->Rating = 0x00; //"-"
             break;
           }
-          T->Unknown1 = Data[p + 4 - 13]; //FIXME
-          T->Unknown2 = Data[p + 4 - 12]; //FIXME
-          T->Unknown3 = Data[p + 4 - 11]; //FIXME
+          T->Unknown1 = Data[5]; //Bound to Channel/Date
+          T->Unknown2 = Data[6]; //Bound to Channel/Date
+          T->Unknown3 = Data[7]; //Bound to Channel/Date
           unsigned char tmp[4096]; //TODO smarter
           Len2 = sky_huffman_decode (&Data[p + 9], Len2, tmp);
           if (Len2 == 0) {
@@ -2306,8 +2439,8 @@ int cFilterEEPG::GetTitlesSKYBOX (const u_char * Data, int Length)
           CleanString (T->Text);
           T->SummaryAvailable = 1; //TODO I assume this is true?
 
-          LogI(3, prep("EventId %08x Titlenr %d,Unknown1:%x,Unknown2:%x,Un3:%x,Name:%s."),
-               T->EventId, nTitles, T->Unknown1, T->Unknown2, T->Unknown3, T->Text);
+          LogI(3, prep("EventId %08x Titlenr %d,Un1:%x,Un2:%x,Un3:%x,Quality:%x,Name:%s."),
+               T->EventId, nTitles, T->Unknown1, T->Unknown2, T->Unknown3, T->Quality, T->Text);
 
           p += Len1;
           nTitles++;
@@ -2334,6 +2467,7 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
   unsigned short int MjdTime;
   int Len1;
   int Len2;
+  const char* STxtDelim = Format == SKY_UK?": ":" - ";
 
   if (Length < 20) {
     return 1; //non fatal error I assume
@@ -2357,6 +2491,7 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
           S->Replays[0].MjdTime = MjdTime;
           S->NumReplays = 0; //not used
           S->EventId = (Data[p] << 8) | Data[p + 1];
+          S->ShortTextLength = 0;
           Len1 = ((Data[p + 2] & 0x0f) << 8) | Data[p + 3];
           if (Data[p + 4] != 0xb9) {
             LogD(5, prep("Data error signature for title - Data[p + 4] != 0xb5"));
@@ -2382,7 +2517,18 @@ int cFilterEEPG::GetSummariesSKYBOX (const u_char * Data, int Length)
           memcpy (S->Text, tmp, Len2);
           S->Text[Len2] = '\0'; //end string with NULL character
           CleanString (S->Text);
-          LogI(3, prep("EventId %08x Summnr %d:%.30s."), S->EventId, nSummaries, S->Text);
+          char * delim = strstr ( (char *)S->Text, STxtDelim );
+          //S->ShortTextLength = delim == NULL ? 0 : delim - (char *)S->Text;
+          if (Format == SKY_UK && !delim && strncmp((char *)S->Text,"..",2) == 0) {
+            char * tdlm = strpbrk ( (char *)(S->Text+3), ".?!" );
+            if (tdlm && tdlm[0] != '.')
+              tdlm++;
+            if (tdlm)
+              delim = tdlm;
+	  }
+          int shLen = delim - (char *)S->Text;
+          S->ShortTextLength = delim == NULL || shLen > numeric_limits<u_char>::max() ? 0 : shLen;
+          LogI(4, prep("EventId %08x Summnr %d:%.30s."), S->EventId, nSummaries, S->Text);
           p += Len1;
           nSummaries++;
           if (nSummaries >= MAX_TITLES) {
@@ -2405,7 +2551,9 @@ void cFilterEEPG::FreeSummaries (void)
       S = Summaries[i];
       if (i < nSummaries - 1) {
         S2 = Summaries[i + 1]; //look at next summary
-        if (S->Text != S2->Text && S->Text != 0x00) //this is the last summary that points to this text block; needed in case NumReplays > 1, multiple pointers to same textblock
+        //this is the last summary that points to this text block;
+        // needed in case NumReplays > 1, multiple pointers to same textblock
+        if (S->Text != S2->Text && S->Text != 0x00) 
           free (S->Text);
       } else if (S->Text != 0x00)
         free (S->Text);
@@ -2437,21 +2585,26 @@ void cFilterEEPG::LoadIntoSchedule (void)
   foundtitle = false;
   Title_t *T;
   Summary_t *S;
-  int remembersummary;
+  int remembersummary = -1;
   //keep statistics
   int SummariesNotFound = 0;
   int NoSummary = 0;
   int NotMatching = 0;
   int LostSync = 0;
-  remembersummary = -1;
+  int OldEvents = 0;
+  int SummIndex = -1;
+  bool isOTV = Format == SKY_IT || Format == SKY_UK;
 
   {
+#if APIVERSNUM >= 20300
+  LOCK_SCHEDULES_WRITE;
+#else
   cSchedulesLock SchedulesLock (true);
-  cSchedules *s = (cSchedules *) cSchedules::Schedules (SchedulesLock);
-  if (s) {
+  cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
+#endif
+  if (Schedules) {
 
     while (i < nTitles) {
-      T = Titles[i];
       S = Summaries[j];
       foundtitle = false;
 
@@ -2468,13 +2621,16 @@ void cFilterEEPG::LoadIntoSchedule (void)
 
       if (!foundtitle)  //no more titles with summaries
         break;
-      if ((T->EventId == S->EventId) && (T->MjdTime == S->Replays[0].MjdTime)
-        && ((T->ChannelId == S->Replays[0].ChannelId) || ((Format != SKY_IT) && (Format != SKY_UK)))) { //should always be true, titles and summaries are broadcasted in order...
+      time_t too_old = time(NULL) - (Setup.EPGLinger * 60 + 3600); 
+      if ((T->EventId == S->EventId && T->MjdTime == S->Replays[0].MjdTime) &&
+          ((T->ChannelId == S->Replays[0].ChannelId) || !isOTV)) { //should always be true, titles and summaries are broadcasted in order...
         LogD(3, prep("T->EventId == S->EventId"));
         //MjdTime = 0 for all but SKY
         //S->ChannelId must be equal to T->ChannelId only for SKY; in MHW1 S->ChannelId overrides T->ChannelId when NumReplays > 1
         remembersummary = -1; //reset summary searcher
         //int Replays = S->NumReplays;
+        if (isOTV)
+           SummIndex = j;
 
         int index = 0;
         do {
@@ -2488,14 +2644,21 @@ void cFilterEEPG::LoadIntoSchedule (void)
             StartTime = S->Replays[index].StartTime;
           }
 
+          index++;
+          if ((StartTime + (int)T->Duration) < too_old) {
+            LogD(3, prep("Skipping old event '%s', start time:%s"), T->Text, ctime (&StartTime));
+            OldEvents++;
+            continue;
+          }
+
           //channelids are sequentially numbered and sent in MHW1 and MHW2, but not in SKY, so we need to lookup the table index
           sChannel *C = &sChannels[ChannelSeq[ChannelId]]; //find channel
           //cSchedule *p;//[MAX_EQUIVALENCES];
-          //PrepareToWriteToSchedule (C, s, p);
+          //PrepareToWriteToSchedule (C, Schedules, p);
           tChannelID chanID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
 
           char rating = 0x00;
-          if ((Format == SKY_IT || Format == SKY_UK) &&  T->Rating) { //TODO only works on OTV for now
+          if (isOTV &&  T->Rating) { //TODO only works on OTV for now
             rating = T->Rating;
           }
           unsigned short int TableId = DEFAULT_TABLE_ID;
@@ -2503,11 +2666,15 @@ void cFilterEEPG::LoadIntoSchedule (void)
             TableId = T->TableId;
           }
 
-          WriteToSchedule (chanID, s, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
-                           (char *) S->Text, T->ThemeId, TableId, 0, rating);
-          sortSchedules(s, chanID);
+//          LogD (0, prep("EventId %08x Titlenr:%d,SummNr:%d,SummAv:%x,Un1:%x,Un2:%x,Un3:%x,Name:%s,STxtLn:%d,Summary:%s."),
+//                      T->EventId, i, j, T->SummaryAvailable, T->Unknown1, T->Unknown2, T->Unknown3, T->Text, S->ShortTextLength, S->Text);
 
-          //FinishWriteToSchedule (C, s, p);
+          WriteToSchedule (chanID, Schedules, T->EventId, StartTime, T->Duration / 60, (char *) T->Text,
+                           (char *) S->Text, T->ThemeId, TableId, 0, rating, S->ShortTextLength);
+          sortSchedules(Schedules, chanID);
+          //if (shortText != NULL) delete [] shortText;
+
+          //FinishWriteToSchedule (C, Schedules, p);
           //Replays--;
           //if ((S->NumReplays != 0) && (Replays > 0)) { //when replays are used, all summaries of the replays are stored consecutively; currently only CSAT
           //j++;  //move to next summary
@@ -2515,11 +2682,9 @@ void cFilterEEPG::LoadIntoSchedule (void)
           //j = 0;
           //S = Summaries[j]; //next summary within replay range
           //}
-          index++;
         }   //while
         while (index < S->NumReplays);
 
-        //TODO: why load events that have already past, and then run Cleanup
         //end of putting title and summary in schedule
         i++; //move to next title
       }    //if T->EventId == S->EventId
@@ -2532,31 +2697,43 @@ void cFilterEEPG::LoadIntoSchedule (void)
             remembersummary = nSummaries; //or next test will never be succesfull for remembersummary = 0
           LostSync++;
 //      esyslog("EEPG Error: lost sync at title %d, summary %d.",i,j);
-        } else if (j == (remembersummary - 1)) { //the last summary to be checked has failed also
+        } else if (j == (remembersummary - 1) || SummIndex !=-1) { //the last summary to be checked has failed also
           //esyslog ("EEPG Error: could not find summary for summary-available Title %d.", i);
-          esyslog
-          ("EEPG: Error, summary not found for EventId %08x Titlenr %d:SummAv:%x,Unknown1:%x,Unknown2:%x,Un3:%x,Name:%s.",
-            T->EventId, i, T->SummaryAvailable, T->Unknown1, T->Unknown2, T->Unknown3, T->Text);
+          if ((T->StartTime + T->Duration) < (uint)too_old) {
+            LogD(3, prep("Skipping old event '%s' without summary, start time:%s"), T->Text, ctime ((time_t*)&T->StartTime));
+            OldEvents++;
+          } else {
 
-          /* write Title info to schedule */
-          sChannel *C = &sChannels[ChannelSeq[T->ChannelId]]; //find channel
-          //cSchedule *p;//[MAX_EQUIVALENCES];
-          tChannelID chanID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
-          //PrepareToWriteToSchedule (C, s, p);
-          char rating = 0x00;
-          if ((Format == SKY_IT || Format == SKY_UK) &&  T->Rating) { //TODO only works on OTV for now
-            rating = T->Rating;
+            if (!isOTV) //No sense of logging for SKY when SummaryAvailable bit is not known
+               esyslog("EEPG: Error, summary not found for EventId %08x Titlenr %d:SummAv:%x,Un1:%x,Un2:%x,Un3:%x,Name:%s.",
+                 T->EventId, i, T->SummaryAvailable, T->Unknown1, T->Unknown2, T->Unknown3, T->Text);
+
+            /* write Title info to schedule */
+            sChannel *C = &sChannels[ChannelSeq[T->ChannelId]]; //find channel
+            //cSchedule *p;//[MAX_EQUIVALENCES];
+            tChannelID chanID = tChannelID (C->Src, C->Nid, C->Tid, C->Sid);
+            //PrepareToWriteToSchedule (C, Schedules, p);
+            char rating = 0x00;
+            if (!isOTV &&  T->Rating) { //TODO only works on OTV for now
+              rating = T->Rating;
+            }
+            WriteToSchedule (chanID, Schedules, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
+                             NULL, T->ThemeId, DEFAULT_TABLE_ID, 0, rating, S->ShortTextLength);
+            //FinishWriteToSchedule (C, Schedules, p);
+            sortSchedules(Schedules, chanID);
+
+            SummariesNotFound++;
           }
-          WriteToSchedule (chanID, s, T->EventId, T->StartTime, T->Duration / 60, (char *) T->Text,
-                           NULL, T->ThemeId, DEFAULT_TABLE_ID, 0, rating);
-          //FinishWriteToSchedule (C, s, p);
-          sortSchedules(s, chanID);
-
-          SummariesNotFound++;
           i++; //move to next title, for this one no summary can be found
         }
 
-//      esyslog("Trying again for this title %d, remember summary %d, but advancing one Summary to %d.",i,remembersummary,j);
+        //Do not loop through summaries for OTV when sumaries and titles are in sync
+        if (SummIndex != -1 && isOTV && nSummaries <= nTitles){
+          j--;
+        }
+
+//      if (SummIndex != -1)
+//        esyslog("Trying again for this title %d, remember summary %d, but advancing one Summary to %d.",i,remembersummary,j+1);
       }
       j++; //move to next summary
       if (j >= nSummaries) //do not forget to look in beginning of (ring)buffer
@@ -2567,24 +2744,33 @@ void cFilterEEPG::LoadIntoSchedule (void)
     LogE (0, prep("Error: could not lock schedules."));
 
   }//release ScheduleLock
-  cSchedules::Cleanup (true); //deletes all past events
+  //TODO: Test if cleanup is needed now that old events are no more
+  //one thing it Cleanup (true) does is write the epg.data immediately
+  //cSchedules::Cleanup (true); //deletes all past events
+  cSchedules::Cleanup (); //deletes all past events
 
-  //isyslog ("EEPG: found %i equivalents channels", nEquivChannels);
   isyslog ("EEPG: found %i themes", nThemes);
   isyslog ("EEPG: found %i channels", nChannels);
   isyslog ("EEPG: found %i titles", nTitles);
-  if (NoSummary != 0)
+  if (NoSummary)
     isyslog ("EEPG: of which %i reported to have no summary available; skipping these BIENTOT titles", NoSummary);
   isyslog ("EEPG: found %i summaries", nSummaries);
-  if (SummariesNotFound != 0)
-    esyslog ("EEPG: %i summaries not found", SummariesNotFound);
+  if (SummariesNotFound) {
+     if (nTitles-nSummaries!=SummariesNotFound) {
+        esyslog ("EEPG: %i summaries not found", SummariesNotFound);
+        esyslog ("EEPG: %i difference between No. of summaries and summaries not found", nTitles-nSummaries-SummariesNotFound);
+     } else
+        isyslog ("EEPG: %i titles without summaries", SummariesNotFound);
+  }
+  if (OldEvents)
+    isyslog ("EEPG: Skipped %i old events", OldEvents);
   if (NotMatching > nSummaries)
-    LogI (0, prep("Warning: lost sync %i times, summary did not match %i times."),
-      LostSync, NotMatching);
+    LogI (0, prep("Warning: lost sync %i times, summary did not match %i times."), LostSync, NotMatching);
+  
 
   FreeSummaries (); //do NOT free channels, themes and bouquets here because they will be reused in SKY!
   FreeTitles ();
-  if (!((Format == SKY_IT) || (Format == SKY_UK))) { //everything but SKY; SKY is the only protocol where LoadIntoSchedule is called repeatedly
+  if (!isOTV) { //everything but SKY; SKY is the only protocol where LoadIntoSchedule is called repeatedly
     ChannelSeq.clear ();
   }
 }
@@ -2593,7 +2779,7 @@ void cFilterEEPG::AddFilter (u_short Pid, u_char Tid)
 {
   if (!Matches (Pid, Tid)) {
     Add (Pid, Tid);
-    esyslog (prep("Filter Pid:%x,Tid:%x added."), Pid, Tid);
+    esyslog (prep("Filter Pid:0x%x,Tid:0x%x added."), Pid, Tid);
   }
 }
 
@@ -2601,7 +2787,7 @@ void cFilterEEPG::AddFilter (u_short Pid, u_char Tid, unsigned char Mask)
 {
   if (!Matches (Pid, Tid)) {
     Add (Pid, Tid, Mask);
-    esyslog (prep("Filter Pid:%x,Tid:%x,Mask:%x added."), Pid, Tid, Mask);
+    esyslog (prep("Filter Pid:0x%x,Tid:0x%x,Mask:0x%x added."), Pid, Tid, Mask);
   }
 }
 
@@ -2627,8 +2813,6 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
       free(mesg);
     }
 
-    TitleCounter = 0;
-    SummaryCounter = 0;
     /*if (SummariesNotFound != 0)
        esyslog ("EEPG: %i summaries not found", SummariesNotFound);
        else if (VERBOSE >= 1)
@@ -2686,28 +2870,29 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
   EndThemes = false;
   switch (Format) {
   case PREMIERE:
-    AddFilter (pid, 0xA0);
+    AddFilter (pid, SI::TableIdPremiereCIT);
     break;
   case MHW1:
-    AddFilter (0xd3, 0x92); //ThemesMHW1//TODO: all filters are serialized, strictly speaking Themes is non-fatal...
+    AddFilter (0xd3, SI::TableIdMHW1Themes); //ThemesMHW1//TODO: all filters are serialized, strictly speaking Themes is non-fatal...
     break;
   case MHW2:
-    AddFilter (0x231, 0xc8); //MHW2 Channels & Themes
+    AddFilter (0x231, SI::TableIdMHW2ChannelsThemes); //MHW2 Channels & Themes
     break;
   case SKY_IT:
   case SKY_UK:
-    AddFilter (0x11, 0x4a); //Sky Channels
+    GetThemesSKYBOX (); //Sky Themes from file
+    AddFilter (0x11, SI::TableIdSKYChannels); //Sky Channels
     break;
   case FREEVIEW: //Freeview, CONT mode //TODO streamline this for other modes
     InitDictionary ();
-    AddFilter (pid, 0x4e, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
-    AddFilter (pid, 0x50, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
-    AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
-    AddFilter (0x39, 0x50, 0xf0); //event info, actual TS, Viasat
-    AddFilter (0x39, 0x60, 0xf0); //event info, other  TS, Viasat
+    AddFilter (pid, SI::TableIdEIT_presentFollowing, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (pid, SI::TableIdEIT_schedule_first, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
+    AddFilter (pid, SI::TableIdEIT_schedule_Other_first, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
+    AddFilter (0x39, SI::TableIdEIT_schedule_first, 0xf0); //event info, actual TS, Viasat
+    AddFilter (0x39, SI::TableIdEIT_schedule_Other_first, 0xf0); //event info, other  TS, Viasat
     break;
   case NAGRA:
-    AddFilter (pid, 0xb0); //perhaps TID is equal to first data byte?
+    AddFilter (pid, SI::TableIdNagraCIT); //perhaps TID is equal to first data byte?
     break;
   case DISH_BEV:
 #if APIVERSNUM < 10726
@@ -2719,9 +2904,9 @@ void cFilterEEPG::ProcessNextFormat (bool FirstTime = false)
 //    AddFilter (0x0441, 0x60, 0xf0); // Bell ExpressVU EEPG
     break;
   case EIT:
-    AddFilter (pid, 0x4e, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
-    AddFilter (pid, 0x50, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
-    AddFilter (pid, 0x60, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
+    AddFilter (pid, SI::TableIdEIT_presentFollowing, 0xfe); //event info, actual(0x4e)/other(0x4f) TS, present/following
+    AddFilter (pid, SI::TableIdEIT_schedule_first, 0xf0); //event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
+    AddFilter (pid, SI::TableIdEIT_schedule_Other_first, 0xf0); //event info, other  TS, schedule(0x60)/schedule for future days(0x6X)
     break;
   default:
     break;
@@ -2732,25 +2917,36 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
 {
   //0x39 Viasat, 0x0300 Dish Network EEPG, 0x0441 Bell ExpressVU EEPG
   LogD(4, prep("Pid: 0x%02x Tid: %d Length: %d"), Pid, Tid, Length);
+#if APIVERSNUM >= 20300
+  LOCK_CHANNELS_WRITE;
+  LOCK_SCHEDULES_WRITE;
+//  cStateKey SchedulesStateKey;
+//  cSchedules *Schedules = cSchedules::GetSchedulesWrite(SchedulesStateKey, 10);
+#else
   cSchedulesLock SchedulesLock(true, 10);
   cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
+#endif
   //Look for other satelite positions only if Dish/Bell ExpressVU for the moment hardcoded pid check
-  if(Schedules)
-    SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Format, Pid == EIT_PID);
+  if(Channels && Schedules)
+    SI::cEIT2 EIT(Channels, Schedules, Source(), Tid, Data, Format, Pid == EIT_PID);
 
+#if APIVERSNUM < 20300
   else//cEIT EIT (Schedules, Source (), Tid, Data);
   {
     // If we don't get a write lock, let's at least get a read lock, so
     // that we can set the running status and 'seen' timestamp (well, actually
     // with a read lock we shouldn't be doing that, but it's only integers that
     // get changed, so it should be ok)
+    cChannelsLock ChannelsLock;
+    cChannels *Channels = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
     cSchedulesLock SchedulesLock;
     cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
-    if(Schedules)
-      SI::cEIT2 EIT(Schedules, Source(), Tid, Data, Format, Pid == EIT_PID, true);
+    if(Channels && Schedules)
+      SI::cEIT2 EIT(Channels, Schedules, Source(), Tid, Data, Format, Pid == EIT_PID, true);
 
     //cEIT EIT (Schedules, Source (), Tid, Data, true);
   }
+#endif
 }
 
 void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Length)
@@ -2774,7 +2970,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
               if (idx++ == pmtidx) {
                 pmtpid = assoc.getPid ();
                 pmtsid = assoc.getServiceId ();
-                Add (pmtpid, 0x02);
+                Add (pmtpid, SI::TableIdPMT);
                 pmtnext = now + PMT_SCAN_TIMEOUT;
                 LogI(3, prep("PMT pid now 0x%04x (idx=%d)\n"), pmtpid, pmtidx);
                 break;
@@ -2811,7 +3007,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
               usrFRV = 1;
               LogD(4, prep("if (data[2]==0x39) {//TODO Test This"));
             }
-            //Format = 0;               // 0 = premiere, 1 = MHW1, 2 = MHW2, 3 = Sky Italy (OpenTV), 4 = Sky UK (OpenTV), 5 = Freesat (Freeview), 6 = Nagraguide
+
             SI::Descriptor * d;
             unsigned char nDescriptorTag;
             for (SI::Loop::Iterator it; (d = stream.streamDescriptors.getNext (it));) {
@@ -2827,36 +3023,35 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
                 if (d->getLength () == 6 && d->getData ().FourBytes (2) == 0x46534154) //Freeview
                   prvFRV = true;
                 break;
-              case 0x52:
+              case SI::StreamIdentifierDescriptorTag:
                 //if (d->getLength () == 3 && d->getData ().FourBytes (2) == 0xb07ea882) {
                 if (d->getLength () == 3 && ((d->getData ().TwoBytes (2) & 0xff00) == 0xb000))
                   UnprocessedFormat[NAGRA] = stream.getPid ();
                 break;
-              case 0x90:
+              case SI::SkyOTVDescriptorTag:
                 //esyslog ("usr: %d %08x\n", d->getLength (), d->getData ().FourBytes (2));
                 if (d->getLength () == 6 && d->getData ().FourBytes (2) == 0x0000ffff)
                   usrData = true;
                 if (d->getLength () == 3 && ((d->getData ().TwoBytes (2) & 0xff00) == 0xb600)) //SKY IT //TODO ugly!
-                  //if (d->getLength () == 3 && (d->getData ().TwoBytes (2) == 0xb6a5))   //SKY IT //TODO ugly!
                   usrOTV = SKY_IT;
                 //Format = SKY_IT;
                 if (d->getLength () == 3 && d->getData ().FourBytes (2) == 0xc004e288)       //SKY UK
                   usrOTV = SKY_UK;
                 //Format = SKY_UK;
                 break;
-              case 0xc1: //MHW1, MHW2
+              case SI::MHW1DescriptorTag: //MHW1, MHW2
 //      esyslog("EEPGDEBUG:d->getDescriptorTAG:%d %08x\n",d->getLength(),d->getData().FourBytes(2));
                 if (d->getLength () == 10 && d->getData ().FourBytes (2) == 0x50555348) //MHw1 Cyfra
                   UnprocessedFormat[MHW1] = stream.getPid ();
                 break;
-              case 0xc2: //MHW1, MHW2
+              case SI::MHW1_2DescriptorTag: //MHW1, MHW2
                 if (d->getLength () == 10 && d->getData ().FourBytes (2) == 0x45504700) //MHw1 CanDigNL and CSat
                   UnprocessedFormat[MHW1] = stream.getPid ();
                 else if (d->getLength () == 10 && d->getData ().FourBytes (2) == 0x46494348) { //MHW2
                   UnprocessedFormat[MHW2] = stream.getPid ();
                 }
                 break;
-              case 0xd1: //Freeview
+              case SI::FreeviewDescriptorTag: //Freeview
                 LogD(4, prep("case 0xd1: //Freeview"));
                 if (d->getLength () == 3 && ((d->getData ().TwoBytes (2) & 0xff00) == 0x0100))
                   usrFRV = 0x01;
@@ -2913,39 +3108,34 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
   else if (Source ()) {
 
     if ( Pid == EIT_PID || Pid == 0x0300 || Pid == 0x0441 ) {
-      if (Tid >= 0x4E)
+      if (Tid >= SI::TableIdEIT_presentFollowing)
         ProccessContinuous(Pid, Tid, Length, Data);
       return;
     }
     int Result;
     switch (Tid) {
-    case 0xA0:
+    case SI::TableIdPremiereCIT:
       if ((Pid < 0x30) || (Pid > 0x37)) {
 
         ProcessPremiere(Data);
         break;
       } //if citpid == 0xb11 Premiere
       /* no break - used for sky also*/
-    case 0xa1:
-    case 0xa2:
-    case 0xa3:
+    case SI::TableIdSKYTitles_first ... SI::TableIdSKYTitles_last:
       Result = GetTitlesSKYBOX (Data, Length - 4);
       if (Result != 1) //when fatal error or finished
-        Del (Pid, 0xa0, 0xfc); //kill filter
+        Del (Pid, SI::TableIdSKYTitlesA0, 0xfc); //kill filter
       if (Result == 0) { //fatal error
         esyslog ("EEPG: Fatal error reading titles.");
         ProcessNextFormat (); //and go process other formats
       }
       if (Result == 2)
-        AddFilter (Pid + 0x10, 0xa8, 0xfc); //Set filter that processes summaries of this batch
+        AddFilter (Pid + 0x10, SI::TableIdSKYSummaries_first, 0xfc); //Set filter that processes summaries of this batch
       break;
-    case 0xa8:
-    case 0xa9:
-    case 0xaa:
-    case 0xab:
+    case SI::TableIdSKYSummaries_first ... SI::TableIdSKYSummaries_last:
       Result = GetSummariesSKYBOX (Data, Length - 4);
       if (Result != 1) //when fatal error or finished
-        Del (Pid, 0xa8, 0xfc); //kill filter
+        Del (Pid, SI::TableIdSKYSummaries_first, 0xfc); //kill filter
       if (Result == 0) {
         esyslog ("EEPG: Fatal error reading summaries.");
         ProcessNextFormat ();
@@ -2953,12 +3143,12 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
       if (Result == 2) {
         LoadIntoSchedule ();
         if (Pid < 0x47) //this is not the last batch//FIXME chaining is easy on the PIDs and the CPU, but error when Pid,Tid is not used at the moment...
-          AddFilter (Pid - 0x0F, 0xa0, 0xfc); //next pid, first tid
+          AddFilter (Pid - 0x0F, SI::TableIdSKYTitlesA0, 0xfc); //next pid, first tid
         else //last pid was processed
           ProcessNextFormat ();
       }
       break;
-    case 0x90:
+    case SI::TableIdMHW1TitlesSummaries:
       if (Pid == 0xd2) {
         Result = GetTitlesMHW1 (Data, Length);
         if (Result != 1) //fatal error or last processed
@@ -2968,7 +3158,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
           ProcessNextFormat ();
         }
         if (Result == 2)
-          AddFilter (0xd3, 0x90); //SummariesMHW1
+          AddFilter (0xd3, SI::TableIdMHW1TitlesSummaries); //SummariesMHW1
       } else if (Pid == 0xd3) {
         Result = GetSummariesMHW1 (Data, Length);
         if (Result != 1) //fatal error or last processed
@@ -2984,24 +3174,24 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
         }
       }
       break;
-    case 0xc8: //GetChannelsMHW2 or GetThemesMHW2
+    case SI::TableIdMHW2ChannelsThemes: //GetChannelsMHW2 or GetThemesMHW2
       if (Pid == 0x231) {
         if (Data[3] == 0x01) { //Themes it will be
-          Result = GetThemesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+          Result = GetThemesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
           //break;
           if (Result != 1)
             EndThemes = true; //also set Endthemes on true on fatal error
         } //if Data
         else if (Data[3] == 0x00) { //Channels it will be
-          Result = GetChannelsMHW (Data, Length, 2); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+          Result = GetChannelsMHW (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
           if (Result != 1)
             EndChannels = true; //always remove filter, code 1 should never be returned since MHW2 always reads all channels..
           ChannelsOk = (Result == 2);
         }
-        if (EndChannels && EndThemes) { //those are only set withing MHW2
-          Del (0x231, 0xc8); //stop reading MHW2 themes and channels
-          if (ChannelsOk) //No channels = fatal, no themes = nonfatal
-            AddFilter (0x234, 0xe6); //start reading MHW2 titles
+        if (EndChannels && EndThemes) { //those are only set within MHW2
+          Del (0x231, SI::TableIdMHW2ChannelsThemes); //stop reading MHW2 themes and channels
+          if (ChannelsOk) //No channels = fatal, no themes = non fatal
+            AddFilter (0x234, SI::TableIdMHW2Titles); //start reading MHW2 titles
           else {
             esyslog ("EEPG: Fatal error reading channels.");
             ProcessNextFormat ();
@@ -3009,30 +3199,30 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
         }
       }    //if Pid == 0x231
       break;
-    case 0x91:
-      Result = GetChannelsMHW (Data, Length, 1); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+    case SI::TableIdMHW1Channels:
+      Result = GetChannelsMHW (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
       Del (Pid, Tid); //always remove filter, code 1 should never be returned since MHW1 always reads all channels...
       if (Result == 2)
-        AddFilter (0xd2, 0x90); //TitlesMHW1
+        AddFilter (0xd2, SI::TableIdMHW1TitlesSummaries); //TitlesMHW1
       else {
         esyslog ("EEPG: Fatal error reading channels.");
         ProcessNextFormat ();
       }
       break;
-    case 0x92:
-      Result = GetThemesMHW1 (Data, Length); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+    case SI::TableIdMHW1Themes:
+      Result = GetThemesMHW1 (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
       if (Result != 1)
         Del (Pid, Tid);
       if (Result == 2)
-        AddFilter (0xd3, 0x91); //ChannelsMHW1
+        AddFilter (0xd3, SI::TableIdMHW1Channels); //ChannelsMHW1
       else {
-        esyslog ("EEPG: Fatal error reading themes."); //doesnt have to be fatal...
+        esyslog ("EEPG: Fatal error reading themes."); //Doesn't have to be fatal...
         ProcessNextFormat ();
       }
       break;
-    case 0xe6: //TitlesMHW2
+    case SI::TableIdMHW2Titles: //TitlesMHW2
       if (Pid == 0x234) {
-        Result = GetTitlesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
+        Result = GetTitlesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = success, code 2 = last item processed
         if (Result != 1)
           Del (Pid, Tid);
         if (Result == 0) {
@@ -3040,10 +3230,10 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
           ProcessNextFormat ();
         }
         if (Result == 2)
-          AddFilter (0x236, 0x96); //start reading MHW2 summaries....
+          AddFilter (0x236, SI::TableIdMHW2Summaries); //start reading MHW2 summaries....
       }
       break;
-    case 0x96: //Summaries MHW2
+    case SI::TableIdMHW2Summaries: //Summaries MHW2
       if (Pid == 0x236) {
         Result = GetSummariesMHW2 (Data, Length); //return code 0 = fatal error, code 1 = sucess, code 2 = last item processed
         if (Result != 1)
@@ -3058,15 +3248,14 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
         }
       } //if pid
       break;
-    case 0x4a: //Sky channels
+    case SI::TableIdSKYChannels: //Sky channels
       if (Pid == 0x11) {
         Result = GetChannelsSKYBOX (Data, Length - 4);
         if (Result != 1) //only breakoff on completion or error; do NOT clean up after success, because then not all bouquets will be read
           Del (Pid, Tid); //Read all channels, clean up filter
         if (Result == 2) {
-          GetThemesSKYBOX (); //Sky Themes from file; must be called AFTER first channels to have lThemes initialized FIXME
           if (InitDictionary ())
-            AddFilter (0x30, 0xa0, 0xfc); //SKY Titles batch 0 of 7
+            AddFilter (0x30, SI::TableIdSKYTitlesA0, 0xfc); //SKY Titles batch 0 of 7
           else {
             esyslog ("EEPG: Fatal error reading huffman table.");
             ProcessNextFormat ();
@@ -3075,7 +3264,7 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
 
       } //if Pid == 0x11
       break;
-    case 0xb0: //NagraGuide
+    case SI::TableIdNagraCIT: //NagraGuide
       if (Pid == 0xc8) {
         Result = GetNagra (Data, Length);
         if (Result != 1)
@@ -3094,40 +3283,9 @@ void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Len
       }
       break;
 
-    case 0x4E:
-    case 0x4F:
-    case 0x50:
-    case 0x51:
-    case 0x52:
-    case 0x53:
-    case 0x54:
-    case 0x55:
-    case 0x56:
-    case 0x57:
-    case 0x58:
-    case 0x59:
-    case 0x5A:
-    case 0x5B:
-    case 0x5C:
-    case 0x5D:
-    case 0x5E:
-    case 0x5F:
-    case 0x60:
-    case 0x61:
-    case 0x62:
-    case 0x63:
-    case 0x64:
-    case 0x65:
-    case 0x66:
-    case 0x67:
-    case 0x68:
-    case 0x69:
-    case 0x6A:
-    case 0x6B:
-    case 0x6C:
-    case 0x6D:
-    case 0x6E:
-    case 0x6F:
+    case SI::TableIdEIT_presentFollowing:
+    case SI::TableIdEIT_presentFollowing_other:
+    case SI::TableIdEIT_schedule_first ... SI::TableIdEIT_schedule_Other_last:
       // Freesat:
       // Set(3842, 0x4E, 0xFE);  // event info, actual(0x4E)/other(0x4F) TS, present/following
       // Set(3842, 0x50, 0xF0);  // event info, actual TS, schedule(0x50)/schedule for future days(0x5X)
@@ -3156,13 +3314,17 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
   SI::PremiereCIT cit(Data, false);
 
   if (cit.CheckCRCAndParse ()) {
+#if APIVERSNUM >= 20300
+    LOCK_SCHEDULES_WRITE;
+#else
     cSchedulesLock SchedulesLock (true, 10);
     cSchedules *Schedules = (cSchedules *) cSchedules::Schedules (SchedulesLock);
+#endif
     if (Schedules) {
       int now = time (0);
       int nCount = 0;
       int nRating = 0;
-      unsigned char Tid = 0xa0; // TODO maybe default TableID
+      unsigned char Tid = SI::TableIdPremiereCIT; // TODO maybe default TableID
       SI::ExtendedEventDescriptors * ExtendedEventDescriptors = 0;
       SI::ShortEventDescriptor * ShortEventDescriptor = 0;
       char *order = 0, *rating = 0;
@@ -3176,7 +3338,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
         for (SI::Loop::Iterator it; (d = cit.eventDescriptors.getNext (it));) {
           nDescriptorTag = d->getDescriptorTag ();
           switch (nDescriptorTag) {
-          case 0xF0: // order information
+          case SI::PremiereOrderInfoDescriptorTag: // order information
             if (SetupPE->OrderInfo) {
               static const char *text[] = {
                 trNOOP ("Ordernumber"),
@@ -3198,7 +3360,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
                 order = strdup (buff);
             }
             break;
-          case 0xF1: // parental rating
+          case SI::PremiereRatingInfoDescriptorTag: // parental rating
             if (SetupPE->RatingInfo) {
               char buff[512];
               int p = 0;
@@ -3281,14 +3443,13 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
           int sid = pct->getServiceId ();
           if (SetupPE->FixEpg) {
             if (nid == 133) {
-              if (tid == 0x03 && sid == 0xf0) {
-                tid = 0x02;
+              if (tid == SI::TableIdTSDT && sid == 0xf0) {
+                tid = SI::TableIdPMT;
                 sid = 0xe0;
-              } else if (tid == 0x03 && sid == 0xf1) {
-                tid = 0x02;
+              } else if (tid == SI::TableIdTSDT && sid == 0xf1) {
+                tid = SI::TableIdPMT;
                 sid = 0xe1;
-              } else if (tid == 0x03 && sid == 0xf5) {
-                tid = 0x03;
+              } else if (tid == SI::TableIdTSDT && sid == 0xf5) {
                 sid = 0xdc;
               } else if (tid == 0x04 && sid == 0xd2) {
                 tid = 0x11;
@@ -3300,7 +3461,12 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
             }
           }
           tChannelID channelID (Source (), nid, tid, sid);
+#if APIVERSNUM >= 20300
+	  LOCK_CHANNELS_READ;
+          const cChannel *channel = Channels->GetByChannelID (channelID, true);
+#else
           cChannel *channel = Channels.GetByChannelID (channelID, true);
+#endif
 
           if (!channel)
             continue;
@@ -3349,7 +3515,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
               } else {
                 LogI(2, "(upd)\n");
                 pEvent->SetSeen ();
-                if (pEvent->TableID () == 0x00 || pEvent->Version () == cit.getVersionNumber ()) {
+                if (pEvent->TableID () == SI::TableIdPAT || pEvent->Version () == cit.getVersionNumber ()) {
                   if (pEvent->RunningStatus () != runningStatus)
                     pSchedule->SetRunningStatus (pEvent, runningStatus, channel);
                   continue;
@@ -3405,7 +3571,11 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
           }
           if (Modified) {
             pSchedule->Sort ();
+#if APIVERSNUM >= 20300
+            pSchedule->SetModified();
+#else
             Schedules->SetModified (pSchedule);
+#endif
           }
           delete pct;
         }
@@ -3524,14 +3694,19 @@ bool cPluginEEPG::Start (void)
   CheckCreateFile("sky_uk.themes", SkyUkThemes);
   CheckCreateFile("freesat.t1", FreesatT1);
   CheckCreateFile("freesat.t2", FreesatT2);
-  CheckCreateFile("sky_uk.themes", SkyUkThemes);
+  load_theme_dictionaries();
 
   sky_tables[0] = NULL;
   sky_tables[1] = NULL;
   tables[0][0] = NULL;
   //store all available sources, so when a channel is not found on current satellite, we can look for alternate sat positions.
   //perhaps this can be done smarter through existing VDR function???
-  for (cChannel * Channel = Channels.First (); Channel; Channel = Channels.Next (Channel)) {
+#if APIVERSNUM >= 20300
+  LOCK_CHANNELS_READ;
+  for (const cChannel * Channel = Channels->First(); Channel; Channel = Channels->Next(Channel)) {
+#else
+  for (const cChannel * Channel = Channels.First (); Channel; Channel = Channels.Next (Channel)) {
+#endif
     if (!Channel->GroupSep ()) {
       bool found = false;
       for (int i = 0; (i < NumberOfAvailableSources) && (!found); i++)
@@ -3590,17 +3765,6 @@ cMenuSetupPage *cPluginEEPG::SetupMenu (void)
 
 bool cPluginEEPG::SetupParse (const char *Name, const char *Value)
 {
-//  LogF(0, "!!!! Dime test LogF");
-//  LogF(0, "!!!! Dime test LogF %d", 2);
-//  LogI(0, "!!!! Dime test LogI");
-//  LogI(0, "!!!! Dime test LogI %d", 2);
-//  LogI(0, prep2("!!!! Dime test prep"));
-//  LogI(0, prep2("!!!! Dime test prep %d"), 2);
-//  LogD(0, "!!!! Dime test LogD");
-//  LogD(0, "!!!! Dime test LogD %d", 2);
-//  LogE(0, "!!!! Dime test LogE");
-//  LogE(0, "!!!! Dime test LogE %d", 2);
-
 
   if (!strcasecmp (Name, "OptionPattern"))
     SetupPE->OptPat = atoi (Value);
@@ -3612,6 +3776,10 @@ bool cPluginEEPG::SetupParse (const char *Name, const char *Value)
     SetupPE->FixEpg = atoi (Value);
   else if (!strcasecmp (Name, "DisplayMessage"))
     SetupPE->DisplayMessage = atoi (Value);
+  else if (!strcasecmp (Name, "ReplaceEmptyShText"))
+    SetupPE->ReplaceEmptyShText = atoi (Value);
+  else if (!strcasecmp (Name, "FixCharset"))
+    SetupPE->FixCharset = atoi (Value);
 #ifdef DEBUG
   else if (!strcasecmp (Name, "LogLevel"))
     SetupPE->LogLevel = atoi (Value);

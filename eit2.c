@@ -76,14 +76,21 @@ cEvent* cEIT2::ProcessEitEvent(cSchedule* pSchedule,const SI::EIT::Event* EitEve
     pSchedule->AddEvent (newEvent);
   if (Tid == 0x4E) { // we trust only the present/following info on the actual TS
     if (EitEvent->getRunningStatus () >= SI::RunningStatusNotRunning)
-      pSchedule->SetRunningStatus (pEvent, EitEvent->getRunningStatus (), channel);
+    {
+#if APIVERSNUM >= 20300
+        pSchedule->SetRunningStatus (pEvent, EitEvent->getRunningStatus (), channel);
+#else
+        cChannel* chan = Channels.GetByChannelID(channel->GetChannelID());
+        pSchedule->SetRunningStatus (pEvent, EitEvent->getRunningStatus (), chan);
+#endif
+    }
   }
   if (OnlyRunningStatus)
     return NULL;  // do this before setting the version, so that the full update can be done later
   pEvent->SetVersion (versionNumber);
 
   ProcessEventDescriptors(ExternalData, channel->Source(), Tid, EitEvent,
-                          pEvent, Schedules, channel);
+                          pEvent, Schedules, channel->GetChannelID());
 
   Modified = true;
   return pEvent;
@@ -91,7 +98,7 @@ cEvent* cEIT2::ProcessEitEvent(cSchedule* pSchedule,const SI::EIT::Event* EitEve
 
 void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
                                     u_char Tid, const SI::EIT::Event* SiEitEvent, cEvent* pEvent,
-                                    cSchedules* Schedules, cChannel* channel)
+                                    cSchedules* Schedules, const tChannelID& channelId)
 {
 
   cEvent *rEvent = NULL;
@@ -110,6 +117,11 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
   cLinkChannels *LinkChannels = NULL;
   cComponents *Components = NULL;
 
+#if APIVERSNUM >= 20300
+  cChannel *channel = Channels->GetByChannelID(channelId);
+#else
+  cChannel *channel = Channels.GetByChannelID(channelId);
+#endif
 
   DescriptorLoop dl = SiEitEvent->eventDescriptors;
   for (SI::Loop::Iterator it2; (d = dl.getNext(it2)); )
@@ -247,7 +259,11 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
           char linkName[ld->privateData.getLength() + 1];
           strn0cpy(linkName, (const char *) ld->privateData.getData(), sizeof(linkName));
           // TODO is there a standard way to determine the character set of this string?
+#if APIVERSNUM >= 20300
+          cChannel *link = Channels->GetByChannelID(linkID);
+#else
           cChannel *link = Channels.GetByChannelID(linkID);
+#endif
           if (link != channel) { // only link to other channels, not the same one
             //fprintf(stderr, "Linkage %s %4d %4d %5d %5d %5d %5d  %02X  '%s'\n", hit ? "*" : "", channel->Number(), link ? link->Number() : -1, SiEitEvent.getEventId(), ld->getOriginalNetworkId(), ld->getTransportStreamId(), ld->getServiceId(), ld->getLinkageType(), linkName);//XXX
             if (link) {
@@ -255,10 +271,15 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
                 link->SetName(linkName, "", "");
             }
             else if (Setup.UpdateChannels >= 4) {
-              cChannel *transponder = channel;
+              const cChannel *transponder = channel;
               if (channel->Tid() != ld->getTransportStreamId())
+#if APIVERSNUM >= 20300
+                transponder = Channels->GetByTransponderID(linkID);
+              link = Channels->NewChannel(transponder, linkName, "", "", ld->getOriginalNetworkId(),
+#else
                 transponder = Channels.GetByTransponderID(linkID);
               link = Channels.NewChannel(transponder, linkName, "", "", ld->getOriginalNetworkId(),
+#endif
                 ld->getTransportStreamId(), ld->getServiceId());
             }
             if (link) {
@@ -438,9 +459,10 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
     channel->SetLinkChannels (LinkChannels);
 }
 
-cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid, bool OnlyRunningStatus)
+cEIT2::cEIT2 (cChannels* Channels, cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid, bool OnlyRunningStatus)
 :  SI::EIT (Data, false)
 , OnlyRunningStatus(OnlyRunningStatus)
+, Channels(Channels)
 , Schedules(Schedules)
 , Format(format)
 {
@@ -549,8 +571,15 @@ cEIT2::cEIT2 (cSchedules * Schedules, int Source, u_char Tid, const u_char * Dat
   ////
 
   if (Empty && Tid == 0x4E && getSectionNumber () == 0)
-    // ETR 211: an empty entry in section 0 of table 0x4E means there is currently no event running
-    pSchedule->ClrRunningStatus (channel);
+  // ETR 211: an empty entry in section 0 of table 0x4E means there is currently no event running
+  {
+#if APIVERSNUM >= 20300
+      cChannel *chan = Channels->GetByChannelID(channel->GetChannelID());
+#else
+      cChannel *chan = Channels.GetByChannelID(channel->GetChannelID());
+#endif
+      pSchedule->ClrRunningStatus (chan);
+  }
   if (Tid == 0x4E)
     pSchedule->SetPresentSeen ();
   if (OnlyRunningStatus) {

@@ -24,9 +24,22 @@
 #
 PLUGIN = eepg
 
+# Output control
+ifdef VERBOSE
+Q =
+else
+Q = @
+endif
+export Q
+
 ### The version number of this plugin (taken from the main source file):
 
-VERSION = $(shell grep 'static const char \*VERSION *=' $(PLUGIN).c | awk '{ print $$6 }' | sed -e 's/[";]//g')
+RELEASE := $(shell grep 'static const char \*VERSION *=' $(PLUGIN).c | awk '{ print $$6 }' | sed -e 's/[";]//g')
+SUBREL  := $(shell if test -d .git; then \
+                     echo -n "-git-"; (git rev-parse --short HEAD 2>/dev/null || echo -n "Unknown") | sed -e 's/ .*//'; \
+                   fi)
+VERSION := $(RELEASE)$(SUBREL)
+#VERSION = $(shell grep 'static const char \*VERSION *=' $(PLUGIN).c | awk '{ print $$6 }' | sed -e 's/[";]//g')
 
 ### The directory environment:
 
@@ -47,6 +60,28 @@ export CXXFLAGS = $(call PKGCFG,cxxflags)
 
 APIVERSION = $(call PKGCFG,apiversion)
 
+# backward compatibility with VDR version < 1.7.34
+API1733 := $(shell if [ "$(APIVERSION)" \< "1.7.34" ]; then echo true; fi; )
+
+ifdef API1733
+
+VDRSRC = $(VDRDIR)
+ifeq ($(strip $(VDRSRC)),)
+VDRSRC := ../../..
+endif
+LIBDIR = $(VDRSRC)/PLUGINS/lib
+
+ifndef NOCONFIG
+CXXFLAGS = $(call PKGCFG,cflags)
+CXXFLAGS += -fPIC
+else
+-include $(VDRSRC)/Make.global
+-include $(VDRSRC)/Make.config
+endif
+
+export CXXFLAGS
+endif
+
 ### Allow user defined options to overwrite defaults:
 
 -include $(PLGCFG)
@@ -63,7 +98,9 @@ SOFILE = libvdr-$(PLUGIN).so
 
 ### Includes and Defines (add further entries here):
 
+ifdef API1733
 INCLUDES += -I$(VDRDIR)/include
+endif
 
 DEFINES += -DPLUGIN_NAME_I18N='"$(PLUGIN)"'
 
@@ -73,12 +110,17 @@ OBJS = $(PLUGIN).o dish.o epghandler.o setupeepg.o equivhandler.o util.o eit2.o
 
 ### The main target:
 
-all: $(SOFILE)
+ifdef API1733
+all: libvdr-$(PLUGIN).so i18n
+else
+all: $(SOFILE) i18n
+endif
 
 ### Implicit rules:
 
 %.o: %.c
-	$(CXX) $(CXXFLAGS) -c $(DEFINES) $(INCLUDES) -o $@ $<
+	@echo CC $@
+	$(Q)$(CXX) $(CXXFLAGS) -c $(DEFINES) $(INCLUDES) -o $@ $<
 
 ### Dependencies:
 
@@ -98,17 +140,21 @@ I18Nmsgs  = $(addprefix $(DESTDIR)$(LOCDIR)/, $(addsuffix /LC_MESSAGES/vdr-$(PLU
 I18Npot   = $(PODIR)/$(PLUGIN).pot
 
 %.mo: %.po
-	msgfmt -c -o $@ $<
+	@echo MO $@
+	$(Q)msgfmt -c -o $@ $<
 
 $(I18Npot): $(wildcard *.c)
-	xgettext -C -cTRANSLATORS --no-wrap --no-location -k -ktr -ktrNOOP --package-name=vdr-$(PLUGIN) --package-version=$(VERSION) --msgid-bugs-address='<see README>' -o $@ `ls $^`
+	@echo GT $@
+	$(Q)xgettext -C -cTRANSLATORS --no-wrap --no-location -k -ktr -ktrNOOP --package-name=vdr-$(PLUGIN) --package-version=$(VERSION) --msgid-bugs-address='<see README>' -o $@ `ls $^`
 
 %.po: $(I18Npot)
-	msgmerge -U --no-wrap --no-location --backup=none -q -N $@ $<
+	@echo PO $@
+	$(Q)msgmerge -U --no-wrap --no-location --backup=none -q -N $@ $<
 	@touch $@
 
 $(I18Nmsgs): $(DESTDIR)$(LOCDIR)/%/LC_MESSAGES/vdr-$(PLUGIN).mo: $(PODIR)/%.mo
-	install -D -m644 $< $@
+	@echo IN $@
+	$(Q)install -D -m644 $< $@
 
 .PHONY: i18n
 i18n: $(I18Nmo) $(I18Npot)
@@ -118,7 +164,8 @@ install-i18n: $(I18Nmsgs)
 ### Targets:
 
 $(SOFILE): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -shared $(OBJS) -o $@
+	@echo LD $@
+	$(Q)$(CXX) $(CXXFLAGS) $(LDFLAGS) -shared $(OBJS) -o $@
 
 install-lib: $(SOFILE)
 	install -D $^ $(DESTDIR)$(LIBDIR)/$^.$(APIVERSION)

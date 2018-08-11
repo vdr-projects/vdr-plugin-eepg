@@ -7,16 +7,16 @@ Release 0.0.6pre:
 - Fixed charset 
 - Added viasat support
 - Removed include si.c
-- Changed docodeText2 to use code from vdr which also handles charset override
-- Removed some gotos
+- Changed docodeText2 to use code from VDR which also handles charset override
+- Removed some GOTOs
 - Removed some code duplication
-- Removed some todos
+- Removed some TODOs
 - moved Premiere code in separate method
-- Added setup option to display message after finish of writing epg
+- Added setup option to display message after finish of writing EPG
 - Added Dish Network and Bell ExpressVU support, thanks to the VDR patch, Mrgandalf and VDR User
 - Applied patch to Load Huffman dictionaries only on first use, thanks to Torsten Lang
 - Fixed update of equivalents for Freesat
-- Add category and genere to the description usable with epgsearch
+- Add category and genre to the description usable with epgsearch
 - Added EpgHandler for manipulation of the EPG for VDR > 1.7.26
 - Try to discard very long events that override more than one existing event
 - Equivalents stored in map for all equivalents for better handling
@@ -28,7 +28,21 @@ Release 0.0.6pre:
 - Move cEIT2 in a separate file and try to use it in epghandler also
 - Drop unmanaged NOEPG support, there is a separate plugin for that
 - Drop unmanaged Disable Double EPG entry. EEPG tries to handle this anyway
-- Aditional fixes logged at http://projects.vdr-developer.org/git/vdr-plugin-eepg.git/
+- Added Short Text to events extracted from the extended description for MHW2 and Sky
+- Added option to setup not to set Category and Genre to empty short texts
+- Added po Translation support
+- added Macedonian translation
+- Added functionality to try to fix the charset for some known providers that incorrectly announce charset. 
+  This has to be enabled from setup menu.
+- Updated handling of duplicate events, and implemented for equivalent channels.
+- Dropping already expired events without adding them to the schedule, this reduces cleanups
+- Changed the logic of summary handling for SKY so that no SummaryAvailable bit is required, since it can not be located from the stream
+- Reformatted MHW1 themes
+- Added some new/missing SKY themes
+- Added ability to translate themes. See README/Examples
+- Added support for Freeview HD (DVB-T)
+
+- Additional fixes logged at http://projects.vdr-developer.org/git/vdr-plugin-eepg.git/
 
 Release 0.0.5:
 -changed TableId's so that Now/Next overwrites Nagra which overwrites MHW

@@ -57,6 +57,7 @@ typedef struct {
   unsigned char Unknown2;//FIXME
   unsigned char Unknown3;//FIXME
   unsigned char Rating;
+  unsigned char Quality;
   unsigned short int TableId;
 } Title_t;
 
@@ -70,6 +71,7 @@ typedef struct {
   unsigned int EventId;//short is not sufficient for Nagra
   unsigned short int NumReplays;
   unsigned char * Text;
+  unsigned char ShortTextLength;
 } Summary_t;
 
 
@@ -1207,7 +1209,7 @@ static const char *SkyItThemes[] = {
   "Intrattenimento - Festival", // 001 10001
   "Intrattenimento - Teatro", // 001 10010
   "Intrattenimento - Gioco", // 001 10011
-  NULL, // 001 10100
+  "Intrattenimento - Manga", // 001 10100
   NULL, // 001 10101
   NULL, // 001 10110
   NULL, // 001 10111
@@ -1237,11 +1239,11 @@ static const char *SkyItThemes[] = {
   "Sport - Golf", // 010 01111
   "Sport - Nuoto", // 010 10000
   "Sport - Wrestling", // 010 10001
-  NULL, // 010 10010
-  NULL, // 010 10011
-  NULL, // 010 10100
-  NULL, // 010 10101
-  NULL, // 010 10110
+  "Sport - Pallamano", // 010 10010
+  "Sport - Volley", // 010 10011
+  "Sport - Poker", // 010 10100
+  "Sport - Vela", // 010 10101
+  "Sport - Sport Invernali", // 010 10110
   NULL, // 010 10111
   NULL, // 010 11000
   NULL, // 010 11001
@@ -1269,7 +1271,7 @@ static const char *SkyItThemes[] = {
   "Film - Musicale", // 011 01111
   "Film - Corto", // 011 10000
   "Film - Cortometraggio", // 011 10001
-  NULL, // 011 10010
+  "Film - Erotico", // 011 10010
   NULL, // 011 10011
   NULL, // 011 10100
   NULL, // 011 10101
@@ -1356,19 +1358,19 @@ static const char *SkyItThemes[] = {
   "Ragazzi e Musica - Film", // 110 00110
   "Ragazzi e Musica - Telefilm", // 110 00111
   "Ragazzi e Musica - Magazine", // 110 01000
-  NULL, // 110 01001
+  "Ragazzi e Musica - Giochi", // 110 01001
   NULL, // 110 01010
-  NULL, // 110 01011
+  "Ragazzi e Musica - Musica da Camera", // 110 01011
   NULL, // 110 01100
   NULL, // 110 01101
-  NULL, // 110 01110
+  "Ragazzi e Musica - Classica", // 110 01110
   NULL, // 110 01111
   NULL, // 110 10000
-  NULL, // 110 10001
+  "Ragazzi e Musica - Concerto", // 110 10001
   NULL, // 110 10010
   NULL, // 110 10011
   "Ragazzi e Musica - Danza", // 110 10100
-  NULL, // 110 10101
+  "Ragazzi e Musica - Videoclip", // 110 10101
   NULL, // 110 10110
   NULL, // 110 10111
   NULL, // 110 11000
@@ -1383,7 +1385,7 @@ static const char *SkyItThemes[] = {
   "Altri Programmi - Educational", // 111 00001
   "Altri Programmi - Regionale", // 111 00010
   "Altri Programmi - Shopping", // 111 00011
-  NULL, // 111 00100
+  "Altri Programmi - Altri", // 111 00100
   "Altri Programmi - Inizio e Fine Trasmissioni", // 111 00101
   "Altri Programmi - Eventi Speciali", // 111 00110
   "Altri Programmi - Film per Adulti", // 111 00111
@@ -1446,11 +1448,11 @@ static const char *SkyUkThemes[] = {
   NULL, // 000 11101
   NULL, // 000 11110
   NULL, // 000 11111
-  NULL, // 001 00000
+  "Specialist - Shopping", // 001 00000
   NULL, // 001 00001
   NULL, // 001 00010
   "Shopping", // 001 00011
-  NULL, // 001 00100
+  "Specialist - Gaming", // 001 00100
   NULL, // 001 00101
   NULL, // 001 00110
   NULL, // 001 00111
@@ -1486,8 +1488,8 @@ static const char *SkyUkThemes[] = {
   "Children - Under 5", // 010 00101
   "Children - Factual", // 010 00110
   "Children - Magazine", // 010 00111
-  NULL, // 010 01000
-  NULL, // 010 01001
+  "Children - Games Shows", // 010 01000
+  "Children - Games", // 010 01001
   NULL, // 010 01010
   NULL, // 010 01011
   NULL, // 010 01100
@@ -1516,7 +1518,7 @@ static const char *SkyUkThemes[] = {
   "Entertainment - Detective", // 011 00011
   "Entertainment - Drama", // 011 00100
   "Entertainment - Game Show", // 011 00101
-  "Entertainment - Sci-FI", // 011 00110
+  "Entertainment - Sci-Fi", // 011 00110
   "Entertainment - Soap", // 011 00111
   "Entertainment - Animation", // 011 01000
   "Entertainment - Chat Show", // 011 01001
@@ -1543,7 +1545,7 @@ static const char *SkyUkThemes[] = {
   NULL, // 011 11110
   NULL, // 011 11111
   "Music", // 100 00000
-  "Music - Classical ", // 100 00001
+  "Music - Classical", // 100 00001
   "Music - Folk and Country", // 100 00010
   "Music - National Music", // 100 00011
   "Music - Jazz", // 100 00100
@@ -1555,14 +1557,14 @@ static const char *SkyUkThemes[] = {
   "Music - Hip Hop", // 100 01010
   "Music - Soul/R&B", // 100 01011
   "Music - Dance", // 100 01100
-  NULL, // 100 01101
+  "Music - Ballet", // 100 01101
   NULL, // 100 01110
   NULL, // 100 01111
   "Music - Features", // 100 10000
   NULL, // 100 10001
-  NULL, // 100 10010
+  "Music - Factual", // 100 10010
   NULL, // 100 10011
-  NULL, // 100 10100
+  "Music - Comedy", // 100 10100
   "Music - Lifestyle", // 100 10101
   "Music - News and Weather", // 100 10110
   "Music - Easy Listening", // 100 10111
@@ -1593,11 +1595,11 @@ static const char *SkyUkThemes[] = {
   "News & Documentaries - Transport", // 101 10000
   "News & Documentaries - Docudrama", // 101 10001
   "News & Documentaries - World Affairs", // 101 10010
-  NULL, // 101 10011
-  NULL, // 101 10100
-  NULL, // 101 10101
+  "News & Documentaries - Features", // 101 10011
+  "News & Documentaries - Showbiz", // 101 10100
+  "News & Documentaries - Politics", // 101 10101
   NULL, // 101 10110
-  NULL, // 101 10111
+  "News & Documentaries - World Affairs", // 101 10111
   NULL, // 101 11000
   NULL, // 101 11001
   NULL, // 101 11010
@@ -1625,7 +1627,7 @@ static const char *SkyUkThemes[] = {
   "Movie - Fantasy", // 110 10000
   "Movie - Erotic", // 110 10001
   "Movie - Adventure", // 110 10010
-  NULL, // 110 10011
+  "Movie - War", // 110 10011
   NULL, // 110 10100
   NULL, // 110 10101
   NULL, // 110 10110
@@ -7179,4 +7181,14 @@ typedef struct { //first three bytes form unknown header, then X blocks, where X
 
 #define HILO16( x ) ( ( ( x##High << 8 ) | x##Low ) & 0xffff )
 #define HILO32( x ) ( ( ( ( ( x##High << 24 ) | ( x##MediumHigh << 16 ) ) | ( x##MediumLow << 8 ) ) | x##Low ) & 0xffffffff )
-#define MjdToEpochTime(x) (((x##_hi << 8 | x##_lo)-40587)*86400)
+//#define MjdToEpochTime(x) (((x##_hi << 8 | x##_lo)-40587)*86400)
+inline time_t MjdToEpochTime(u_short mjd, u_char Hour = 0, u_char Minute = 0, u_char Sec = 0) {
+  return ((mjd - 40587) * 86400) + ( ((((Hour & 0xf0) >> 4) * 10) + (Hour & 0x0f)) * 3600 )
+      + (((((Minute & 0xf0) >> 4) * 10) + (Minute & 0x0f)) * 60)
+      + ((((Sec & 0xf0) >> 4) * 10) + (Sec & 0x0f));
+}
+inline time_t MjdToEpochTime(u_char dateHigh, u_char dateLow, u_char Hour = 0, u_char Minute = 0,u_char Sec = 0) {
+  unsigned short mjd = HILO16(date);
+  return MjdToEpochTime(mjd, Hour, Minute, Sec);
+}
+

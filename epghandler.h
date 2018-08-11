@@ -13,12 +13,15 @@
 #include <string>
 
 class cEquivHandler;
+namespace util {
+class cCharsetFixer;
+}
 
 class cEEpgHandler : public cEpgHandler {
 public:
     cEEpgHandler();
     virtual ~cEEpgHandler();
-    virtual bool IgnoreChannel(const cChannel *Channel) { return false; }
+    virtual bool IgnoreChannel(const cChannel *Channel);
     virtual bool HandleEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
     virtual bool SetEventID(cEvent *Event, tEventID EventID);
     virtual bool SetTitle(cEvent *Event, const char *Title);
@@ -29,19 +32,29 @@ public:
     virtual bool SetStartTime(cEvent *Event, time_t StartTime);
     virtual bool SetDuration(cEvent *Event, int Duration);
     virtual bool SetVps(cEvent *Event, time_t Vps);
-    virtual bool FixEpgBugs(cEvent *Event) { return false; }
+    virtual bool FixEpgBugs(cEvent *Event);
     virtual bool HandleEvent(cEvent *Event);
     virtual bool SortSchedule(cSchedule *Schedule);
     virtual bool DropOutdated(cSchedule *Schedule, time_t SegmentStart, time_t SegmentEnd, uchar TableID, uchar Version);
 
 //    bool ParseEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
+private:
+    std::string  ExtractAttribute(const char* attr);
+    void  FindDuplicate(cEvent* Event, const char* newTitle);
+    /*
+     * Extract the date from duplicate event and remove it
+     */
+    void  RemoveEvent(cEvent* ev);
 
 private:
     std::string origShortText;
     std::string origDescription;
     cEquivHandler* equivHandler;
+    util::cCharsetFixer* charsetFixer;
+    cSchedule* schedule;
     static const int _LONG_EVENT_HOURS = 10;
     bool modified;
+  bool searchDuplicates;
 };
 
 #endif /*APIVERSNUM > 10725*/

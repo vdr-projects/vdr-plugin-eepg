@@ -32,6 +32,7 @@ Currently the following EEPG formats are supported:
 * Sky Italy
 * Sky UK
 * Freesat
+* Freeview
 * Premiere
 * NagraGuide (CanaalDigitaalNL, only in test)
 * NA Dish and BEV
@@ -102,6 +103,17 @@ In addition there are two switches in the plugin setup menu to control inclusion
 of order and parental rating information into the event description.
 The plugin setup menu is only for Premiere protocol!
 
+Optionally EEPG can try to fix the charset of providers that send the EPG data with no 
+or incorrect Charset. In order for EEPG to try to fix the charset the option must be 
+selected from the menu.
+This is a workaround fix which does double conversion and depends on
+already know data for providers that send incorrect charset.
+The real solution is for Providers to follow the standards and not to do this in the first place.
+
+The themes of the EPG events can be translated. For MHW a translation file is used, and for OTV the 
+theme file should be translated.
+See example english translation files in: extra/en-themes/*.*
+This files should be placed in eepg plugin config directory.
 
 THANKS
 This code is based on:
@@ -114,6 +126,8 @@ This code is based on:
 Thanks to mrgandalf, and the others who helped map NA eit.
 Thanks to VDR User for testing and providing makequiv.sh script for S72.7W channels.
 Thanks to cheesemonster for providing a patch to fix multipe device problems
+Thanks to Tony Houghton and Stuart Morris for testing Freeview HD
+Thanks to Matthias Feistel for the wrong lock sequence fix
 
 We wish to thank all authors for the great work they have been doing, decoding
 this EEPG data; this plugin tries to combine the best of all worlds.
@@ -130,7 +144,4 @@ information.
 
 KNOWN BUGS
 -Equivalents file is not used for Premiere.
--On Sky Italy and Sky UK, a lot of "summaries not found" are reported. This is 
- because it is not (yet) known where the "summary available" flag is coded in the
- OpenTV protocol used, so all titles are assumed to have a summary available.
 
