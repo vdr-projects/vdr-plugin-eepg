@@ -18,7 +18,7 @@ using namespace util;
 namespace SI
 {
 
-cEvent* cEIT2::ProcessEitEvent(cSchedule* pSchedule,const SI::EIT::Event* EitEvent,
+cEvent* cEIT2::ProcessEitEvent(/*cChannels* Channels, cSchedules * Schedules,*/cSchedule* pSchedule,const SI::EIT::Event* EitEvent,
                                uchar Tid, uchar versionNumber)
 {
   bool ExternalData = false;
@@ -90,7 +90,7 @@ cEvent* cEIT2::ProcessEitEvent(cSchedule* pSchedule,const SI::EIT::Event* EitEve
   pEvent->SetVersion (versionNumber);
 
   ProcessEventDescriptors(ExternalData, channel->Source(), Tid, EitEvent,
-                          pEvent, Schedules, channel->GetChannelID());
+                          pEvent, /*Schedules,*/ channel->GetChannelID());
 
   Modified = true;
   return pEvent;
@@ -98,10 +98,10 @@ cEvent* cEIT2::ProcessEitEvent(cSchedule* pSchedule,const SI::EIT::Event* EitEve
 
 void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
                                     u_char Tid, const SI::EIT::Event* SiEitEvent, cEvent* pEvent,
-                                    cSchedules* Schedules, const tChannelID& channelId)
+                                    /*cChannels* Channels, cSchedules* Schedules,*/ const tChannelID& channelId)
 {
 
-  cEvent *rEvent = NULL;
+  const cEvent *rEvent = NULL;
   int LanguagePreferenceShort = -1;
   int LanguagePreferenceExt = -1;
   unsigned char nDescriptorTag;
@@ -114,14 +114,14 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
   //uchar DishTheme = 0, DishCategory = 0;
 
 
-  cLinkChannels *LinkChannels = NULL;
+  //cLinkChannels *LinkChannels = NULL;
   cComponents *Components = NULL;
 
-#if APIVERSNUM >= 20300
+/*#if APIVERSNUM >= 20300
   cChannel *channel = Channels->GetByChannelID(channelId);
 #else
   cChannel *channel = Channels.GetByChannelID(channelId);
-#endif
+#endif*/
 
   DescriptorLoop dl = SiEitEvent->eventDescriptors;
   for (SI::Loop::Iterator it2; (d = dl.getNext(it2)); )
@@ -232,13 +232,18 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
     }
     break;
     case SI::TimeShiftedEventDescriptorTag: {
+#if APIVERSNUM >= 20300
+      LOCK_SCHEDULES_READ;
+#else
+  //TODO
+#endif
       if (Schedules) {
         SI::TimeShiftedEventDescriptor * tsed = (SI::TimeShiftedEventDescriptor *) d;
-        cSchedule *rSchedule = (cSchedule *) Schedules->GetSchedule(
+        const cSchedule *rSchedule = Schedules->GetSchedule(
           tChannelID(Source, channel->Nid(), channel->Tid(), tsed->getReferenceServiceId()));
         if (!rSchedule)
           break;
-        rEvent = (cEvent *) rSchedule->GetEvent(tsed->getReferenceEventId());
+        rEvent = rSchedule->GetEvent(tsed->getReferenceEventId());
         if (!rEvent)
           break;
         pEvent->SetTitle(rEvent->Title());
@@ -248,7 +253,8 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
     }
     break;
     case SI::LinkageDescriptorTag: {
-      SI::LinkageDescriptor * ld = (SI::LinkageDescriptor *) d;
+    //Leave channel linking to VDR
+/*      SI::LinkageDescriptor * ld = (SI::LinkageDescriptor *) d;
       tChannelID linkID(Source, ld->getOriginalNetworkId(), ld->getTransportStreamId(),
         ld->getServiceId());
       if (ld->getLinkageType() == 0xB0) { // Premiere World
@@ -290,7 +296,7 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
           else
             channel->SetPortalName(linkName);
         }
-      }
+      }*/
     }
     break;
     case SI::ComponentDescriptorTag: {
@@ -455,15 +461,15 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
   if (Format != DISH_BEV)
     pEvent->FixEpgBugs();
 
-  if (LinkChannels)
-    channel->SetLinkChannels (LinkChannels);
+  //if (LinkChannels)
+    //channel->SetLinkChannels (LinkChannels);
 }
 
-cEIT2::cEIT2 (cChannels* Channels, cSchedules * Schedules, int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid, bool OnlyRunningStatus)
+cEIT2::cEIT2 (/*cChannels* Channels, cSchedules * Schedules,*/ int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid, bool OnlyRunningStatus)
 :  SI::EIT (Data, false)
 , OnlyRunningStatus(OnlyRunningStatus)
-, Channels(Channels)
-, Schedules(Schedules)
+//, Channels(Channels)
+//, Schedules(Schedules)
 , Format(format)
 {
 
@@ -486,6 +492,20 @@ cEIT2::cEIT2 (cChannels* Channels, cSchedules * Schedules, int Source, u_char Ti
 
   //LogD(5, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
 
+#if APIVERSNUM >= 20300
+    LOCK_CHANNELS_WRITE;
+    if (!Channels) {
+      LogD(3, prep("Error obtaining channels lock"));
+      return;
+    }
+    LOCK_SCHEDULES_WRITE;
+    if (!Schedules) {
+      LogD(3, prep("Error obtaining schedules lock"));
+      return;
+    }
+#else
+  //TODO
+#endif
   cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (channel, true);
 
   Empty = true;
@@ -602,7 +622,7 @@ cEIT2::cEIT2 (cSchedule * Schedule, EFormat format)
 , OnlyRunningStatus(false)
 , SegmentStart(0)
 , SegmentEnd(0)
-, Schedules(NULL)
+//, Schedules(NULL)
 , Format(format)
 {
   //LogD(2, prep("cEIT2::cEIT2"));

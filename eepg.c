@@ -2917,7 +2917,7 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
 {
   //0x39 Viasat, 0x0300 Dish Network EEPG, 0x0441 Bell ExpressVU EEPG
   LogD(4, prep("Pid: 0x%02x Tid: %d Length: %d"), Pid, Tid, Length);
-#if APIVERSNUM >= 20300
+/*#if APIVERSNUM >= 20300
   LOCK_CHANNELS_WRITE;
   LOCK_SCHEDULES_WRITE;
 //  cStateKey SchedulesStateKey;
@@ -2925,12 +2925,12 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
 #else
   cSchedulesLock SchedulesLock(true, 10);
   cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
-#endif
+#endif*/
   //Look for other satelite positions only if Dish/Bell ExpressVU for the moment hardcoded pid check
-  if(Channels && Schedules)
-    SI::cEIT2 EIT(Channels, Schedules, Source(), Tid, Data, Format, Pid == EIT_PID);
+  //if(Channels && Schedules)
+    SI::cEIT2 EIT(/*Channels, Schedules,*/ Source(), Tid, Data, Format, Pid == EIT_PID);
 
-#if APIVERSNUM < 20300
+#if APIVERSNUM < 20300 //TODO
   else//cEIT EIT (Schedules, Source (), Tid, Data);
   {
     // If we don't get a write lock, let's at least get a read lock, so
