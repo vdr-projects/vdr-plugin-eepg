@@ -18,7 +18,7 @@ using namespace util;
 namespace SI
 {
 
-cEvent* cEIT2::ProcessEitEvent(/*cChannels* Channels, cSchedules * Schedules,*/cSchedule* pSchedule,const SI::EIT::Event* EitEvent,
+cEvent* cEIT2::ProcessEitEvent(cSchedule* pSchedule,const SI::EIT::Event* EitEvent,
                                uchar Tid, uchar versionNumber)
 {
   bool ExternalData = false;
@@ -90,15 +90,14 @@ cEvent* cEIT2::ProcessEitEvent(/*cChannels* Channels, cSchedules * Schedules,*/c
   pEvent->SetVersion (versionNumber);
 
   ProcessEventDescriptors(ExternalData, channel->Source(), Tid, EitEvent,
-                          pEvent, /*Schedules,*/ channel->GetChannelID());
+                          pEvent, channel->GetChannelID());
 
   Modified = true;
   return pEvent;
 }
 
-void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
-                                    u_char Tid, const SI::EIT::Event* SiEitEvent, cEvent* pEvent,
-                                    /*cChannels* Channels, cSchedules* Schedules,*/ const tChannelID& channelId)
+void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source, u_char Tid, 
+		const SI::EIT::Event* SiEitEvent, cEvent* pEvent, const tChannelID& channelId)
 {
 
   const cEvent *rEvent = NULL;
@@ -235,7 +234,8 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
 #if APIVERSNUM >= 20300
       LOCK_SCHEDULES_READ;
 #else
-  //TODO
+      cSchedulesLock SchedulesLock;
+      cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
 #endif
       if (Schedules) {
         SI::TimeShiftedEventDescriptor * tsed = (SI::TimeShiftedEventDescriptor *) d;
@@ -465,11 +465,9 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source,
     //channel->SetLinkChannels (LinkChannels);
 }
 
-cEIT2::cEIT2 (/*cChannels* Channels, cSchedules * Schedules,*/ int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid, bool OnlyRunningStatus)
+cEIT2::cEIT2 (int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid)
 :  SI::EIT (Data, false)
-, OnlyRunningStatus(OnlyRunningStatus)
-//, Channels(Channels)
-//, Schedules(Schedules)
+, OnlyRunningStatus(false)
 , Format(format)
 {
 
@@ -493,18 +491,39 @@ cEIT2::cEIT2 (/*cChannels* Channels, cSchedules * Schedules,*/ int Source, u_cha
   //LogD(5, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
 
 #if APIVERSNUM >= 20300
-    LOCK_CHANNELS_WRITE;
-    if (!Channels) {
-      LogD(3, prep("Error obtaining channels lock"));
-      return;
-    }
-    LOCK_SCHEDULES_WRITE;
-    if (!Schedules) {
-      LogD(3, prep("Error obtaining schedules lock"));
-      return;
-    }
+  LOCK_CHANNELS_WRITE;
+  if (!Channels) {
+     LogD(3, prep("Error obtaining channels lock"));
+     return;
+  }
+  LOCK_SCHEDULES_WRITE;
+  if (!Schedules) {
+     LogD(3, prep("Error obtaining schedules lock"));
+     return;
+  }
 #else
-  //TODO
+  cChannelsLock ChannelsLock(true, 10), ChannelsLockR;
+  cChannels *Channels = (cChannels*)(cChannels::Channels(ChannelsLock));
+  cSchedulesLock SchedulesLock(true, 10), SchedulesLockR;
+  cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
+  if (!Channels) {
+     LogD(3, prep("Error obtaining channels lock"));
+     OnlyRunningStatus = true;
+     cChannels *Channels = (cChannels*)(cChannels::Channels(ChannelsLockR));
+  }
+  if (!Schedules) {
+    // If we don't get a write lock, let's at least get a read lock, so
+    // that we can set the running status and 'seen' timestamp (well, actually
+    // with a read lock we shouldn't be doing that, but it's only integers that
+    // get changed, so it should be ok)
+     LogD(3, prep("Error obtaining schedules lock"));
+     OnlyRunningStatus = true;
+     cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLockR));
+  }
+  if (!Schedules || !Channels) {
+     LogD(3, prep("Error obtaining read lock"));
+     return;
+  }
 #endif
   cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (channel, true);
 
@@ -622,7 +641,6 @@ cEIT2::cEIT2 (cSchedule * Schedule, EFormat format)
 , OnlyRunningStatus(false)
 , SegmentStart(0)
 , SegmentEnd(0)
-//, Schedules(NULL)
 , Format(format)
 {
   //LogD(2, prep("cEIT2::cEIT2"));

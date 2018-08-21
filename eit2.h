@@ -51,18 +51,16 @@ extern bool SystemCharacterTableIsSingleByte;*/
 class cEIT2:public SI::EIT
 {
 public:
-  cEIT2(/*cChannels* Channels, cSchedules * Schedules,*/ int Source, u_char Tid, const u_char * Data,
-        EFormat format, bool isEITPid = false,
-        bool OnlyRunningStatus = false);
+  cEIT2 (int Source, u_char Tid, const u_char * Data, EFormat format, bool isEITPid = false);
   cEIT2 (cSchedule * Schedule, EFormat format);
   //protected:
   //  void updateEquivalent(cSchedules * Schedules, tChannelID channelID, cEvent *pEvent);
-  cEvent* ProcessEitEvent(/*cChannels* Channels, cSchedules * Schedules,*/cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
+  cEvent* ProcessEitEvent(cSchedule *Schedule, const SI::EIT::Event *EitEvent, uchar TableID, uchar Version);
 
 private:
   void ProcessEventDescriptors(bool ExternalData, int Source, u_char Tid,
                                const SI::EIT::Event* SiEitEvent, cEvent* pEvent,
-                               /*cChannels* Channels,cSchedules* Schedules,*/ const tChannelID& channelID);
+                               const tChannelID& channelID);
 
 private:
   bool Empty;
@@ -71,8 +69,6 @@ private:
   bool OnlyRunningStatus;
   time_t SegmentStart;
   time_t SegmentEnd;
-//  cChannels* Channels;
-//  cSchedules* Schedules;
   EFormat Format;
   const cChannel* channel;
 };

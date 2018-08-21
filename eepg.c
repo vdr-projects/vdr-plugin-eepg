@@ -2917,36 +2917,8 @@ void cFilterEEPG::ProccessContinuous(u_short Pid, u_char Tid, int Length, const 
 {
   //0x39 Viasat, 0x0300 Dish Network EEPG, 0x0441 Bell ExpressVU EEPG
   LogD(4, prep("Pid: 0x%02x Tid: %d Length: %d"), Pid, Tid, Length);
-/*#if APIVERSNUM >= 20300
-  LOCK_CHANNELS_WRITE;
-  LOCK_SCHEDULES_WRITE;
-//  cStateKey SchedulesStateKey;
-//  cSchedules *Schedules = cSchedules::GetSchedulesWrite(SchedulesStateKey, 10);
-#else
-  cSchedulesLock SchedulesLock(true, 10);
-  cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
-#endif*/
   //Look for other satelite positions only if Dish/Bell ExpressVU for the moment hardcoded pid check
-  //if(Channels && Schedules)
-    SI::cEIT2 EIT(/*Channels, Schedules,*/ Source(), Tid, Data, Format, Pid == EIT_PID);
-
-#if APIVERSNUM < 20300 //TODO
-  else//cEIT EIT (Schedules, Source (), Tid, Data);
-  {
-    // If we don't get a write lock, let's at least get a read lock, so
-    // that we can set the running status and 'seen' timestamp (well, actually
-    // with a read lock we shouldn't be doing that, but it's only integers that
-    // get changed, so it should be ok)
-    cChannelsLock ChannelsLock;
-    cChannels *Channels = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
-    cSchedulesLock SchedulesLock;
-    cSchedules *Schedules = (cSchedules*)(cSchedules::Schedules(SchedulesLock));
-    if(Channels && Schedules)
-      SI::cEIT2 EIT(Channels, Schedules, Source(), Tid, Data, Format, Pid == EIT_PID, true);
-
-    //cEIT EIT (Schedules, Source (), Tid, Data, true);
-  }
-#endif
+  SI::cEIT2 EIT(Source(), Tid, Data, Format, Pid == EIT_PID);
 }
 
 void cFilterEEPG::Process (u_short Pid, u_char Tid, const u_char * Data, int Length)
