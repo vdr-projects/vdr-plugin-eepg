@@ -491,13 +491,16 @@ cEIT2::cEIT2 (int Source, u_char Tid, const u_char * Data, EFormat format, bool 
   //LogD(5, prep("channelID: %s format:%d"), *channel->GetChannelID().ToString(), Format);
 
 #if APIVERSNUM >= 20300
-  LOCK_CHANNELS_WRITE;
+  cStateKey ChannelsStateKey;
+  cChannels *Channels = cChannels::GetChannelsWrite(ChannelsStateKey, 10);
   if (!Channels) {
      LogD(3, prep("Error obtaining channels lock"));
      return;
   }
-  LOCK_SCHEDULES_WRITE;
+  cStateKey SchedulesStateKey;
+  cSchedules *Schedules = cSchedules::GetSchedulesWrite(SchedulesStateKey, 10);
   if (!Schedules) {
+     ChannelsStateKey.Remove(false);
      LogD(3, prep("Error obtaining schedules lock"));
      return;
   }
@@ -622,6 +625,8 @@ cEIT2::cEIT2 (int Source, u_char Tid, const u_char * Data, EFormat format, bool 
   if (Tid == 0x4E)
     pSchedule->SetPresentSeen ();
   if (OnlyRunningStatus) {
+    SchedulesStateKey.Remove(false);
+    ChannelsStateKey.Remove(false);
     LogD(4, prep("OnlyRunningStatus"));
     return;
   }
@@ -630,6 +635,8 @@ cEIT2::cEIT2 (int Source, u_char Tid, const u_char * Data, EFormat format, bool 
     pSchedule->DropOutdated (SegmentStart, SegmentEnd, Tid, getVersionNumber ());
     sortSchedules(Schedules, channel->GetChannelID());
   }
+  SchedulesStateKey.Remove(Modified);
+  ChannelsStateKey.Remove(Modified);
   LogD(4, prep("end of cEIT2"));
 
 }
