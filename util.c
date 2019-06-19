@@ -403,7 +403,7 @@ char *freesat_huffman_decode (const unsigned char *src, size_t size)
             bit++;
         }
       } else {
-        LogE (0, prep("Missing table %d entry: <%s>"), tableid + 1, uncompressed);
+        //LogE (0, prep("Missing table %d entry: <%s>"), tableid + 1, uncompressed);
         // Entry missing in table.
         return uncompressed;
       }
