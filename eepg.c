@@ -274,7 +274,7 @@ void cFilterEEPG::Trigger (void)
 
 void cFilterEEPG::SetStatus (bool On)
 {
-  LogI(0, prep("setstatus %d\n"), On);
+  // LogI(0, prep("setstatus %d\n"), On);
   if (!On) {
     FreeSummaries ();
     FreeTitles ();
@@ -2779,7 +2779,7 @@ void cFilterEEPG::AddFilter (u_short Pid, u_char Tid)
 {
   if (!Matches (Pid, Tid)) {
     Add (Pid, Tid);
-    esyslog (prep("Filter Pid:0x%x,Tid:0x%x added."), Pid, Tid);
+    //esyslog (prep("Filter Pid:0x%x,Tid:0x%x added."), Pid, Tid);
   }
 }
 
@@ -2787,7 +2787,7 @@ void cFilterEEPG::AddFilter (u_short Pid, u_char Tid, unsigned char Mask)
 {
   if (!Matches (Pid, Tid)) {
     Add (Pid, Tid, Mask);
-    esyslog (prep("Filter Pid:0x%x,Tid:0x%x,Mask:0x%x added."), Pid, Tid, Mask);
+    //esyslog (prep("Filter Pid:0x%x,Tid:0x%x,Mask:0x%x added."), Pid, Tid, Mask);
   }
 }
 
