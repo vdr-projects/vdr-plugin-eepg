@@ -391,7 +391,7 @@ static bool load_freesat_file (int tableid, const char *filename)
 
     while (fgets (buf, sizeof (buf), fp) != NULL) {
       from = binary = to = NULL;
-      int elems = sscanf (buf, "%a[^:]:%a[^:]:%a[^:]:", &from, &binary, &to);
+      int elems = sscanf (buf, "%m[^:]:%m[^:]:%m[^:]:", &from, &binary, &to);
       if (elems == 3) {
         int bin_len = strlen (binary);
         int from_char = resolve_char (from);
