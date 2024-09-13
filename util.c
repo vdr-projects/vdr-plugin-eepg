@@ -214,7 +214,16 @@ void cAddEventThread::Action(void)
       while (((*it).second->First()) != NULL) {
         cEvent* event = (*it).second->First();
 
+#if APIVERSNUM >= 20502
+        cEvent *pEqvEvent;
+        if (event->StartTime() > 0){
+          pEqvEvent = (cEvent *) schedule->GetEventByTime (event->StartTime());
+        } else {
+          pEqvEvent = (cEvent *) schedule->GetEventById (event->EventID());
+        }
+#else
         cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
+#endif
         if (pEqvEvent){
           (*it).second->Del(event);
         } else {

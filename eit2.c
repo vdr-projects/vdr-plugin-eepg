@@ -32,7 +32,11 @@ cEvent* cEIT2::ProcessEitEvent(cSchedule* pSchedule,const SI::EIT::Event* EitEve
   //    int versionNumber = getVersionNumber();
 
   cEvent *newEvent = NULL;
+#if APIVERSNUM >= 20502
+  cEvent *pEvent = (cEvent *) pSchedule->GetEventByTime (EitEvent->getStartTime ());
+#else
   cEvent *pEvent = (cEvent *) pSchedule->GetEvent (EitEvent->getEventId (), EitEvent->getStartTime ());
+#endif
   if (!pEvent) {
     if (OnlyRunningStatus)
       return NULL;
@@ -243,7 +247,11 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source, u_char Tid,
           tChannelID(Source, channel->Nid(), channel->Tid(), tsed->getReferenceServiceId()));
         if (!rSchedule)
           break;
+#if APIVERSNUM >= 20502
+        rEvent = rSchedule->GetEventById(tsed->getReferenceEventId());
+#else
         rEvent = rSchedule->GetEvent(tsed->getReferenceEventId());
+#endif
         if (!rEvent)
           break;
         pEvent->SetTitle(rEvent->Title());

@@ -143,7 +143,16 @@ void cEquivHandler::updateEquivalent(cSchedules * Schedules, tChannelID channelI
     if (equChannel) {
       LogD(2, prep("found Equivalent channel %s"), *equChannelID.ToString());
       cSchedule *pSchedule = (cSchedule *) Schedules->GetSchedule (equChannel, true);
+#if APIVERSNUM >= 20502
+      cEvent *pEqvEvent;
+      if (pEvent->StartTime() > 0){
+        pEqvEvent = (cEvent *) pSchedule->GetEventByTime (pEvent->StartTime());
+      } else {
+        pEqvEvent = (cEvent *) pSchedule->GetEventById (pEvent->EventID());
+      }
+#else
       cEvent *pEqvEvent = (cEvent *) pSchedule->GetEvent (pEvent->EventID(), pEvent->StartTime());
+#endif
       if (pEqvEvent) {
         LogD(3, prep("equivalent event exists"));
         if (pEqvEvent == pEvent) {
