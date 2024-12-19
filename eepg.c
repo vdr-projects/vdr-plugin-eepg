@@ -64,7 +64,7 @@
 #define PMT_SCAN_TIMEOUT  10 // seconds
 #define PMT_SCAN_IDLE     3600 // seconds
 
-static const char *VERSION = "0.0.6pre";
+static const char *VERSION = "0.0.7";
 static const char *DESCRIPTION = trNOOP ("Parses Extended EPG data");
 
 using namespace std;
