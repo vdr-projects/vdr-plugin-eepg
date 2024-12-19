@@ -32,7 +32,7 @@ cEvent* cEIT2::ProcessEitEvent(cSchedule* pSchedule,const SI::EIT::Event* EitEve
   //    int versionNumber = getVersionNumber();
 
   cEvent *newEvent = NULL;
-  cEvent *pEvent = (cEvent *) pSchedule->GetEvent (EitEvent->getEventId (), EitEvent->getStartTime ());
+  cEvent *pEvent = (cEvent *) pSchedule->GetEventByTime (EitEvent->getStartTime ());
   if (!pEvent) {
     if (OnlyRunningStatus)
       return NULL;
@@ -243,7 +243,7 @@ void cEIT2::ProcessEventDescriptors(bool ExternalData, int Source, u_char Tid,
           tChannelID(Source, channel->Nid(), channel->Tid(), tsed->getReferenceServiceId()));
         if (!rSchedule)
           break;
-        rEvent = rSchedule->GetEvent(tsed->getReferenceEventId());
+        rEvent = rSchedule->GetEventById(tsed->getReferenceEventId());
         if (!rEvent)
           break;
         pEvent->SetTitle(rEvent->Title());

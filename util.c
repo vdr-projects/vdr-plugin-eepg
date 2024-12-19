@@ -214,7 +214,7 @@ void cAddEventThread::Action(void)
       while (((*it).second->First()) != NULL) {
         cEvent* event = (*it).second->First();
 
-        cEvent *pEqvEvent = (cEvent *) schedule->GetEvent (event->EventID(), event->StartTime());
+        cEvent *pEqvEvent = (cEvent *) schedule->GetEventByTime (event->StartTime());
         if (pEqvEvent){
           (*it).second->Del(event);
         } else {

@@ -66,10 +66,10 @@ bool cEEpgHandler::HandleEitEvent(cSchedule* Schedule,
   modified = false;
   //VDR creates new event if the EitEvent StartTime is different than EEPG time so
   //the EPG event has to be deleted but the data should be kept
-  const cEvent* ev = schedule->GetEvent(EitEvent->getEventId(),EitEvent->getStartTime());
+  const cEvent* ev = schedule->GetEventByTime(EitEvent->getStartTime());
   searchDuplicates = !ev; //if the event exist with a same start time, it is handled by SetShortText/SetDescription
   if (!ev){
-      ev = schedule->GetEvent(EitEvent->getEventId());
+      ev = schedule->GetEventById(EitEvent->getEventId());
       // remove shifted duplicates with same ID
       if (ev && ((ev->StartTime()>EitEvent->getStartTime() && ev->StartTime() < EitEvent->getStartTime()+EitEvent->getDuration())
           || (EitEvent->getStartTime() > ev->StartTime() && EitEvent->getStartTime() < ev->EndTime()))) {

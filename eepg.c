@@ -1324,12 +1324,12 @@ void cFilterEEPG::WriteToSchedule(tChannelID channelID, cSchedules* pSchedules,
   cEvent *Event = NULL;
   if (ps/*[eq]*/) {
 
-      Event = (cEvent *) ps->GetEvent (EventId); //since Nagra uses consistent EventIds, try this first
+      Event = (cEvent *) ps->GetEventById (EventId); //since Nagra uses consistent EventIds, try this first
       bool TableIdMatches = false;
       if (Event)
         TableIdMatches = (Event->TableID() == TableId);
       if (!Event || !TableIdMatches || abs(Event->StartTime() - (time_t) StartTime) > Duration * 60) //if EventId does not match, or it matched with wrong TableId, then try with StartTime
-        Event = (cEvent *) ps->GetEvent (EventId, StartTime);
+        Event = (cEvent *) ps->GetEventByTime (StartTime);
   }
   cEvent *newEvent = NULL;
   if (!Event) {  //event is new
@@ -3477,7 +3477,7 @@ void cFilterEEPG::ProcessPremiere(const u_char *& Data)
               }
 
               bool newEvent = false;
-              cEvent *pEvent = (cEvent *) pSchedule->GetEvent (EventId, -1);
+              cEvent *pEvent = (cEvent *) pSchedule->GetEventByTime (-1);
               if (!pEvent) {
                 LogI(2, "(new)\n");
                 pEvent = new cEvent (EventId);
